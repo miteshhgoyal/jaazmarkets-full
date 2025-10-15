@@ -2,7 +2,7 @@ import axios from 'axios';
 import { tokenService } from './tokenService';
 
 const api = axios.create({
-    baseURL: import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:8000',
+    baseURL: import.meta.env.VITE_REACT_APP_API_URL || 'https://jaazmarkets-backend.onrender.com',
     headers: {
         'Content-Type': 'application/json',
     },
@@ -81,7 +81,7 @@ api.interceptors.response.use(
 
             try {
                 const response = await axios.post(
-                    `${import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:8000'}/auth/refresh`,
+                    `${import.meta.env.VITE_REACT_APP_API_URL || 'https://jaazmarkets-backend.onrender.com'}/auth/refresh`,
                     { refreshToken },
                     {
                         headers: {
