@@ -83,10 +83,10 @@ const Sidebar = ({ isOpen, onToggle, isCollapsed, toggleCollapsed }) => {
       subItems: [
         { name: "Analyst Views", href: "/analytics/analyst-views" },
         { name: "Market News", href: "/analytics/market-news" },
-        {
-          name: "Economic Calendar",
-          href: "/analytics/economic-calendar",
-        },
+        // {
+        //   name: "Economic Calendar",
+        //   href: "/analytics/economic-calendar",
+        // },
       ],
     },
     // {
@@ -136,7 +136,7 @@ const Sidebar = ({ isOpen, onToggle, isCollapsed, toggleCollapsed }) => {
           fixed left-0 top-16 h-[calc(100vh-4rem)] bg-white border-r border-slate-200 z-50 
           transition-all duration-300 ease-in-out
           ${isOpen ? "translate-x-0" : "-translate-x-full"}
-          ${isCollapsed ? "w-16" : "w-72"}
+          ${isCollapsed ? "w-16" : "w-68"}
           lg:translate-x-0
         `}
       >

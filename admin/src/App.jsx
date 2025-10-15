@@ -93,7 +93,7 @@ const ProtectedDashboardLayout = () => {
         <main
           className={`
             pt-16 min-h-screen transition-all duration-300 ease-in-out
-            ${sidebarCollapsed ? "lg:ml-16" : "lg:ml-72"}
+            ${sidebarCollapsed ? "lg:ml-16" : "lg:ml-60"}
           `}
         >
           <div className="p-3 sm:p-4 md:p-6 lg:p-8">

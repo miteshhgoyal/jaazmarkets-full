@@ -116,7 +116,7 @@ const Sidebar = ({ isOpen, onToggle, isCollapsed, toggleCollapsed }) => {
           fixed left-0 top-16 h-[calc(100vh-4rem)] bg-white border-r border-slate-200 z-50 
           transition-all duration-300 ease-in-out
           ${isOpen ? "translate-x-0" : "-translate-x-full"}
-          ${isCollapsed ? "w-16" : "w-72"}
+          ${isCollapsed ? "w-16" : "w-60"}
           lg:translate-x-0
         `}
       >
