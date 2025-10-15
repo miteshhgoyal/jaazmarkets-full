@@ -82,25 +82,6 @@ const Navbar = ({ toggleSidebar, toggleSidebarCollapse, sidebarCollapsed }) => {
 
         {/* Right Section */}
         <div className="flex items-center gap-2 sm:gap-4">
-          {/* More Options Dropdown */}
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-300"
-            >
-              <MoreHorizontal size={20} />
-            </button>
-
-            {isDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-2 z-50">
-                <button className="flex items-center gap-3 w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                  <Users size={16} />
-                  Partnership
-                </button>
-              </div>
-            )}
-          </div>
-
           {/* User Menu */}
           <div className="relative" ref={userMenuRef}>
             <button
