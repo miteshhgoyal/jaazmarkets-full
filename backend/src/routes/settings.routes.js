@@ -1,6 +1,7 @@
+// routes/admin/settings.routes.js
 import express from 'express';
-import Settings from '../../models/Setting.js';
-import { authenticateToken, authorize } from '../../middlewares/auth.js';
+import Settings from '../models/Setting.js';
+import { authenticateToken, authorize } from '../middlewares/auth.js';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = express.Router();
@@ -90,6 +91,32 @@ router.get('/account-types', async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to fetch account types'
+        });
+    }
+});
+
+// GET SINGLE ACCOUNT TYPE
+router.get('/account-types/:id', async (req, res) => {
+    try {
+        const settings = await getOrCreateSettings();
+        const accountType = settings.accountTypes.find(at => at.id === req.params.id);
+
+        if (!accountType) {
+            return res.status(404).json({
+                success: false,
+                message: 'Account type not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            data: accountType
+        });
+    } catch (error) {
+        console.error('Get account type error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch account type'
         });
     }
 });
