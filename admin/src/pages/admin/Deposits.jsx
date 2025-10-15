@@ -1,7 +1,6 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import MetaHead from "../../components/MetaHead";
 import PageHeader from "../../components/ui/PageHeader";
-import { useData } from "../../hooks/useData";
 import { CSVLink } from "react-csv";
 import {
   Download,
@@ -23,7 +22,12 @@ import {
   Hash,
   Wallet,
   User,
+  Edit2,
+  Trash2,
+  Save,
+  RefreshCw,
 } from "lucide-react";
+import api from "../../services/api";
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
@@ -38,18 +42,16 @@ const STATUS_FILTERS = [
 
 const METHOD_FILTERS = [
   { label: "All Methods", value: "all" },
-  { label: "Bitcoin", value: "btc" },
-  { label: "USDT ERC20", value: "usdt_erc20" },
-  { label: "USDT TRC20", value: "usdt_trc20" },
-  { label: "Ethereum", value: "eth" },
-  { label: "TRON", value: "trx" },
-  { label: "USDC", value: "usdc_erc20" },
+  { label: "Bank Transfer", value: "bank_transfer" },
+  { label: "Crypto", value: "crypto" },
+  { label: "Card", value: "card" },
+  { label: "Wallet", value: "wallet" },
 ];
 
 const Deposits = () => {
-  const { data: users } = useData("users");
-  const { data: accounts } = useData("accounts");
-  const { data: deposits, loading, error } = useData("deposits");
+  const [deposits, setDeposits] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -59,47 +61,53 @@ const Deposits = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [viewModalDeposit, setViewModalDeposit] = useState(null);
+  const [editModalDeposit, setEditModalDeposit] = useState(null);
+  const [deleteConfirmDeposit, setDeleteConfirmDeposit] = useState(null);
 
-  // Get user for deposit
-  const getUserForDeposit = (userId) => {
-    return users.find((user) => user.id === userId);
-  };
+  // Fetch all deposits with populated data
+  useEffect(() => {
+    fetchAllData();
+  }, []);
 
-  // Get account for deposit
-  const getAccountForDeposit = (accountId) => {
-    if (!accounts || typeof accounts !== "object") return null;
-    const allAccounts = [
-      ...(accounts.real || []),
-      ...(accounts.demo || []),
-      ...(accounts.archived || []),
-    ];
-    return allAccounts.find((acc) => acc.id === accountId);
+  const fetchAllData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await api.get("/transactions/admin/deposits?limit=1000");
+      setDeposits(response.data.data || []);
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      setError(err.response?.data?.message || "Failed to fetch data");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Filter and search deposits
   const filteredDeposits = useMemo(() => {
     return deposits.filter((deposit) => {
-      const user = getUserForDeposit(deposit.userId);
+      const user = deposit.userId;
 
       const searchLower = searchQuery.toLowerCase();
       const matchesSearch =
         !searchQuery ||
-        deposit.id.toLowerCase().includes(searchLower) ||
-        deposit.transactionHash?.toLowerCase().includes(searchLower) ||
-        deposit.methodName.toLowerCase().includes(searchLower) ||
+        (deposit._id || deposit.id || "").toLowerCase().includes(searchLower) ||
+        deposit.transactionId?.toLowerCase().includes(searchLower) ||
+        deposit.paymentMethod?.toLowerCase().includes(searchLower) ||
         (user &&
-          (user.firstName.toLowerCase().includes(searchLower) ||
-            user.lastName.toLowerCase().includes(searchLower) ||
-            user.email.toLowerCase().includes(searchLower)));
+          (user.firstName?.toLowerCase().includes(searchLower) ||
+            user.lastName?.toLowerCase().includes(searchLower) ||
+            user.email?.toLowerCase().includes(searchLower)));
 
       const matchesStatus =
         statusFilter === "all" || deposit.status === statusFilter;
       const matchesMethod =
-        methodFilter === "all" || deposit.method === methodFilter;
+        methodFilter === "all" || deposit.paymentMethod === methodFilter;
 
       return matchesSearch && matchesStatus && matchesMethod;
     });
-  }, [deposits, searchQuery, statusFilter, methodFilter, users]);
+  }, [deposits, searchQuery, statusFilter, methodFilter]);
 
   // Sort deposits
   const sortedDeposits = useMemo(() => {
@@ -114,7 +122,7 @@ const Deposits = () => {
         bValue = new Date(bValue || 0).getTime();
       }
 
-      if (sortField === "amount" || sortField === "netAmount") {
+      if (sortField === "amount") {
         aValue = parseFloat(aValue) || 0;
         bValue = parseFloat(bValue) || 0;
       }
@@ -139,7 +147,7 @@ const Deposits = () => {
   const endIndex = startIndex + itemsPerPage;
   const paginatedDeposits = sortedDeposits.slice(startIndex, endIndex);
 
-  useMemo(() => {
+  useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, statusFilter, methodFilter, itemsPerPage]);
 
@@ -161,7 +169,7 @@ const Deposits = () => {
   const stats = useMemo(() => {
     const completed = deposits.filter((d) => d.status === "completed");
     const totalDeposited = completed.reduce(
-      (sum, d) => sum + parseFloat(d.amount),
+      (sum, d) => sum + parseFloat(d.amount || 0),
       0
     );
     const pending = deposits.filter(
@@ -176,15 +184,28 @@ const Deposits = () => {
     };
   }, [deposits]);
 
+  // Handle Delete Deposit
+  const handleDeleteDeposit = async (depositId) => {
+    try {
+      await api.delete(`/transactions/admin/deposits/${depositId}`);
+      setDeposits(deposits.filter((d) => (d._id || d.id) !== depositId));
+      setDeleteConfirmDeposit(null);
+      alert("Deposit deleted successfully");
+    } catch (err) {
+      console.error("Error deleting deposit:", err);
+      alert(err.response?.data?.message || "Failed to delete deposit");
+    }
+  };
+
   const csvHeaders = [
-    { label: "Deposit ID", key: "id" },
+    { label: "Transaction ID", key: "transactionId" },
+    { label: "User", key: "userId.firstName" },
+    { label: "Email", key: "userId.email" },
     { label: "Amount", key: "amount" },
     { label: "Currency", key: "currency" },
-    { label: "Method", key: "methodName" },
+    { label: "Method", key: "paymentMethod" },
     { label: "Status", key: "status" },
-    { label: "Transaction Hash", key: "transactionHash" },
     { label: "Created At", key: "createdAt" },
-    { label: "Completed At", key: "completedAt" },
   ];
 
   if (loading) {
@@ -200,7 +221,10 @@ const Deposits = () => {
           subtitle="View and manage all deposit transactions"
         />
         <div className="flex justify-center items-center mt-20">
-          <div className="animate-pulse text-gray-600">Loading deposits...</div>
+          <div className="flex items-center gap-3">
+            <RefreshCw className="w-6 h-6 animate-spin text-blue-600" />
+            <span className="text-gray-600">Loading deposits...</span>
+          </div>
         </div>
       </>
     );
@@ -218,8 +242,17 @@ const Deposits = () => {
           title="Deposit Transactions"
           subtitle="View and manage all deposit transactions"
         />
-        <div className="flex justify-center items-center mt-20">
-          <p className="text-red-600">Error loading deposits: {error}</p>
+        <div className="flex flex-col justify-center items-center mt-20 gap-4">
+          <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+            <p className="text-red-600">Error loading deposits: {error}</p>
+          </div>
+          <button
+            onClick={fetchAllData}
+            className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Retry
+          </button>
         </div>
       </>
     );
@@ -311,7 +344,7 @@ const Deposits = () => {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by deposit ID, transaction hash, method, or user..."
+            placeholder="Search by transaction ID, payment method, or user..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white"
@@ -345,6 +378,14 @@ const Deposits = () => {
               </option>
             ))}
           </select>
+
+          <button
+            onClick={fetchAllData}
+            className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </button>
         </div>
 
         <CSVLink
@@ -383,12 +424,12 @@ const Deposits = () => {
                   <tr>
                     <th
                       className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort("id")}
+                      onClick={() => handleSort("transactionId")}
                     >
                       <div className="flex items-center gap-1">
-                        Deposit ID
+                        Transaction ID
                         <SortIcon
-                          field="id"
+                          field="transactionId"
                           sortField={sortField}
                           sortDirection={sortDirection}
                         />
@@ -411,10 +452,10 @@ const Deposits = () => {
                       </div>
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Method
+                      Account
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Transaction Hash
+                      Method
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
@@ -439,21 +480,23 @@ const Deposits = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {paginatedDeposits.map((deposit) => {
-                    const user = getUserForDeposit(deposit.userId);
-                    const account = getAccountForDeposit(deposit.accountId);
+                    const user = deposit.userId;
+                    const account = deposit.tradingAccountId;
+                    const depositId = deposit._id || deposit.id;
+
                     return (
-                      <tr key={deposit.id} className="hover:bg-gray-50">
+                      <tr key={depositId} className="hover:bg-gray-50">
                         <td className="px-4 py-3 whitespace-nowrap">
                           <p className="text-sm font-mono font-medium text-gray-900">
-                            {deposit.id}
+                            {deposit.transactionId}
                           </p>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           {user ? (
                             <div className="flex items-center gap-2">
                               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold text-xs">
-                                {user.firstName.charAt(0)}
-                                {user.lastName.charAt(0)}
+                                {user.firstName?.charAt(0) || ""}
+                                {user.lastName?.charAt(0) || ""}
                               </div>
                               <div>
                                 <p className="text-sm font-medium text-gray-900">
@@ -473,7 +516,7 @@ const Deposits = () => {
                         <td className="px-4 py-3 whitespace-nowrap">
                           <div>
                             <p className="text-sm font-semibold text-gray-900">
-                              ${parseFloat(deposit.amount).toFixed(2)}
+                              ${parseFloat(deposit.amount || 0).toFixed(2)}
                             </p>
                             <p className="text-xs text-gray-500">
                               {deposit.currency}
@@ -481,14 +524,23 @@ const Deposits = () => {
                           </div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="text-sm text-gray-700">
-                            {deposit.methodName}
-                          </span>
+                          {account ? (
+                            <div>
+                              <p className="text-sm font-mono font-medium text-gray-900">
+                                {account.accountNumber}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {account.platform} • {account.accountClass}
+                              </p>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400">N/A</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <p className="text-xs font-mono text-gray-600 max-w-[150px] truncate">
-                            {deposit.transactionHash || "N/A"}
-                          </p>
+                          <span className="text-sm text-gray-700 capitalize">
+                            {deposit.paymentMethod?.replace("_", " ") || "N/A"}
+                          </span>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <StatusBadge status={deposit.status} />
@@ -497,15 +549,29 @@ const Deposits = () => {
                           {new Date(deposit.createdAt).toLocaleString()}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <button
-                            onClick={() =>
-                              setViewModalDeposit({ ...deposit, user, account })
-                            }
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="View Details"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => setViewModalDeposit(deposit)}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="View Details"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setEditModalDeposit(deposit)}
+                              className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                              title="Edit Deposit"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirmDeposit(depositId)}
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete Deposit"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -536,6 +602,33 @@ const Deposits = () => {
           onClose={() => setViewModalDeposit(null)}
         />
       )}
+
+      {/* Edit Modal */}
+      {editModalDeposit && (
+        <EditDepositModal
+          deposit={editModalDeposit}
+          onClose={() => setEditModalDeposit(null)}
+          onUpdate={(updatedDeposit) => {
+            setDeposits(
+              deposits.map((d) =>
+                (d._id || d.id) === (updatedDeposit._id || updatedDeposit.id)
+                  ? updatedDeposit
+                  : d
+              )
+            );
+            setEditModalDeposit(null);
+          }}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmDeposit && (
+        <DeleteConfirmModal
+          depositId={deleteConfirmDeposit}
+          onConfirm={handleDeleteDeposit}
+          onCancel={() => setDeleteConfirmDeposit(null)}
+        />
+      )}
     </>
   );
 };
@@ -562,7 +655,7 @@ const StatusBadge = ({ status }) => {
   };
   return (
     <span
-      className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+      className={`inline-flex px-2 py-1 text-xs font-medium rounded-full capitalize ${
         styles[status] || styles.pending
       }`}
     >
@@ -654,6 +747,10 @@ const ViewDepositModal = ({ deposit, onClose }) => {
     });
   };
 
+  const user = deposit.userId;
+  const account = deposit.tradingAccountId;
+  const processedBy = deposit.processedBy;
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
@@ -671,7 +768,7 @@ const ViewDepositModal = ({ deposit, onClose }) => {
 
         <div className="p-6 space-y-6">
           {/* User Information */}
-          {deposit.user && (
+          {user && (
             <div>
               <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide flex items-center gap-2">
                 <User className="w-4 h-4" />
@@ -679,17 +776,24 @@ const ViewDepositModal = ({ deposit, onClose }) => {
               </h3>
               <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold">
-                  {deposit.user.firstName.charAt(0)}
-                  {deposit.user.lastName.charAt(0)}
+                  {user.firstName?.charAt(0)}
+                  {user.lastName?.charAt(0)}
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-900">
-                    {deposit.user.firstName} {deposit.user.lastName}
+                    {user.firstName} {user.lastName}
                   </p>
-                  <p className="text-xs text-gray-500">{deposit.user.email}</p>
-                  <p className="text-xs text-gray-500">
-                    {deposit.user.phoneNumber}
-                  </p>
+                  <p className="text-xs text-gray-500">{user.email}</p>
+                  {user.phoneNumber && (
+                    <p className="text-xs text-gray-500">{user.phoneNumber}</p>
+                  )}
+                  {user.country && (
+                    <p className="text-xs text-gray-500">
+                      <span className="inline-flex items-center gap-1">
+                        📍 {user.country}
+                      </span>
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -704,10 +808,10 @@ const ViewDepositModal = ({ deposit, onClose }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs text-gray-500 uppercase tracking-wide">
-                  Deposit ID
+                  Transaction ID
                 </label>
-                <p className="text-sm font-medium text-gray-900 mt-1">
-                  {deposit.id}
+                <p className="text-sm font-medium text-gray-900 mt-1 font-mono">
+                  {deposit.transactionId}
                 </p>
               </div>
               <div>
@@ -723,93 +827,106 @@ const ViewDepositModal = ({ deposit, onClose }) => {
                   Amount
                 </label>
                 <p className="text-sm font-semibold text-gray-900 mt-1">
-                  ${parseFloat(deposit.amount).toFixed(2)} {deposit.currency}
+                  ${parseFloat(deposit.amount || 0).toFixed(2)}{" "}
+                  {deposit.currency}
                 </p>
               </div>
               <div>
                 <label className="text-xs text-gray-500 uppercase tracking-wide">
-                  Net Amount
-                </label>
-                <p className="text-sm font-semibold text-gray-900 mt-1">
-                  ${parseFloat(deposit.netAmount).toFixed(2)} {deposit.currency}
-                </p>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 uppercase tracking-wide">
-                  Fee
-                </label>
-                <p className="text-sm font-medium text-gray-900 mt-1">
-                  ${parseFloat(deposit.fee).toFixed(2)}
-                </p>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 uppercase tracking-wide">
-                  Method
-                </label>
-                <p className="text-sm font-medium text-gray-900 mt-1">
-                  {deposit.methodName}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Transaction Details */}
-          <div className="border-t border-gray-200 pt-6">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide flex items-center gap-2">
-              <Hash className="w-4 h-4" />
-              Transaction Details
-            </h3>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs text-gray-500 uppercase tracking-wide">
-                  Transaction Hash
-                </label>
-                <p className="text-sm font-mono text-gray-900 mt-1 break-all">
-                  {deposit.transactionHash || "N/A"}
-                </p>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 uppercase tracking-wide">
-                  Wallet Address
-                </label>
-                <p className="text-sm font-mono text-gray-900 mt-1 break-all">
-                  {deposit.walletAddress}
-                </p>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 uppercase tracking-wide">
-                  Wallet Type
+                  Payment Method
                 </label>
                 <p className="text-sm font-medium text-gray-900 mt-1 capitalize">
-                  {deposit.walletType?.replace("_", " ") || "N/A"}
+                  {deposit.paymentMethod?.replace("_", " ")}
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Account Information */}
-          {deposit.account && (
+          {/* Trading Account */}
+          {account && (
             <div className="border-t border-gray-200 pt-6">
               <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide flex items-center gap-2">
                 <Wallet className="w-4 h-4" />
                 Trading Account
               </h3>
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-700">
-                  <span className="font-medium">Account:</span> #
-                  {deposit.account.login}
-                </p>
-                <p className="text-sm text-gray-700 mt-1">
-                  <span className="font-medium">Platform:</span>{" "}
-                  {deposit.account.platform}
-                </p>
-                <p className="text-sm text-gray-700 mt-1">
-                  <span className="font-medium">Type:</span>{" "}
-                  {deposit.account.accountType}
-                </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-gray-500 uppercase tracking-wide">
+                    Account Number
+                  </label>
+                  <p className="text-sm font-mono font-medium text-gray-900 mt-1">
+                    {account.accountNumber}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 uppercase tracking-wide">
+                    Login
+                  </label>
+                  <p className="text-sm font-mono font-medium text-gray-900 mt-1">
+                    {account.login}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 uppercase tracking-wide">
+                    Platform
+                  </label>
+                  <p className="text-sm font-medium text-gray-900 mt-1">
+                    {account.platform}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 uppercase tracking-wide">
+                    Account Type
+                  </label>
+                  <p className="text-sm font-medium text-gray-900 mt-1">
+                    {account.accountType} • {account.accountClass}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 uppercase tracking-wide">
+                    Balance
+                  </label>
+                  <p className="text-sm font-semibold text-gray-900 mt-1">
+                    ${parseFloat(account.balance || 0).toFixed(2)}{" "}
+                    {account.currency}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 uppercase tracking-wide">
+                    Status
+                  </label>
+                  <div className="mt-1">
+                    <StatusBadge status={account.status} />
+                  </div>
+                </div>
               </div>
             </div>
           )}
+
+          {/* Payment Details */}
+          {deposit.paymentDetails &&
+            Object.keys(deposit.paymentDetails).length > 0 && (
+              <div className="border-t border-gray-200 pt-6">
+                <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide flex items-center gap-2">
+                  <Hash className="w-4 h-4" />
+                  Payment Details
+                </h3>
+                <div className="space-y-3">
+                  {Object.entries(deposit.paymentDetails)
+                    .filter(([_, value]) => value)
+                    .map(([key, value]) => (
+                      <div key={key}>
+                        <label className="text-xs text-gray-500 uppercase tracking-wide">
+                          {key.replace(/([A-Z])/g, " $1").trim()}
+                        </label>
+                        <p className="text-sm font-mono text-gray-900 mt-1 break-all">
+                          {value}
+                        </p>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
 
           {/* Timestamps */}
           <div className="border-t border-gray-200 pt-6">
@@ -826,6 +943,16 @@ const ViewDepositModal = ({ deposit, onClose }) => {
                   {formatDate(deposit.createdAt)}
                 </p>
               </div>
+              {deposit.processedAt && (
+                <div>
+                  <label className="text-xs text-gray-500 uppercase tracking-wide">
+                    Processed At
+                  </label>
+                  <p className="text-sm font-medium text-gray-900 mt-1">
+                    {formatDate(deposit.processedAt)}
+                  </p>
+                </div>
+              )}
               {deposit.completedAt && (
                 <div>
                   <label className="text-xs text-gray-500 uppercase tracking-wide">
@@ -836,16 +963,45 @@ const ViewDepositModal = ({ deposit, onClose }) => {
                   </p>
                 </div>
               )}
+              {processedBy && (
+                <div>
+                  <label className="text-xs text-gray-500 uppercase tracking-wide">
+                    Processed By
+                  </label>
+                  <p className="text-sm font-medium text-gray-900 mt-1">
+                    {processedBy.firstName} {processedBy.lastName}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Notes */}
-          {deposit.notes && (
+          {(deposit.adminNotes || deposit.userNotes) && (
             <div className="border-t border-gray-200 pt-6">
               <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide">
                 Notes
               </h3>
-              <p className="text-sm text-gray-700">{deposit.notes}</p>
+              {deposit.userNotes && (
+                <div className="mb-3">
+                  <label className="text-xs text-gray-500 uppercase tracking-wide">
+                    User Notes
+                  </label>
+                  <p className="text-sm text-gray-700 mt-1 p-3 bg-gray-50 rounded-lg">
+                    {deposit.userNotes}
+                  </p>
+                </div>
+              )}
+              {deposit.adminNotes && (
+                <div>
+                  <label className="text-xs text-gray-500 uppercase tracking-wide">
+                    Admin Notes
+                  </label>
+                  <p className="text-sm text-gray-700 mt-1 p-3 bg-blue-50 rounded-lg">
+                    {deposit.adminNotes}
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -856,6 +1012,208 @@ const ViewDepositModal = ({ deposit, onClose }) => {
             className="w-full px-4 py-2 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-colors font-medium"
           >
             Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Edit Deposit Modal
+const EditDepositModal = ({ deposit, onClose, onUpdate }) => {
+  const [formData, setFormData] = useState({
+    status: deposit.status || "pending",
+    amount: deposit.amount || 0,
+    currency: deposit.currency || "USD",
+    adminNotes: deposit.adminNotes || "",
+  });
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const depositId = deposit._id || deposit.id;
+
+      // Update deposit status and admin notes
+      const statusRes = await api.patch(
+        `/transactions/admin/deposits/${depositId}/status`,
+        {
+          status: formData.status,
+          adminNotes: formData.adminNotes,
+        }
+      );
+
+      // If amount or currency changed, make additional update
+      if (
+        formData.amount !== deposit.amount ||
+        formData.currency !== deposit.currency
+      ) {
+        await api.patch(`/transactions/admin/deposits/${depositId}`, {
+          amount: formData.amount,
+          currency: formData.currency,
+        });
+      }
+
+      alert("Deposit updated successfully");
+
+      // Re-populate the data
+      const updatedRes = await api.get(
+        "/transactions/admin/deposits?limit=1000"
+      );
+      const updatedDeposit = updatedRes.data.data.find(
+        (d) => (d._id || d.id) === depositId
+      );
+
+      onUpdate(updatedDeposit || statusRes.data.data);
+    } catch (err) {
+      console.error("Error updating deposit:", err);
+      alert(err.response?.data?.message || "Failed to update deposit");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-gray-900">Edit Deposit</h2>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Status
+            </label>
+            <select
+              value={formData.status}
+              onChange={(e) =>
+                setFormData({ ...formData, status: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              required
+            >
+              <option value="pending">Pending</option>
+              <option value="processing">Processing</option>
+              <option value="completed">Completed</option>
+              <option value="failed">Failed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Amount
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={formData.amount}
+              onChange={(e) =>
+                setFormData({ ...formData, amount: parseFloat(e.target.value) })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Currency
+            </label>
+            <select
+              value={formData.currency}
+              onChange={(e) =>
+                setFormData({ ...formData, currency: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              required
+            >
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
+              <option value="JPY">JPY</option>
+              <option value="AUD">AUD</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Admin Notes
+            </label>
+            <textarea
+              value={formData.adminNotes}
+              onChange={(e) =>
+                setFormData({ ...formData, adminNotes: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              rows="4"
+              placeholder="Add any admin notes here..."
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <Save className="w-4 h-4" />
+              {loading ? "Saving..." : "Save Changes"}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-colors font-medium"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Delete Confirmation Modal
+const DeleteConfirmModal = ({ depositId, onConfirm, onCancel }) => {
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl max-w-md w-full p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-3 bg-red-100 rounded-full">
+            <Trash2 className="w-6 h-6 text-red-600" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900">
+            Delete Deposit
+          </h2>
+        </div>
+
+        <p className="text-gray-600 mb-6">
+          Are you sure you want to delete this deposit? This action cannot be
+          undone and will refund the amount if the deposit was completed.
+        </p>
+
+        <div className="flex gap-3">
+          <button
+            onClick={() => onConfirm(depositId)}
+            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors font-medium"
+          >
+            Delete
+          </button>
+          <button
+            onClick={onCancel}
+            className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-colors font-medium"
+          >
+            Cancel
           </button>
         </div>
       </div>

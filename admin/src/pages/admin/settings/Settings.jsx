@@ -21,6 +21,7 @@ import {
   Globe,
   Clock,
 } from "lucide-react";
+import api from "../../../services/api";
 
 const WalletSettings = () => {
   const [activeTab, setActiveTab] = useState("payment-methods");
@@ -143,13 +144,13 @@ const WalletSettings = () => {
   return (
     <>
       <MetaHead
-        title="Wallet Settings"
+        title="Settings"
         description="Configure wallet and payment settings"
-        keywords="wallet settings, payment methods, transaction limits"
+        keywords="Settings, payment methods, transaction limits"
       />
 
       <PageHeader
-        title="Wallet Settings"
+        title="Settings"
         subtitle="Configure payment methods, wallet addresses, and transaction settings"
       />
 
@@ -734,8 +735,8 @@ const WalletSettings = () => {
               Important Information
             </p>
             <p className="text-sm text-blue-700 mt-1">
-              Changes to wallet settings will affect all users immediately. Make
-              sure to test changes in a staging environment before applying to
+              Changes to Settings will affect all users immediately. Make sure
+              to test changes in a staging environment before applying to
               production.
             </p>
           </div>

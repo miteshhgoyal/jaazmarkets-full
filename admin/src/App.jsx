@@ -26,7 +26,7 @@ import Users from "./pages/admin/Users";
 import Accounts from "./pages/admin/Accounts";
 import Withdrawals from "./pages/admin/Withdrawals";
 import Deposits from "./pages/admin/Deposits";
-import WalletSettings from "./pages/admin/settings/WalletSettings";
+import Settings from "./pages/admin/settings/Settings";
 import AccountTypes from "./pages/admin/AccountTypes";
 
 const DefaultRoute = () => {
@@ -163,10 +163,7 @@ function App() {
               <Route path="/admin/accounts" element={<Accounts />} />
               <Route path="/admin/withdrawals" element={<Withdrawals />} />
               <Route path="/admin/deposits" element={<Deposits />} />
-              <Route
-                path="/admin/settings/wallet"
-                element={<WalletSettings />}
-              />
+              <Route path="/admin/settings" element={<Settings />} />
             </Route>
 
             {/* Default redirects */}

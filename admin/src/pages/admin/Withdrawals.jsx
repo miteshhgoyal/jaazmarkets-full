@@ -1,7 +1,6 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import MetaHead from "../../components/MetaHead";
 import PageHeader from "../../components/ui/PageHeader";
-import { useData } from "../../hooks/useData";
 import { CSVLink } from "react-csv";
 import {
   Download,
@@ -24,7 +23,12 @@ import {
   Wallet,
   User,
   ArrowDownCircle,
+  Edit2,
+  Trash2,
+  Save,
+  RefreshCw,
 } from "lucide-react";
+import api from "../../services/api";
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
@@ -33,25 +37,21 @@ const STATUS_FILTERS = [
   { label: "Completed", value: "completed" },
   { label: "Processing", value: "processing" },
   { label: "Pending", value: "pending" },
-  { label: "Failed", value: "failed" },
+  { label: "Rejected", value: "rejected" },
   { label: "Cancelled", value: "cancelled" },
 ];
 
 const METHOD_FILTERS = [
   { label: "All Methods", value: "all" },
   { label: "Bank Transfer", value: "bank_transfer" },
-  { label: "Bitcoin", value: "btc" },
-  { label: "USDT ERC20", value: "usdt_erc20" },
-  { label: "USDT TRC20", value: "usdt_trc20" },
-  { label: "Ethereum", value: "eth" },
-  { label: "TRON", value: "trx" },
-  { label: "USDC", value: "usdc_erc20" },
+  { label: "Crypto", value: "crypto" },
+  { label: "Wallet", value: "wallet" },
 ];
 
 const Withdrawals = () => {
-  const { data: users } = useData("users");
-  const { data: accounts } = useData("accounts");
-  const { data: withdrawals, loading, error } = useData("withdrawals");
+  const [withdrawals, setWithdrawals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -61,48 +61,60 @@ const Withdrawals = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [viewModalWithdrawal, setViewModalWithdrawal] = useState(null);
+  const [editModalWithdrawal, setEditModalWithdrawal] = useState(null);
+  const [deleteConfirmWithdrawal, setDeleteConfirmWithdrawal] = useState(null);
 
-  // Get user for withdrawal
-  const getUserForWithdrawal = (userId) => {
-    return users.find((user) => user.id === userId);
-  };
+  // Fetch all withdrawals with populated data
+  useEffect(() => {
+    fetchAllData();
+  }, []);
 
-  // Get account for withdrawal
-  const getAccountForWithdrawal = (accountId) => {
-    if (!accounts || typeof accounts !== "object") return null;
-    const allAccounts = [
-      ...(accounts.real || []),
-      ...(accounts.demo || []),
-      ...(accounts.archived || []),
-    ];
-    return allAccounts.find((acc) => acc.id === accountId);
+  const fetchAllData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await api.get(
+        "/transactions/admin/withdrawals?limit=1000"
+      );
+      setWithdrawals(response.data.data || []);
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      setError(err.response?.data?.message || "Failed to fetch data");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Filter and search withdrawals
   const filteredWithdrawals = useMemo(() => {
     return withdrawals.filter((withdrawal) => {
-      const user = getUserForWithdrawal(withdrawal.userId);
+      const user = withdrawal.userId;
 
       const searchLower = searchQuery.toLowerCase();
       const matchesSearch =
         !searchQuery ||
-        withdrawal.id.toLowerCase().includes(searchLower) ||
-        withdrawal.transactionHash?.toLowerCase().includes(searchLower) ||
-        withdrawal.methodName.toLowerCase().includes(searchLower) ||
-        withdrawal.destinationAddress?.toLowerCase().includes(searchLower) ||
+        (withdrawal._id || withdrawal.id || "")
+          .toLowerCase()
+          .includes(searchLower) ||
+        withdrawal.transactionId?.toLowerCase().includes(searchLower) ||
+        withdrawal.withdrawalMethod?.toLowerCase().includes(searchLower) ||
+        withdrawal.withdrawalDetails?.walletAddress
+          ?.toLowerCase()
+          .includes(searchLower) ||
         (user &&
-          (user.firstName.toLowerCase().includes(searchLower) ||
-            user.lastName.toLowerCase().includes(searchLower) ||
-            user.email.toLowerCase().includes(searchLower)));
+          (user.firstName?.toLowerCase().includes(searchLower) ||
+            user.lastName?.toLowerCase().includes(searchLower) ||
+            user.email?.toLowerCase().includes(searchLower)));
 
       const matchesStatus =
         statusFilter === "all" || withdrawal.status === statusFilter;
       const matchesMethod =
-        methodFilter === "all" || withdrawal.method === methodFilter;
+        methodFilter === "all" || withdrawal.withdrawalMethod === methodFilter;
 
       return matchesSearch && matchesStatus && matchesMethod;
     });
-  }, [withdrawals, searchQuery, statusFilter, methodFilter, users]);
+  }, [withdrawals, searchQuery, statusFilter, methodFilter]);
 
   // Sort withdrawals
   const sortedWithdrawals = useMemo(() => {
@@ -142,7 +154,7 @@ const Withdrawals = () => {
   const endIndex = startIndex + itemsPerPage;
   const paginatedWithdrawals = sortedWithdrawals.slice(startIndex, endIndex);
 
-  useMemo(() => {
+  useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, statusFilter, methodFilter, itemsPerPage]);
 
@@ -164,7 +176,7 @@ const Withdrawals = () => {
   const stats = useMemo(() => {
     const completed = withdrawals.filter((w) => w.status === "completed");
     const totalWithdrawn = completed.reduce(
-      (sum, w) => sum + parseFloat(w.amount),
+      (sum, w) => sum + parseFloat(w.amount || 0),
       0
     );
     const pending = withdrawals.filter(
@@ -179,16 +191,32 @@ const Withdrawals = () => {
     };
   }, [withdrawals]);
 
+  // Handle Delete Withdrawal
+  const handleDeleteWithdrawal = async (withdrawalId) => {
+    try {
+      await api.delete(`/transactions/admin/withdrawals/${withdrawalId}`);
+      setWithdrawals(
+        withdrawals.filter((w) => (w._id || w.id) !== withdrawalId)
+      );
+      setDeleteConfirmWithdrawal(null);
+      alert("Withdrawal deleted successfully");
+    } catch (err) {
+      console.error("Error deleting withdrawal:", err);
+      alert(err.response?.data?.message || "Failed to delete withdrawal");
+    }
+  };
+
   const csvHeaders = [
-    { label: "Withdrawal ID", key: "id" },
+    { label: "Transaction ID", key: "transactionId" },
+    { label: "User", key: "userId.firstName" },
+    { label: "Email", key: "userId.email" },
     { label: "Amount", key: "amount" },
+    { label: "Fee", key: "fee" },
+    { label: "Net Amount", key: "netAmount" },
     { label: "Currency", key: "currency" },
-    { label: "Method", key: "methodName" },
+    { label: "Method", key: "withdrawalMethod" },
     { label: "Status", key: "status" },
-    { label: "Transaction Hash", key: "transactionHash" },
-    { label: "Destination", key: "destinationAddress" },
     { label: "Created At", key: "createdAt" },
-    { label: "Completed At", key: "completedAt" },
   ];
 
   if (loading) {
@@ -204,8 +232,9 @@ const Withdrawals = () => {
           subtitle="View and manage all withdrawal transactions"
         />
         <div className="flex justify-center items-center mt-20">
-          <div className="animate-pulse text-gray-600">
-            Loading withdrawals...
+          <div className="flex items-center gap-3">
+            <RefreshCw className="w-6 h-6 animate-spin text-blue-600" />
+            <span className="text-gray-600">Loading withdrawals...</span>
           </div>
         </div>
       </>
@@ -224,8 +253,17 @@ const Withdrawals = () => {
           title="Withdrawal Transactions"
           subtitle="View and manage all withdrawal transactions"
         />
-        <div className="flex justify-center items-center mt-20">
-          <p className="text-red-600">Error loading withdrawals: {error}</p>
+        <div className="flex flex-col justify-center items-center mt-20 gap-4">
+          <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+            <p className="text-red-600">Error loading withdrawals: {error}</p>
+          </div>
+          <button
+            onClick={fetchAllData}
+            className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Retry
+          </button>
         </div>
       </>
     );
@@ -317,7 +355,7 @@ const Withdrawals = () => {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by withdrawal ID, transaction hash, destination, method, or user..."
+            placeholder="Search by transaction ID, wallet address, method, or user..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white"
@@ -351,6 +389,14 @@ const Withdrawals = () => {
               </option>
             ))}
           </select>
+
+          <button
+            onClick={fetchAllData}
+            className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </button>
         </div>
 
         <CSVLink
@@ -390,12 +436,12 @@ const Withdrawals = () => {
                   <tr>
                     <th
                       className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort("id")}
+                      onClick={() => handleSort("transactionId")}
                     >
                       <div className="flex items-center gap-1">
-                        Withdrawal ID
+                        Transaction ID
                         <SortIcon
-                          field="id"
+                          field="transactionId"
                           sortField={sortField}
                           sortDirection={sortDirection}
                         />
@@ -418,10 +464,10 @@ const Withdrawals = () => {
                       </div>
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Method
+                      Account
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Destination
+                      Method
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
@@ -446,23 +492,23 @@ const Withdrawals = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {paginatedWithdrawals.map((withdrawal) => {
-                    const user = getUserForWithdrawal(withdrawal.userId);
-                    const account = getAccountForWithdrawal(
-                      withdrawal.accountId
-                    );
+                    const user = withdrawal.userId;
+                    const account = withdrawal.tradingAccountId;
+                    const withdrawalId = withdrawal._id || withdrawal.id;
+
                     return (
-                      <tr key={withdrawal.id} className="hover:bg-gray-50">
+                      <tr key={withdrawalId} className="hover:bg-gray-50">
                         <td className="px-4 py-3 whitespace-nowrap">
                           <p className="text-sm font-mono font-medium text-gray-900">
-                            {withdrawal.id}
+                            {withdrawal.transactionId}
                           </p>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           {user ? (
                             <div className="flex items-center gap-2">
                               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center text-white font-semibold text-xs">
-                                {user.firstName.charAt(0)}
-                                {user.lastName.charAt(0)}
+                                {user.firstName?.charAt(0) || ""}
+                                {user.lastName?.charAt(0) || ""}
                               </div>
                               <div>
                                 <p className="text-sm font-medium text-gray-900">
@@ -482,22 +528,32 @@ const Withdrawals = () => {
                         <td className="px-4 py-3 whitespace-nowrap">
                           <div>
                             <p className="text-sm font-semibold text-red-600">
-                              -${parseFloat(withdrawal.amount).toFixed(2)}
+                              -${parseFloat(withdrawal.amount || 0).toFixed(2)}
                             </p>
                             <p className="text-xs text-gray-500">
-                              {withdrawal.currency}
+                              Fee: ${parseFloat(withdrawal.fee || 0).toFixed(2)}
                             </p>
                           </div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="text-sm text-gray-700">
-                            {withdrawal.methodName}
-                          </span>
+                          {account ? (
+                            <div>
+                              <p className="text-sm font-mono font-medium text-gray-900">
+                                {account.accountNumber}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {account.platform} • {account.accountClass}
+                              </p>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400">N/A</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <p className="text-xs font-mono text-gray-600 max-w-[150px] truncate">
-                            {withdrawal.destinationAddress || "N/A"}
-                          </p>
+                          <span className="text-sm text-gray-700 capitalize">
+                            {withdrawal.withdrawalMethod?.replace("_", " ") ||
+                              "N/A"}
+                          </span>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <StatusBadge status={withdrawal.status} />
@@ -506,19 +562,31 @@ const Withdrawals = () => {
                           {new Date(withdrawal.createdAt).toLocaleString()}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <button
-                            onClick={() =>
-                              setViewModalWithdrawal({
-                                ...withdrawal,
-                                user,
-                                account,
-                              })
-                            }
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="View Details"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => setViewModalWithdrawal(withdrawal)}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="View Details"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setEditModalWithdrawal(withdrawal)}
+                              className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                              title="Edit Withdrawal"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() =>
+                                setDeleteConfirmWithdrawal(withdrawalId)
+                              }
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete Withdrawal"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -549,6 +617,34 @@ const Withdrawals = () => {
           onClose={() => setViewModalWithdrawal(null)}
         />
       )}
+
+      {/* Edit Modal */}
+      {editModalWithdrawal && (
+        <EditWithdrawalModal
+          withdrawal={editModalWithdrawal}
+          onClose={() => setEditModalWithdrawal(null)}
+          onUpdate={(updatedWithdrawal) => {
+            setWithdrawals(
+              withdrawals.map((w) =>
+                (w._id || w.id) ===
+                (updatedWithdrawal._id || updatedWithdrawal.id)
+                  ? updatedWithdrawal
+                  : w
+              )
+            );
+            setEditModalWithdrawal(null);
+          }}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmWithdrawal && (
+        <DeleteConfirmModal
+          withdrawalId={deleteConfirmWithdrawal}
+          onConfirm={handleDeleteWithdrawal}
+          onCancel={() => setDeleteConfirmWithdrawal(null)}
+        />
+      )}
     </>
   );
 };
@@ -570,12 +666,12 @@ const StatusBadge = ({ status }) => {
     completed: "bg-green-100 text-green-700",
     processing: "bg-blue-100 text-blue-700",
     pending: "bg-yellow-100 text-yellow-700",
-    failed: "bg-red-100 text-red-700",
+    rejected: "bg-red-100 text-red-700",
     cancelled: "bg-gray-100 text-gray-700",
   };
   return (
     <span
-      className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+      className={`inline-flex px-2 py-1 text-xs font-medium rounded-full capitalize ${
         styles[status] || styles.pending
       }`}
     >
@@ -667,6 +763,10 @@ const ViewWithdrawalModal = ({ withdrawal, onClose }) => {
     });
   };
 
+  const user = withdrawal.userId;
+  const account = withdrawal.tradingAccountId;
+  const processedBy = withdrawal.processedBy;
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
@@ -684,7 +784,7 @@ const ViewWithdrawalModal = ({ withdrawal, onClose }) => {
 
         <div className="p-6 space-y-6">
           {/* User Information */}
-          {withdrawal.user && (
+          {user && (
             <div>
               <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide flex items-center gap-2">
                 <User className="w-4 h-4" />
@@ -692,19 +792,24 @@ const ViewWithdrawalModal = ({ withdrawal, onClose }) => {
               </h3>
               <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center text-white font-semibold">
-                  {withdrawal.user.firstName.charAt(0)}
-                  {withdrawal.user.lastName.charAt(0)}
+                  {user.firstName?.charAt(0)}
+                  {user.lastName?.charAt(0)}
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-900">
-                    {withdrawal.user.firstName} {withdrawal.user.lastName}
+                    {user.firstName} {user.lastName}
                   </p>
-                  <p className="text-xs text-gray-500">
-                    {withdrawal.user.email}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {withdrawal.user.phoneNumber}
-                  </p>
+                  <p className="text-xs text-gray-500">{user.email}</p>
+                  {user.phoneNumber && (
+                    <p className="text-xs text-gray-500">{user.phoneNumber}</p>
+                  )}
+                  {user.country && (
+                    <p className="text-xs text-gray-500">
+                      <span className="inline-flex items-center gap-1">
+                        📍 {user.country}
+                      </span>
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -719,10 +824,10 @@ const ViewWithdrawalModal = ({ withdrawal, onClose }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs text-gray-500 uppercase tracking-wide">
-                  Withdrawal ID
+                  Transaction ID
                 </label>
-                <p className="text-sm font-medium text-gray-900 mt-1">
-                  {withdrawal.id}
+                <p className="text-sm font-medium text-gray-900 mt-1 font-mono">
+                  {withdrawal.transactionId}
                 </p>
               </div>
               <div>
@@ -738,16 +843,7 @@ const ViewWithdrawalModal = ({ withdrawal, onClose }) => {
                   Amount
                 </label>
                 <p className="text-sm font-semibold text-red-600 mt-1">
-                  -${parseFloat(withdrawal.amount).toFixed(2)}{" "}
-                  {withdrawal.currency}
-                </p>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 uppercase tracking-wide">
-                  Net Amount
-                </label>
-                <p className="text-sm font-semibold text-gray-900 mt-1">
-                  ${parseFloat(withdrawal.netAmount).toFixed(2)}{" "}
+                  -${parseFloat(withdrawal.amount || 0).toFixed(2)}{" "}
                   {withdrawal.currency}
                 </p>
               </div>
@@ -756,79 +852,114 @@ const ViewWithdrawalModal = ({ withdrawal, onClose }) => {
                   Fee
                 </label>
                 <p className="text-sm font-medium text-gray-900 mt-1">
-                  ${parseFloat(withdrawal.fee).toFixed(2)}
+                  ${parseFloat(withdrawal.fee || 0).toFixed(2)}
+                </p>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 uppercase tracking-wide">
+                  Net Amount
+                </label>
+                <p className="text-sm font-semibold text-gray-900 mt-1">
+                  ${parseFloat(withdrawal.netAmount || 0).toFixed(2)}{" "}
+                  {withdrawal.currency}
                 </p>
               </div>
               <div>
                 <label className="text-xs text-gray-500 uppercase tracking-wide">
                   Method
                 </label>
-                <p className="text-sm font-medium text-gray-900 mt-1">
-                  {withdrawal.methodName}
+                <p className="text-sm font-medium text-gray-900 mt-1 capitalize">
+                  {withdrawal.withdrawalMethod?.replace("_", " ")}
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Transaction Details */}
-          <div className="border-t border-gray-200 pt-6">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide flex items-center gap-2">
-              <Hash className="w-4 h-4" />
-              Transaction Details
-            </h3>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs text-gray-500 uppercase tracking-wide">
-                  Transaction Hash
-                </label>
-                <p className="text-sm font-mono text-gray-900 mt-1 break-all">
-                  {withdrawal.transactionHash || "Pending..."}
-                </p>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 uppercase tracking-wide">
-                  Destination Address
-                </label>
-                <p className="text-sm font-mono text-gray-900 mt-1 break-all">
-                  {withdrawal.destinationAddress}
-                </p>
-              </div>
-              {withdrawal.walletType && (
-                <div>
-                  <label className="text-xs text-gray-500 uppercase tracking-wide">
-                    Wallet Type
-                  </label>
-                  <p className="text-sm font-medium text-gray-900 mt-1 capitalize">
-                    {withdrawal.walletType.replace("_", " ")}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Account Information */}
-          {withdrawal.account && (
+          {/* Trading Account */}
+          {account && (
             <div className="border-t border-gray-200 pt-6">
               <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide flex items-center gap-2">
                 <Wallet className="w-4 h-4" />
                 Trading Account
               </h3>
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-700">
-                  <span className="font-medium">Account:</span> #
-                  {withdrawal.account.login}
-                </p>
-                <p className="text-sm text-gray-700 mt-1">
-                  <span className="font-medium">Platform:</span>{" "}
-                  {withdrawal.account.platform}
-                </p>
-                <p className="text-sm text-gray-700 mt-1">
-                  <span className="font-medium">Type:</span>{" "}
-                  {withdrawal.account.accountType}
-                </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-gray-500 uppercase tracking-wide">
+                    Account Number
+                  </label>
+                  <p className="text-sm font-mono font-medium text-gray-900 mt-1">
+                    {account.accountNumber}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 uppercase tracking-wide">
+                    Login
+                  </label>
+                  <p className="text-sm font-mono font-medium text-gray-900 mt-1">
+                    {account.login}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 uppercase tracking-wide">
+                    Platform
+                  </label>
+                  <p className="text-sm font-medium text-gray-900 mt-1">
+                    {account.platform}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 uppercase tracking-wide">
+                    Account Type
+                  </label>
+                  <p className="text-sm font-medium text-gray-900 mt-1">
+                    {account.accountType} • {account.accountClass}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 uppercase tracking-wide">
+                    Balance
+                  </label>
+                  <p className="text-sm font-semibold text-gray-900 mt-1">
+                    ${parseFloat(account.balance || 0).toFixed(2)}{" "}
+                    {account.currency}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 uppercase tracking-wide">
+                    Status
+                  </label>
+                  <div className="mt-1">
+                    <StatusBadge status={account.status} />
+                  </div>
+                </div>
               </div>
             </div>
           )}
+
+          {/* Withdrawal Details */}
+          {withdrawal.withdrawalDetails &&
+            Object.keys(withdrawal.withdrawalDetails).length > 0 && (
+              <div className="border-t border-gray-200 pt-6">
+                <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide flex items-center gap-2">
+                  <Hash className="w-4 h-4" />
+                  Withdrawal Details
+                </h3>
+                <div className="space-y-3">
+                  {Object.entries(withdrawal.withdrawalDetails)
+                    .filter(([_, value]) => value)
+                    .map(([key, value]) => (
+                      <div key={key}>
+                        <label className="text-xs text-gray-500 uppercase tracking-wide">
+                          {key.replace(/([A-Z])/g, " $1").trim()}
+                        </label>
+                        <p className="text-sm font-mono text-gray-900 mt-1 break-all">
+                          {value}
+                        </p>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
 
           {/* Timestamps */}
           <div className="border-t border-gray-200 pt-6">
@@ -845,6 +976,16 @@ const ViewWithdrawalModal = ({ withdrawal, onClose }) => {
                   {formatDate(withdrawal.createdAt)}
                 </p>
               </div>
+              {withdrawal.processedAt && (
+                <div>
+                  <label className="text-xs text-gray-500 uppercase tracking-wide">
+                    Processed At
+                  </label>
+                  <p className="text-sm font-medium text-gray-900 mt-1">
+                    {formatDate(withdrawal.processedAt)}
+                  </p>
+                </div>
+              )}
               {withdrawal.completedAt && (
                 <div>
                   <label className="text-xs text-gray-500 uppercase tracking-wide">
@@ -855,42 +996,47 @@ const ViewWithdrawalModal = ({ withdrawal, onClose }) => {
                   </p>
                 </div>
               )}
+              {processedBy && (
+                <div>
+                  <label className="text-xs text-gray-500 uppercase tracking-wide">
+                    Processed By
+                  </label>
+                  <p className="text-sm font-medium text-gray-900 mt-1">
+                    {processedBy.firstName} {processedBy.lastName}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Notes */}
-          {withdrawal.notes && (
+          {(withdrawal.adminNotes || withdrawal.rejectionReason) && (
             <div className="border-t border-gray-200 pt-6">
               <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide">
                 Notes
               </h3>
-              <p className="text-sm text-gray-700">{withdrawal.notes}</p>
+              {withdrawal.rejectionReason && (
+                <div className="mb-3">
+                  <label className="text-xs text-gray-500 uppercase tracking-wide">
+                    Rejection Reason
+                  </label>
+                  <p className="text-sm text-gray-700 mt-1 p-3 bg-red-50 rounded-lg">
+                    {withdrawal.rejectionReason}
+                  </p>
+                </div>
+              )}
+              {withdrawal.adminNotes && (
+                <div>
+                  <label className="text-xs text-gray-500 uppercase tracking-wide">
+                    Admin Notes
+                  </label>
+                  <p className="text-sm text-gray-700 mt-1 p-3 bg-blue-50 rounded-lg">
+                    {withdrawal.adminNotes}
+                  </p>
+                </div>
+              )}
             </div>
           )}
-
-          {/* Status Badge */}
-          <div className="border-t border-gray-200 pt-6">
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-              <div>
-                <p className="text-sm font-medium text-gray-900">
-                  Current Status
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {withdrawal.status === "pending" &&
-                    "Withdrawal request is awaiting approval"}
-                  {withdrawal.status === "processing" &&
-                    "Withdrawal is being processed"}
-                  {withdrawal.status === "completed" &&
-                    "Withdrawal has been completed successfully"}
-                  {withdrawal.status === "failed" &&
-                    "Withdrawal failed - please contact support"}
-                  {withdrawal.status === "cancelled" &&
-                    "Withdrawal was cancelled"}
-                </p>
-              </div>
-              <StatusBadge status={withdrawal.status} />
-            </div>
-          </div>
         </div>
 
         <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4">
@@ -899,6 +1045,295 @@ const ViewWithdrawalModal = ({ withdrawal, onClose }) => {
             className="w-full px-4 py-2 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-colors font-medium"
           >
             Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Edit Withdrawal Modal
+const EditWithdrawalModal = ({ withdrawal, onClose, onUpdate }) => {
+  const [formData, setFormData] = useState({
+    status: withdrawal.status || "pending",
+    amount: withdrawal.amount || 0,
+    currency: withdrawal.currency || "USD",
+    fee: withdrawal.fee || 0,
+    netAmount: withdrawal.netAmount || 0,
+    adminNotes: withdrawal.adminNotes || "",
+    rejectionReason: withdrawal.rejectionReason || "",
+    txHash: withdrawal.withdrawalDetails?.txHash || "",
+  });
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const withdrawalId = withdrawal._id || withdrawal.id;
+
+      // Update withdrawal status
+      const statusRes = await api.patch(
+        `/transactions/admin/withdrawals/${withdrawalId}/status`,
+        {
+          status: formData.status,
+          adminNotes: formData.adminNotes,
+          rejectionReason: formData.rejectionReason,
+          txHash: formData.txHash,
+        }
+      );
+
+      // If amount, fee, or currency changed, make additional update
+      if (
+        formData.amount !== withdrawal.amount ||
+        formData.fee !== withdrawal.fee ||
+        formData.netAmount !== withdrawal.netAmount ||
+        formData.currency !== withdrawal.currency
+      ) {
+        await api.patch(`/transactions/admin/withdrawals/${withdrawalId}`, {
+          amount: formData.amount,
+          currency: formData.currency,
+          fee: formData.fee,
+          netAmount: formData.netAmount,
+        });
+      }
+
+      alert("Withdrawal updated successfully");
+
+      // Re-fetch to get populated data
+      const updatedRes = await api.get(
+        "/transactions/admin/withdrawals?limit=1000"
+      );
+      const updatedWithdrawal = updatedRes.data.data.find(
+        (w) => (w._id || w.id) === withdrawalId
+      );
+
+      onUpdate(updatedWithdrawal || statusRes.data.data);
+    } catch (err) {
+      console.error("Error updating withdrawal:", err);
+      alert(err.response?.data?.message || "Failed to update withdrawal");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-gray-900">
+            Edit Withdrawal
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Status
+            </label>
+            <select
+              value={formData.status}
+              onChange={(e) =>
+                setFormData({ ...formData, status: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              required
+            >
+              <option value="pending">Pending</option>
+              <option value="processing">Processing</option>
+              <option value="completed">Completed</option>
+              <option value="rejected">Rejected</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Amount
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={formData.amount}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    amount: parseFloat(e.target.value),
+                  })
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Fee
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={formData.fee}
+                onChange={(e) =>
+                  setFormData({ ...formData, fee: parseFloat(e.target.value) })
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Net Amount
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={formData.netAmount}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    netAmount: parseFloat(e.target.value),
+                  })
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Currency
+              </label>
+              <select
+                value={formData.currency}
+                onChange={(e) =>
+                  setFormData({ ...formData, currency: e.target.value })
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                required
+              >
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="GBP">GBP</option>
+                <option value="JPY">JPY</option>
+                <option value="AUD">AUD</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Transaction Hash (Optional)
+            </label>
+            <input
+              type="text"
+              value={formData.txHash}
+              onChange={(e) =>
+                setFormData({ ...formData, txHash: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm"
+              placeholder="Enter transaction hash if completed"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Admin Notes
+            </label>
+            <textarea
+              value={formData.adminNotes}
+              onChange={(e) =>
+                setFormData({ ...formData, adminNotes: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              rows="3"
+              placeholder="Add any admin notes here..."
+            />
+          </div>
+
+          {(formData.status === "rejected" ||
+            formData.status === "cancelled") && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Rejection Reason
+              </label>
+              <textarea
+                value={formData.rejectionReason}
+                onChange={(e) =>
+                  setFormData({ ...formData, rejectionReason: e.target.value })
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                rows="2"
+                placeholder="Explain why this withdrawal was rejected..."
+              />
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <Save className="w-4 h-4" />
+              {loading ? "Saving..." : "Save Changes"}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-colors font-medium"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Delete Confirmation Modal
+const DeleteConfirmModal = ({ withdrawalId, onConfirm, onCancel }) => {
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl max-w-md w-full p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-3 bg-red-100 rounded-full">
+            <Trash2 className="w-6 h-6 text-red-600" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900">
+            Delete Withdrawal
+          </h2>
+        </div>
+
+        <p className="text-gray-600 mb-6">
+          Are you sure you want to delete this withdrawal? This action cannot be
+          undone and will refund the amount if the withdrawal was completed.
+        </p>
+
+        <div className="flex gap-3">
+          <button
+            onClick={() => onConfirm(withdrawalId)}
+            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors font-medium"
+          >
+            Delete
+          </button>
+          <button
+            onClick={onCancel}
+            className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-colors font-medium"
+          >
+            Cancel
           </button>
         </div>
       </div>

@@ -82,7 +82,7 @@ const Sidebar = ({ isOpen, onToggle, isCollapsed, toggleCollapsed }) => {
     {
       name: "Settigns",
       icon: Settings2,
-      subItems: [{ name: "Wallet Settings", href: "/admin/settings/wallet" }],
+      href: "/admin/settings",
     },
   ];
 

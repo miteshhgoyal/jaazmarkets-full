@@ -628,34 +628,31 @@ router.patch('/withdrawals/:withdrawalId/cancel', authenticateToken, async (req,
 // ============================================
 // ADMIN ROUTES
 // ============================================
-
-// GET ALL DEPOSITS (Admin)
+// ============================================
+// GET ALL DEPOSITS (Admin) - UPDATED WITH POPULATE
+// ============================================
 router.get('/admin/deposits', authenticateToken, authorize(['admin', 'superadmin']), async (req, res) => {
     try {
-        const {
-            userId,
-            status,
-            startDate,
-            endDate,
-            page = 1,
-            limit = 50
-        } = req.query;
+        const { page = 1, limit = 1000, status, paymentMethod, search } = req.query;
 
         const query = {};
-        if (userId) query.userId = userId;
+
         if (status) query.status = status;
-        if (startDate || endDate) {
-            query.createdAt = {};
-            if (startDate) query.createdAt.$gte = new Date(startDate);
-            if (endDate) query.createdAt.$lte = new Date(endDate);
+        if (paymentMethod) query.paymentMethod = paymentMethod;
+        if (search) {
+            query.$or = [
+                { transactionId: { $regex: search, $options: 'i' } }
+            ];
         }
 
         const deposits = await Deposit.find(query)
-            .populate('userId', 'firstName lastName email')
-            .populate('tradingAccountId', 'accountNumber login platform')
+            .populate('userId', 'firstName lastName email phoneNumber country accountStatus')
+            .populate('tradingAccountId', 'accountNumber login platform accountClass accountType currency balance status')
+            .populate('processedBy', 'firstName lastName email')
             .limit(limit * 1)
             .skip((page - 1) * limit)
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .lean();
 
         const count = await Deposit.countDocuments(query);
 
@@ -667,13 +664,14 @@ router.get('/admin/deposits', authenticateToken, authorize(['admin', 'superadmin
             total: count
         });
     } catch (error) {
-        console.error('Get all deposits error:', error);
+        console.error('Get deposits error:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to fetch deposits'
         });
     }
 });
+
 
 // APPROVE/REJECT DEPOSIT (Admin)
 router.patch('/admin/deposits/:depositId/status', authenticateToken, authorize(['admin', 'superadmin']), async (req, res) => {
@@ -738,119 +736,6 @@ router.patch('/admin/deposits/:depositId/status', authenticateToken, authorize([
         res.status(500).json({
             success: false,
             message: 'Failed to update deposit status'
-        });
-    }
-});
-
-// GET ALL WITHDRAWALS (Admin)
-router.get('/admin/withdrawals', authenticateToken, authorize(['admin', 'superadmin']), async (req, res) => {
-    try {
-        const {
-            userId,
-            status,
-            startDate,
-            endDate,
-            page = 1,
-            limit = 50
-        } = req.query;
-
-        const query = {};
-        if (userId) query.userId = userId;
-        if (status) query.status = status;
-        if (startDate || endDate) {
-            query.createdAt = {};
-            if (startDate) query.createdAt.$gte = new Date(startDate);
-            if (endDate) query.createdAt.$lte = new Date(endDate);
-        }
-
-        const withdrawals = await Withdrawal.find(query)
-            .populate('userId', 'firstName lastName email')
-            .populate('tradingAccountId', 'accountNumber login platform')
-            .limit(limit * 1)
-            .skip((page - 1) * limit)
-            .sort({ createdAt: -1 });
-
-        const count = await Withdrawal.countDocuments(query);
-
-        res.json({
-            success: true,
-            data: withdrawals,
-            totalPages: Math.ceil(count / limit),
-            currentPage: Number(page),
-            total: count
-        });
-    } catch (error) {
-        console.error('Get all withdrawals error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to fetch withdrawals'
-        });
-    }
-});
-
-// APPROVE/REJECT WITHDRAWAL (Admin)
-router.patch('/admin/withdrawals/:withdrawalId/status', authenticateToken, authorize(['admin', 'superadmin']), async (req, res) => {
-    try {
-        const { withdrawalId } = req.params;
-        const { status, adminNotes, rejectionReason } = req.body;
-
-        const validStatuses = ['pending', 'processing', 'completed', 'rejected', 'cancelled'];
-        if (!validStatuses.includes(status)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid status'
-            });
-        }
-
-        const withdrawal = await Withdrawal.findById(withdrawalId);
-        if (!withdrawal) {
-            return res.status(404).json({
-                success: false,
-                message: 'Withdrawal not found'
-            });
-        }
-
-        // If rejecting, refund the amount
-        if (status === 'rejected' && withdrawal.status === 'pending') {
-            await TradingAccount.findByIdAndUpdate(
-                withdrawal.tradingAccountId,
-                {
-                    $inc: {
-                        balance: withdrawal.amount,
-                        equity: withdrawal.amount,
-                        freeMargin: withdrawal.amount
-                    }
-                }
-            );
-        }
-
-        // If completing, update user total withdrawals
-        if (status === 'completed' && withdrawal.status !== 'completed') {
-            await User.findByIdAndUpdate(
-                withdrawal.userId,
-                { $inc: { totalWithdrawals: withdrawal.amount } }
-            );
-            withdrawal.completedAt = new Date();
-        }
-
-        withdrawal.status = status;
-        withdrawal.adminNotes = adminNotes;
-        withdrawal.rejectionReason = rejectionReason;
-        withdrawal.processedBy = req.user.userId;
-        withdrawal.processedAt = new Date();
-
-        await withdrawal.save();
-
-        res.json({
-            success: true,
-            message: `Withdrawal ${status} successfully`,
-            data: withdrawal
-        });
-    } catch (error) {
-        console.error('Update withdrawal status error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to update withdrawal status'
         });
     }
 });
@@ -1388,6 +1273,325 @@ router.patch('/admin/transfers/:transferId/status', authenticateToken, authorize
         res.status(500).json({
             success: false,
             message: 'Failed to update transfer status'
+        });
+    }
+});
+
+// ============================================
+// UPDATE DEPOSIT (Admin) - NEW ROUTE
+// ============================================
+router.patch('/admin/deposits/:depositId', authenticateToken, authorize(['admin', 'superadmin']), async (req, res) => {
+    try {
+        const { depositId } = req.params;
+        const { amount, currency, paymentMethod, paymentDetails, adminNotes } = req.body;
+
+        const deposit = await Deposit.findById(depositId);
+        if (!deposit) {
+            return res.status(404).json({
+                success: false,
+                message: 'Deposit not found'
+            });
+        }
+
+        // Update fields
+        if (amount !== undefined) deposit.amount = amount;
+        if (currency !== undefined) deposit.currency = currency;
+        if (paymentMethod !== undefined) deposit.paymentMethod = paymentMethod;
+        if (paymentDetails !== undefined) deposit.paymentDetails = paymentDetails;
+        if (adminNotes !== undefined) deposit.adminNotes = adminNotes;
+
+        deposit.processedBy = req.user.userId;
+        deposit.processedAt = new Date();
+
+        await deposit.save();
+
+        res.json({
+            success: true,
+            message: 'Deposit updated successfully',
+            data: deposit
+        });
+    } catch (error) {
+        console.error('Update deposit error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update deposit'
+        });
+    }
+});
+
+// ============================================
+// DELETE DEPOSIT (Admin) - NEW ROUTE
+// ============================================
+router.delete('/admin/deposits/:depositId', authenticateToken, authorize(['admin', 'superadmin']), async (req, res) => {
+    try {
+        const { depositId } = req.params;
+
+        const deposit = await Deposit.findById(depositId);
+        if (!deposit) {
+            return res.status(404).json({
+                success: false,
+                message: 'Deposit not found'
+            });
+        }
+
+        // If deposit was completed, refund the amount from user's account
+        if (deposit.status === 'completed' && deposit.tradingAccountId) {
+            await TradingAccount.findByIdAndUpdate(
+                deposit.tradingAccountId,
+                {
+                    $inc: {
+                        balance: -deposit.amount,
+                        equity: -deposit.amount,
+                        freeMargin: -deposit.amount
+                    }
+                }
+            );
+
+            // Update user total deposits
+            await User.findByIdAndUpdate(
+                deposit.userId,
+                { $inc: { totalDeposits: -deposit.amount } }
+            );
+        }
+
+        await Deposit.findByIdAndDelete(depositId);
+
+        res.json({
+            success: true,
+            message: 'Deposit deleted successfully'
+        });
+    } catch (error) {
+        console.error('Delete deposit error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to delete deposit'
+        });
+    }
+});
+
+// ============================================
+// GET ALL WITHDRAWALS (Admin) - WITH POPULATE
+// ============================================
+router.get('/admin/withdrawals', authenticateToken, authorize(['admin', 'superadmin']), async (req, res) => {
+    try {
+        const { page = 1, limit = 1000, status, withdrawalMethod, search } = req.query;
+
+        const query = {};
+
+        if (status) query.status = status;
+        if (withdrawalMethod) query.withdrawalMethod = withdrawalMethod;
+        if (search) {
+            query.$or = [
+                { transactionId: { $regex: search, $options: 'i' } }
+            ];
+        }
+
+        const withdrawals = await Withdrawal.find(query)
+            .populate('userId', 'firstName lastName email phoneNumber country accountStatus')
+            .populate('tradingAccountId', 'accountNumber login platform accountClass accountType currency balance status')
+            .populate('processedBy', 'firstName lastName email')
+            .limit(limit * 1)
+            .skip((page - 1) * limit)
+            .sort({ createdAt: -1 })
+            .lean();
+
+        const count = await Withdrawal.countDocuments(query);
+
+        res.json({
+            success: true,
+            data: withdrawals,
+            totalPages: Math.ceil(count / limit),
+            currentPage: Number(page),
+            total: count
+        });
+    } catch (error) {
+        console.error('Get withdrawals error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch withdrawals'
+        });
+    }
+});
+
+// ============================================
+// UPDATE WITHDRAWAL STATUS (Admin)
+// ============================================
+router.patch('/admin/withdrawals/:withdrawalId/status', authenticateToken, authorize(['admin', 'superadmin']), async (req, res) => {
+    try {
+        const { withdrawalId } = req.params;
+        const { status, adminNotes, rejectionReason, txHash } = req.body;
+
+        const withdrawal = await Withdrawal.findById(withdrawalId)
+            .populate('userId')
+            .populate('tradingAccountId');
+
+        if (!withdrawal) {
+            return res.status(404).json({
+                success: false,
+                message: 'Withdrawal not found'
+            });
+        }
+
+        const oldStatus = withdrawal.status;
+        withdrawal.status = status;
+        withdrawal.processedBy = req.user.userId;
+        withdrawal.processedAt = new Date();
+
+        if (adminNotes) withdrawal.adminNotes = adminNotes;
+        if (rejectionReason) withdrawal.rejectionReason = rejectionReason;
+        if (txHash && withdrawal.withdrawalDetails) {
+            withdrawal.withdrawalDetails.txHash = txHash;
+        }
+
+        // If completing withdrawal, update account balance
+        if (status === 'completed' && oldStatus !== 'completed') {
+            withdrawal.completedAt = new Date();
+
+            if (withdrawal.tradingAccountId) {
+                await TradingAccount.findByIdAndUpdate(
+                    withdrawal.tradingAccountId,
+                    {
+                        $inc: {
+                            balance: -withdrawal.amount,
+                            equity: -withdrawal.amount,
+                            freeMargin: -withdrawal.amount
+                        }
+                    }
+                );
+
+                // Update user total withdrawals
+                await User.findByIdAndUpdate(
+                    withdrawal.userId,
+                    { $inc: { totalWithdrawals: withdrawal.amount } }
+                );
+            }
+        }
+
+        // If rejecting/cancelling after it was completed, refund
+        if ((status === 'rejected' || status === 'cancelled') && oldStatus === 'completed') {
+            if (withdrawal.tradingAccountId) {
+                await TradingAccount.findByIdAndUpdate(
+                    withdrawal.tradingAccountId,
+                    {
+                        $inc: {
+                            balance: withdrawal.amount,
+                            equity: withdrawal.amount,
+                            freeMargin: withdrawal.amount
+                        }
+                    }
+                );
+
+                await User.findByIdAndUpdate(
+                    withdrawal.userId,
+                    { $inc: { totalWithdrawals: -withdrawal.amount } }
+                );
+            }
+        }
+
+        await withdrawal.save();
+
+        res.json({
+            success: true,
+            message: 'Withdrawal status updated successfully',
+            data: withdrawal
+        });
+    } catch (error) {
+        console.error('Update withdrawal status error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update withdrawal status'
+        });
+    }
+});
+
+// ============================================
+// UPDATE WITHDRAWAL (Admin)
+// ============================================
+router.patch('/admin/withdrawals/:withdrawalId', authenticateToken, authorize(['admin', 'superadmin']), async (req, res) => {
+    try {
+        const { withdrawalId } = req.params;
+        const { amount, currency, fee, netAmount, adminNotes } = req.body;
+
+        const withdrawal = await Withdrawal.findById(withdrawalId);
+        if (!withdrawal) {
+            return res.status(404).json({
+                success: false,
+                message: 'Withdrawal not found'
+            });
+        }
+
+        // Update fields
+        if (amount !== undefined) withdrawal.amount = amount;
+        if (currency !== undefined) withdrawal.currency = currency;
+        if (fee !== undefined) withdrawal.fee = fee;
+        if (netAmount !== undefined) withdrawal.netAmount = netAmount;
+        if (adminNotes !== undefined) withdrawal.adminNotes = adminNotes;
+
+        withdrawal.processedBy = req.user.userId;
+        withdrawal.processedAt = new Date();
+
+        await withdrawal.save();
+
+        res.json({
+            success: true,
+            message: 'Withdrawal updated successfully',
+            data: withdrawal
+        });
+    } catch (error) {
+        console.error('Update withdrawal error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update withdrawal'
+        });
+    }
+});
+
+// ============================================
+// DELETE WITHDRAWAL (Admin)
+// ============================================
+router.delete('/admin/withdrawals/:withdrawalId', authenticateToken, authorize(['admin', 'superadmin']), async (req, res) => {
+    try {
+        const { withdrawalId } = req.params;
+
+        const withdrawal = await Withdrawal.findById(withdrawalId);
+        if (!withdrawal) {
+            return res.status(404).json({
+                success: false,
+                message: 'Withdrawal not found'
+            });
+        }
+
+        // If withdrawal was completed, refund the amount
+        if (withdrawal.status === 'completed' && withdrawal.tradingAccountId) {
+            await TradingAccount.findByIdAndUpdate(
+                withdrawal.tradingAccountId,
+                {
+                    $inc: {
+                        balance: withdrawal.amount,
+                        equity: withdrawal.amount,
+                        freeMargin: withdrawal.amount
+                    }
+                }
+            );
+
+            // Update user total withdrawals
+            await User.findByIdAndUpdate(
+                withdrawal.userId,
+                { $inc: { totalWithdrawals: -withdrawal.amount } }
+            );
+        }
+
+        await Withdrawal.findByIdAndDelete(withdrawalId);
+
+        res.json({
+            success: true,
+            message: 'Withdrawal deleted successfully'
+        });
+    } catch (error) {
+        console.error('Delete withdrawal error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to delete withdrawal'
         });
     }
 });

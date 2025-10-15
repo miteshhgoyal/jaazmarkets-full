@@ -53,13 +53,17 @@ if __name__ == "__main__":
         # 'account.routes.js',
         # 'User.js',
         # 'TradingAccount.js',
-        'Setting.js',
+        # 'Setting.js',
 
-        'transaction.routes.js',
-        'Deposits.jsx',
-        'Deposit.js',
-        'Withdrawals.jsx',
-        'Withdrawal.js',
+        # 'transaction.routes.js',
+        # 'Deposits.jsx',
+        # 'Deposit.js',
+        # 'Withdrawals.jsx',
+        # 'Withdrawal.js',
+
+        'Setting.js',
+        'settings.routes.js',
+        'Settings.jsx',
     ]
     
     # Start the search from current directory
