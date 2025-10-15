@@ -1,4 +1,3 @@
-// user/src/pages/trading/NewAccount.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import MetaHead from "../../components/MetaHead";
@@ -137,9 +136,51 @@ const NewAccount = () => {
     };
   };
 
-  const copyToClipboard = (text, label) => {
-    navigator.clipboard.writeText(text);
-    toast.success(`${label} copied to clipboard`);
+  // Updated copy function with proper async/await and fallback
+  const copyToClipboard = async (text, label) => {
+    // Modern approach with Async Clipboard API
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        toast.success(`${label} copied to clipboard`);
+      } catch (err) {
+        console.error("Failed to copy:", err);
+        fallbackCopyTextToClipboard(text, label);
+      }
+    } else {
+      // Fallback for older browsers or HTTP contexts
+      fallbackCopyTextToClipboard(text, label);
+    }
+  };
+
+  // Fallback method using document.execCommand
+  const fallbackCopyTextToClipboard = (text, label) => {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+
+    // Avoid scrolling to bottom
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.position = "fixed";
+    textArea.style.opacity = "0";
+
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+
+    try {
+      const successful = document.execCommand("copy");
+      if (successful) {
+        toast.success(`${label} copied to clipboard`);
+      } else {
+        toast.error("Failed to copy to clipboard");
+      }
+    } catch (err) {
+      console.error("Fallback: Could not copy text", err);
+      toast.error("Failed to copy to clipboard");
+    }
+
+    document.body.removeChild(textArea);
   };
 
   const passwordChecks = validatePassword(formData.tradingPassword);
