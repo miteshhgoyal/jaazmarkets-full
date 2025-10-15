@@ -1,3 +1,4 @@
+// pages/admin/users/Users.jsx
 import React, { useState, useEffect, useMemo } from "react";
 import MetaHead from "../../components/MetaHead";
 import PageHeader from "../../components/ui/PageHeader";
@@ -27,6 +28,8 @@ import {
   User as UserIcon,
   CheckCircle,
   XCircle,
+  Building,
+  CreditCard,
 } from "lucide-react";
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
@@ -34,8 +37,9 @@ const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
 const STATUS_FILTERS = [
   { label: "All Status", value: "all" },
   { label: "Active", value: "active" },
-  { label: "Inactive", value: "inactive" },
   { label: "Suspended", value: "suspended" },
+  { label: "Pending", value: "pending" },
+  { label: "Closed", value: "closed" },
 ];
 
 const KYC_FILTERS = [
@@ -46,12 +50,11 @@ const KYC_FILTERS = [
   { label: "Rejected", value: "rejected" },
 ];
 
-const LEVEL_FILTERS = [
-  { label: "All Levels", value: "all" },
-  { label: "Beginner", value: "beginner" },
-  { label: "Intermediate", value: "intermediate" },
-  { label: "Advanced", value: "advanced" },
-  { label: "Expert", value: "expert" },
+const ROLE_FILTERS = [
+  { label: "All Roles", value: "all" },
+  { label: "User", value: "user" },
+  { label: "Admin", value: "admin" },
+  { label: "Super Admin", value: "superadmin" },
 ];
 
 const Users = () => {
@@ -59,11 +62,10 @@ const Users = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
-
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [kycFilter, setKycFilter] = useState("all");
-  const [levelFilter, setLevelFilter] = useState("all");
+  const [roleFilter, setRoleFilter] = useState("all");
   const [sortField, setSortField] = useState(null);
   const [sortDirection, setSortDirection] = useState("asc");
   const [currentPage, setCurrentPage] = useState(1);
@@ -79,7 +81,6 @@ const Users = () => {
     try {
       setError(null);
       const response = await api.get("/admin/users");
-
       if (response.data.data && Array.isArray(response.data.data)) {
         setUsers(response.data.data);
       } else {
@@ -114,10 +115,9 @@ const Users = () => {
     }
   };
 
-  // Open view modal and fetch full user details
+  // Open view modal
   const handleViewUser = async (user) => {
     try {
-      // Fetch complete user details
       const fullUserData = await fetchUserById(user.id);
       setViewModalUser(fullUserData);
     } catch (err) {
@@ -125,10 +125,9 @@ const Users = () => {
     }
   };
 
-  // Open edit modal and fetch full user details
+  // Open edit modal
   const handleEditUser = async (user) => {
     try {
-      // Fetch complete user details
       const fullUserData = await fetchUserById(user.id);
       setEditModalUser(fullUserData);
     } catch (err) {
@@ -140,9 +139,7 @@ const Users = () => {
   const handleUpdateUser = async (userId, updatedData) => {
     try {
       const response = await api.put(`/admin/users/${userId}`, updatedData);
-
-      if (response.data.status === 200) {
-        // Refresh users list
+      if (response.data.success) {
         await fetchUsers();
         return true;
       }
@@ -156,9 +153,7 @@ const Users = () => {
   const handleDeleteUser = async (userId) => {
     try {
       const response = await api.delete(`/admin/users/${userId}`);
-
-      if (response.data.status === 200) {
-        // Remove from local state
+      if (response.data.success) {
         setUsers(users.filter((u) => u.id !== userId));
         return true;
       }
@@ -168,26 +163,72 @@ const Users = () => {
     }
   };
 
+  // Quick toggle functions
+  const handleQuickToggleStatus = async (userId, currentStatus) => {
+    const statusCycle = {
+      active: "suspended",
+      suspended: "pending",
+      pending: "closed",
+      closed: "active",
+    };
+    const newStatus = statusCycle[currentStatus] || "active";
+    try {
+      await api.patch(`/admin/users/${userId}/status`, { status: newStatus });
+      await fetchUsers();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to update status");
+    }
+  };
+
+  const handleQuickToggleKYC = async (userId, currentKyc) => {
+    const kycCycle = {
+      pending: "submitted",
+      submitted: "approved",
+      approved: "rejected",
+      rejected: "pending",
+    };
+    const newKyc = kycCycle[currentKyc] || "pending";
+    try {
+      await api.patch(`/admin/users/${userId}/kyc`, { kycStatus: newKyc });
+      await fetchUsers();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to update KYC status");
+    }
+  };
+
+  const handleQuickToggleVerification = async (userId, field, currentValue) => {
+    try {
+      await api.patch(`/admin/users/${userId}/verification`, {
+        field,
+        value: !currentValue,
+      });
+      await fetchUsers();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to update verification");
+    }
+  };
+
   // Filter and search users
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
       const searchLower = searchQuery.toLowerCase();
       const matchesSearch =
         !searchQuery ||
-        user.first_name?.toLowerCase().includes(searchLower) ||
-        user.last_name?.toLowerCase().includes(searchLower) ||
+        user.firstname?.toLowerCase().includes(searchLower) ||
+        user.lastname?.toLowerCase().includes(searchLower) ||
         user.email?.toLowerCase().includes(searchLower) ||
         user.mobile?.toLowerCase().includes(searchLower) ||
+        user.username?.toLowerCase().includes(searchLower) ||
         user.id?.toLowerCase().includes(searchLower);
 
       const matchesStatus =
         statusFilter === "all" || user.status === statusFilter;
       const matchesKyc = kycFilter === "all" || user.kyc === kycFilter;
-      const matchesLevel = levelFilter === "all" || user.level === levelFilter;
+      const matchesRole = roleFilter === "all" || user.role === roleFilter;
 
-      return matchesSearch && matchesStatus && matchesKyc && matchesLevel;
+      return matchesSearch && matchesStatus && matchesKyc && matchesRole;
     });
-  }, [users, searchQuery, statusFilter, kycFilter, levelFilter]);
+  }, [users, searchQuery, statusFilter, kycFilter, roleFilter]);
 
   // Sort users
   const sortedUsers = useMemo(() => {
@@ -197,8 +238,8 @@ const Users = () => {
       let aValue = a[sortField];
       let bValue = b[sortField];
 
-      if (aValue == null) aValue = "";
-      if (bValue == null) bValue = "";
+      if (aValue === null) aValue = "";
+      if (bValue === null) bValue = "";
 
       if (typeof aValue === "number" && typeof bValue === "number") {
         return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
@@ -222,7 +263,7 @@ const Users = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, statusFilter, kycFilter, levelFilter, itemsPerPage]);
+  }, [searchQuery, statusFilter, kycFilter, roleFilter, itemsPerPage]);
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -240,13 +281,16 @@ const Users = () => {
 
   const csvHeaders = [
     { label: "User ID", key: "id" },
-    { label: "First Name", key: "first_name" },
-    { label: "Last Name", key: "last_name" },
+    { label: "Username", key: "username" },
+    { label: "First Name", key: "firstname" },
+    { label: "Last Name", key: "lastname" },
     { label: "Email", key: "email" },
     { label: "Mobile", key: "mobile" },
+    { label: "Role", key: "role" },
     { label: "Status", key: "status" },
     { label: "KYC", key: "kyc" },
-    { label: "Level", key: "level" },
+    { label: "Wallet Balance", key: "walletbalance" },
+    { label: "Currency", key: "currency" },
   ];
 
   if (loading) {
@@ -300,7 +344,6 @@ const Users = () => {
         description="Manage all users and their accounts"
         keywords="users, user management, accounts"
       />
-
       <PageHeader
         title="Manage All Users"
         subtitle="Manage all user accounts and monitor activity"
@@ -312,7 +355,7 @@ const Users = () => {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by name, email, mobile, or ID..."
+            placeholder="Search by name, email, mobile, username or ID..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white"
@@ -347,10 +390,10 @@ const Users = () => {
 
             <select
               className="w-full md:w-auto px-3 py-2 text-sm rounded-xl border border-gray-200 bg-white outline-none focus:ring-2 focus:ring-blue-500"
-              value={levelFilter}
-              onChange={(e) => setLevelFilter(e.target.value)}
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
             >
-              {LEVEL_FILTERS.map((f) => (
+              {ROLE_FILTERS.map((f) => (
                 <option key={f.value} value={f.value}>
                   {f.label}
                 </option>
@@ -369,7 +412,6 @@ const Users = () => {
               />
               Refresh
             </button>
-
             <CSVLink
               data={sortedUsers}
               headers={csvHeaders}
@@ -421,12 +463,25 @@ const Users = () => {
                   </th>
                   <th
                     className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleSort("first_name")}
+                    onClick={() => handleSort("username")}
+                  >
+                    <div className="flex items-center gap-1">
+                      Username
+                      <SortIcon
+                        field="username"
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                      />
+                    </div>
+                  </th>
+                  <th
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort("firstname")}
                   >
                     <div className="flex items-center gap-1">
                       Name
                       <SortIcon
-                        field="first_name"
+                        field="firstname"
                         sortField={sortField}
                         sortDirection={sortDirection}
                       />
@@ -446,7 +501,7 @@ const Users = () => {
                     </div>
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Mobile
+                    Role
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
@@ -455,7 +510,7 @@ const Users = () => {
                     KYC
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Level
+                    Verifications
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
@@ -468,15 +523,18 @@ const Users = () => {
                     <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-600">
                       {user.id?.substring(0, 8)}...
                     </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                      {user.username || "N/A"}
+                    </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold text-xs">
-                          {user.first_name?.charAt(0)?.toUpperCase()}
-                          {user.last_name?.charAt(0)?.toUpperCase()}
+                          {user.firstname?.charAt(0)?.toUpperCase()}
+                          {user.lastname?.charAt(0)?.toUpperCase()}
                         </div>
                         <div>
                           <p className="text-sm font-medium text-gray-900">
-                            {user.first_name} {user.last_name}
+                            {user.firstname} {user.lastname}
                           </p>
                         </div>
                       </div>
@@ -484,19 +542,89 @@ const Users = () => {
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
                       {user.email}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
-                      {user.mobile || "N/A"}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <RoleBadge role={user.role} />
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <StatusBadge status={user.status} />
+                      <button
+                        onClick={() =>
+                          handleQuickToggleStatus(user.id, user.status)
+                        }
+                        className="focus:outline-none"
+                        title="Click to cycle: active → suspended → pending → closed"
+                      >
+                        <StatusBadge status={user.status} />
+                      </button>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <KYCBadge status={user.kyc} />
+                      <button
+                        onClick={() => handleQuickToggleKYC(user.id, user.kyc)}
+                        className="focus:outline-none"
+                        title="Click to cycle: pending → submitted → approved → rejected"
+                      >
+                        <KYCBadge status={user.kyc} />
+                      </button>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm text-gray-700 capitalize">
-                        {user.level || "N/A"}
-                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() =>
+                            handleQuickToggleVerification(
+                              user.id,
+                              "emailverified",
+                              user.emailverified
+                            )
+                          }
+                          className="p-1 rounded hover:bg-gray-100"
+                          title={`Email ${
+                            user.emailverified ? "Verified" : "Not Verified"
+                          }`}
+                        >
+                          {user.emailverified ? (
+                            <Mail className="w-4 h-4 text-green-600" />
+                          ) : (
+                            <Mail className="w-4 h-4 text-gray-400" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() =>
+                            handleQuickToggleVerification(
+                              user.id,
+                              "phoneverified",
+                              user.phoneverified
+                            )
+                          }
+                          className="p-1 rounded hover:bg-gray-100"
+                          title={`Phone ${
+                            user.phoneverified ? "Verified" : "Not Verified"
+                          }`}
+                        >
+                          {user.phoneverified ? (
+                            <Phone className="w-4 h-4 text-green-600" />
+                          ) : (
+                            <Phone className="w-4 h-4 text-gray-400" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() =>
+                            handleQuickToggleVerification(
+                              user.id,
+                              "mfaenabled",
+                              user.mfaenabled
+                            )
+                          }
+                          className="p-1 rounded hover:bg-gray-100"
+                          title={`MFA ${
+                            user.mfaenabled ? "Enabled" : "Disabled"
+                          }`}
+                        >
+                          {user.mfaenabled ? (
+                            <Shield className="w-4 h-4 text-green-600" />
+                          ) : (
+                            <Shield className="w-4 h-4 text-gray-400" />
+                          )}
+                        </button>
+                      </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center gap-2">
@@ -567,7 +695,9 @@ const Users = () => {
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
+
                 {renderPageNumbers(currentPage, totalPages, handlePageChange)}
+
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
@@ -615,7 +745,7 @@ const Users = () => {
   );
 };
 
-// Helper Components
+// HELPER COMPONENTS
 const SortIcon = ({ field, sortField, sortDirection }) => {
   if (sortField !== field) {
     return <ChevronDown className="w-3 h-3 text-gray-400" />;
@@ -629,14 +759,16 @@ const SortIcon = ({ field, sortField, sortDirection }) => {
 
 const StatusBadge = ({ status }) => {
   const styles = {
-    active: "bg-green-100 text-green-700",
-    inactive: "bg-gray-100 text-gray-700",
-    suspended: "bg-red-100 text-red-700",
+    active: "bg-green-100 text-green-700 hover:bg-green-200",
+    suspended: "bg-red-100 text-red-700 hover:bg-red-200",
+    pending: "bg-yellow-100 text-yellow-700 hover:bg-yellow-200",
+    closed: "bg-gray-100 text-gray-700 hover:bg-gray-200",
   };
+
   return (
     <span
-      className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-        styles[status] || styles.active
+      className={`inline-flex px-2 py-1 text-xs font-medium rounded-full transition-colors cursor-pointer ${
+        styles[status] || styles.pending
       }`}
     >
       {status}
@@ -646,18 +778,39 @@ const StatusBadge = ({ status }) => {
 
 const KYCBadge = ({ status }) => {
   const styles = {
-    approved: "bg-green-100 text-green-700",
-    pending: "bg-yellow-100 text-yellow-700",
-    submitted: "bg-blue-100 text-blue-700",
-    rejected: "bg-red-100 text-red-700",
+    approved: "bg-green-100 text-green-700 hover:bg-green-200",
+    pending: "bg-yellow-100 text-yellow-700 hover:bg-yellow-200",
+    submitted: "bg-blue-100 text-blue-700 hover:bg-blue-200",
+    rejected: "bg-red-100 text-red-700 hover:bg-red-200",
   };
+
   return (
     <span
-      className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+      className={`inline-flex px-2 py-1 text-xs font-medium rounded-full transition-colors cursor-pointer ${
         styles[status] || styles.pending
       }`}
     >
       {status}
+    </span>
+  );
+};
+
+const RoleBadge = ({ role }) => {
+  const styles = {
+    user: "bg-blue-100 text-blue-700",
+    admin: "bg-purple-100 text-purple-700",
+    superadmin: "bg-pink-100 text-pink-700",
+  };
+
+  return (
+    <span
+      className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+        styles[role] || styles.user
+      }`}
+    >
+      {role === "superadmin"
+        ? "Super Admin"
+        : role?.charAt(0).toUpperCase() + role?.slice(1)}
     </span>
   );
 };
@@ -730,7 +883,7 @@ const renderPageNumbers = (currentPage, totalPages, handlePageChange) => {
   return pages;
 };
 
-// View User Modal - Shows all user details
+// VIEW USER MODAL
 const ViewUserModal = ({ user, onClose }) => {
   const formatDate = (dateString) => {
     if (!dateString) return "Not provided";
@@ -743,8 +896,9 @@ const ViewUserModal = ({ user, onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+      <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
           <h2 className="text-xl font-semibold text-gray-900">User Details</h2>
           <button
             onClick={onClose}
@@ -763,8 +917,9 @@ const ViewUserModal = ({ user, onClose }) => {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <InfoField label="User ID" value={user.id} mono />
-              <InfoField label="First Name" value={user.first_name} />
-              <InfoField label="Last Name" value={user.last_name} />
+              <InfoField label="Username" value={user.username || "Not set"} />
+              <InfoField label="First Name" value={user.firstname} />
+              <InfoField label="Last Name" value={user.lastname} />
               <InfoField
                 label="Email"
                 value={user.email}
@@ -777,9 +932,10 @@ const ViewUserModal = ({ user, onClose }) => {
               />
               <InfoField
                 label="Date of Birth"
-                value={formatDate(user.date_of_birth)}
+                value={formatDate(user.dateofbirth)}
                 icon={<Calendar className="w-4 h-4" />}
               />
+              <InfoField label="Role" value={user.role} />
             </div>
           </div>
 
@@ -787,15 +943,15 @@ const ViewUserModal = ({ user, onClose }) => {
           <div className="border-t border-gray-200 pt-6">
             <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide flex items-center gap-2">
               <Shield className="w-4 h-4" />
-              Verification Status
+              Verification & Security
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="text-xs text-gray-500 uppercase tracking-wide flex items-center gap-1">
+                <label className="text-xs text-gray-500 uppercase tracking-wide">
                   Email Verified
                 </label>
                 <div className="mt-1">
-                  {user.email_verified ? (
+                  {user.emailverified ? (
                     <span className="inline-flex items-center gap-1 text-sm font-medium text-green-700">
                       <CheckCircle className="w-4 h-4" />
                       Verified
@@ -813,7 +969,7 @@ const ViewUserModal = ({ user, onClose }) => {
                   Phone Verified
                 </label>
                 <div className="mt-1">
-                  {user.phone_verified ? (
+                  {user.phoneverified ? (
                     <span className="inline-flex items-center gap-1 text-sm font-medium text-green-700">
                       <CheckCircle className="w-4 h-4" />
                       Verified
@@ -828,10 +984,10 @@ const ViewUserModal = ({ user, onClose }) => {
               </div>
               <div>
                 <label className="text-xs text-gray-500 uppercase tracking-wide">
-                  MFA Enabled
+                  2FA / MFA
                 </label>
                 <div className="mt-1">
-                  {user.mfa_enabled ? (
+                  {user.mfaenabled ? (
                     <span className="inline-flex items-center gap-1 text-sm font-medium text-green-700">
                       <CheckCircle className="w-4 h-4" />
                       Enabled
@@ -856,25 +1012,21 @@ const ViewUserModal = ({ user, onClose }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <InfoField
                 label="Address Line 1"
-                value={user.address_line1 || "Not provided"}
+                value={user.addressline1 || "Not provided"}
               />
               <InfoField
                 label="Address Line 2"
-                value={user.address_line2 || "Not provided"}
+                value={user.addressline2 || "Not provided"}
               />
               <InfoField label="City" value={user.city || "Not provided"} />
               <InfoField label="State" value={user.state || "Not provided"} />
               <InfoField
-                label="ZIP Code"
-                value={user.zip_code || "Not provided"}
+                label="ZIP/Postal Code"
+                value={user.zipcode || "Not provided"}
               />
               <InfoField
                 label="Country"
                 value={user.country || "Not provided"}
-              />
-              <InfoField
-                label="Country Code"
-                value={user.country_code || "Not provided"}
               />
             </div>
           </div>
@@ -884,7 +1036,7 @@ const ViewUserModal = ({ user, onClose }) => {
             <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide">
               Account Status
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs text-gray-500 uppercase tracking-wide">
                   Status
@@ -901,18 +1053,131 @@ const ViewUserModal = ({ user, onClose }) => {
                   <KYCBadge status={user.kyc} />
                 </div>
               </div>
-              <div>
-                <label className="text-xs text-gray-500 uppercase tracking-wide">
-                  Level
-                </label>
-                <p className="text-sm font-medium text-gray-900 mt-1 capitalize">
-                  {user.level || "Not set"}
-                </p>
+            </div>
+          </div>
+
+          {/* Wallet Information */}
+          {user.walletbalance !== undefined && (
+            <div className="border-t border-gray-200 pt-6">
+              <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide flex items-center gap-2">
+                <CreditCard className="w-4 h-4" />
+                Wallet Information
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <InfoField
+                  label="Wallet Balance"
+                  value={`${user.currency || "USD"} ${user.walletbalance || 0}`}
+                />
+                <InfoField
+                  label="Total Deposits"
+                  value={`${user.currency || "USD"} ${user.totaldeposits || 0}`}
+                />
+                <InfoField
+                  label="Total Withdrawals"
+                  value={`${user.currency || "USD"} ${
+                    user.totalwithdrawals || 0
+                  }`}
+                />
               </div>
+            </div>
+          )}
+
+          {/* Platform Preferences */}
+          {(user.preferredMT5Terminal || user.preferredMT4Terminal) && (
+            <div className="border-t border-gray-200 pt-6">
+              <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide flex items-center gap-2">
+                <Building className="w-4 h-4" />
+                Platform Preferences
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <InfoField
+                  label="Preferred MT5 Terminal"
+                  value={user.preferredMT5Terminal || "Not set"}
+                />
+                <InfoField
+                  label="Preferred MT4 Terminal"
+                  value={user.preferredMT4Terminal || "Not set"}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Referral Information */}
+          {(user.referralCode || user.referredBy) && (
+            <div className="border-t border-gray-200 pt-6">
+              <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide">
+                Referral Information
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <InfoField
+                  label="Referral Code"
+                  value={user.referralCode || "Not generated"}
+                  mono
+                />
+                <InfoField
+                  label="Referred By"
+                  value={user.referredBy || "Direct signup"}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Trading Accounts */}
+          {user.tradingaccounts && user.tradingaccounts.length > 0 && (
+            <div className="border-t border-gray-200 pt-6">
+              <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide">
+                Trading Accounts
+              </h3>
+              <div className="space-y-2">
+                {user.tradingaccounts.map((account) => (
+                  <div
+                    key={account.id}
+                    className="p-3 bg-gray-50 rounded-lg border border-gray-200"
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {account.accountnumber}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {account.platform} - {account.type}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-gray-900">
+                          {account.currency} {account.balance}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Timestamps */}
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide">
+              Account Timestamps
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <InfoField
+                label="Created At"
+                value={formatDate(user.createdat)}
+              />
+              <InfoField
+                label="Last Updated"
+                value={formatDate(user.updatedat)}
+              />
+              <InfoField
+                label="Last Login"
+                value={formatDate(user.lastlogin)}
+              />
             </div>
           </div>
         </div>
 
+        {/* Footer */}
         <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4">
           <button
             onClick={onClose}
@@ -943,37 +1208,66 @@ const InfoField = ({ label, value, icon, mono = false }) => (
   </div>
 );
 
-// Edit User Modal
+// EDIT USER MODAL WITH ALL MODEL FIELDS
 const EditUserModal = ({ user, onClose, onSave }) => {
   const [formData, setFormData] = useState({
-    first_name: user.first_name || "",
-    last_name: user.last_name || "",
+    // Authentication
+    username: user.username || "",
     email: user.email || "",
+
+    // Personal Info
+    firstname: user.firstname || "",
+    lastname: user.lastname || "",
+    dateofbirth: user.dateofbirth || "",
     mobile: user.mobile || "",
+
+    // Role
+    role: user.role || "user",
+
+    // Address
+    country: user.country || "",
+    state: user.state || "",
+    city: user.city || "",
+    addressline1: user.addressline1 || "",
+    addressline2: user.addressline2 || "",
+    zipcode: user.zipcode || "",
+
+    // Account Status
     status: user.status || "active",
     kyc: user.kyc || "pending",
-    level: user.level || "beginner",
-    country: user.country || "",
-    city: user.city || "",
-    state: user.state || "",
-    zip_code: user.zip_code || "",
-    address_line1: user.address_line1 || "",
-    address_line2: user.address_line2 || "",
+
+    // Verification
+    emailverified: user.emailverified || false,
+    phoneverified: user.phoneverified || false,
+    mfaenabled: user.mfaenabled || false,
+
+    // Wallet
+    walletbalance: user.walletbalance || 0,
+    currency: user.currency || "USD",
+
+    // Platform Preferences
+    preferredMT5Terminal: user.preferredMT5Terminal || "",
+    preferredMT4Terminal: user.preferredMT4Terminal || "",
+
+    // Referral
+    referralCode: user.referralCode || "",
   });
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSaving(true);
-
     try {
       await onSave(user.id, formData);
       onClose();
@@ -986,8 +1280,9 @@ const EditUserModal = ({ user, onClose, onSave }) => {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+      <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
           <h2 className="text-xl font-semibold text-gray-900">Edit User</h2>
           <button
             onClick={onClose}
@@ -1012,12 +1307,24 @@ const EditUserModal = ({ user, onClose, onSave }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  name="username"
+                  value={formData.username}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   First Name *
                 </label>
                 <input
                   type="text"
-                  name="first_name"
-                  value={formData.first_name}
+                  name="firstname"
+                  value={formData.firstname}
                   onChange={handleChange}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
@@ -1029,8 +1336,8 @@ const EditUserModal = ({ user, onClose, onSave }) => {
                 </label>
                 <input
                   type="text"
-                  name="last_name"
-                  value={formData.last_name}
+                  name="lastname"
+                  value={formData.lastname}
                   onChange={handleChange}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
@@ -1061,6 +1368,24 @@ const EditUserModal = ({ user, onClose, onSave }) => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Date of Birth
+                </label>
+                <input
+                  type="date"
+                  name="dateofbirth"
+                  value={
+                    formData.dateofbirth
+                      ? new Date(formData.dateofbirth)
+                          .toISOString()
+                          .split("T")[0]
+                      : ""
+                  }
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
             </div>
           </div>
 
@@ -1076,8 +1401,8 @@ const EditUserModal = ({ user, onClose, onSave }) => {
                 </label>
                 <input
                   type="text"
-                  name="address_line1"
-                  value={formData.address_line1}
+                  name="addressline1"
+                  value={formData.addressline1}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 />
@@ -1088,8 +1413,8 @@ const EditUserModal = ({ user, onClose, onSave }) => {
                 </label>
                 <input
                   type="text"
-                  name="address_line2"
-                  value={formData.address_line2}
+                  name="addressline2"
+                  value={formData.addressline2}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 />
@@ -1120,12 +1445,12 @@ const EditUserModal = ({ user, onClose, onSave }) => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  ZIP Code
+                  ZIP/Postal Code
                 </label>
                 <input
                   type="text"
-                  name="zip_code"
-                  value={formData.zip_code}
+                  name="zipcode"
+                  value={formData.zipcode}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 />
@@ -1150,7 +1475,22 @@ const EditUserModal = ({ user, onClose, onSave }) => {
             <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide">
               Account Settings
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Role
+                </label>
+                <select
+                  name="role"
+                  value={formData.role}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="user">User</option>
+                  <option value="admin">Admin</option>
+                  <option value="superadmin">Super Admin</option>
+                </select>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Status
@@ -1162,8 +1502,9 @@ const EditUserModal = ({ user, onClose, onSave }) => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 >
                   <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
                   <option value="suspended">Suspended</option>
+                  <option value="pending">Pending</option>
+                  <option value="closed">Closed</option>
                 </select>
               </div>
               <div>
@@ -1184,19 +1525,186 @@ const EditUserModal = ({ user, onClose, onSave }) => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Level
+                  Currency
                 </label>
                 <select
-                  name="level"
-                  value={formData.level}
+                  name="currency"
+                  value={formData.currency}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 >
-                  <option value="beginner">Beginner</option>
-                  <option value="intermediate">Intermediate</option>
-                  <option value="advanced">Advanced</option>
-                  <option value="expert">Expert</option>
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="GBP">GBP</option>
+                  <option value="JPY">JPY</option>
+                  <option value="AUD">AUD</option>
                 </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Wallet Settings */}
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide">
+              Wallet Settings
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Wallet Balance
+                </label>
+                <input
+                  type="number"
+                  name="walletbalance"
+                  value={formData.walletbalance}
+                  onChange={handleChange}
+                  step="0.01"
+                  min="0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Platform Preferences */}
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide">
+              Platform Preferences
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Preferred MT5 Terminal
+                </label>
+                <select
+                  name="preferredMT5Terminal"
+                  value={formData.preferredMT5Terminal}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="">Not Set</option>
+                  <option value="MT5 WebTerminal">MT5 WebTerminal</option>
+                  <option value="MT5 Desktop">MT5 Desktop</option>
+                  <option value="MT5 Mobile">MT5 Mobile</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Preferred MT4 Terminal
+                </label>
+                <select
+                  name="preferredMT4Terminal"
+                  value={formData.preferredMT4Terminal}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="">Not Set</option>
+                  <option value="MT4 WebTerminal">MT4 WebTerminal</option>
+                  <option value="MT4 Desktop">MT4 Desktop</option>
+                  <option value="MT4 Mobile">MT4 Mobile</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Referral */}
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide">
+              Referral
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Referral Code
+                </label>
+                <input
+                  type="text"
+                  name="referralCode"
+                  value={formData.referralCode}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Verification Toggles */}
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide flex items-center gap-2">
+              <Shield className="w-4 h-4" />
+              Verification & Security
+            </h3>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-gray-600" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      Email Verified
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Mark email as verified
+                    </p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="emailverified"
+                    checked={formData.emailverified}
+                    onChange={handleChange}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex items-center gap-2">
+                  <Phone className="w-5 h-5 text-gray-600" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      Phone Verified
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Mark phone as verified
+                    </p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="phoneverified"
+                    checked={formData.phoneverified}
+                    onChange={handleChange}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-gray-600" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      2FA / MFA Enabled
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Enable/disable two-factor authentication
+                    </p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="mfaenabled"
+                    checked={formData.mfaenabled}
+                    onChange={handleChange}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
               </div>
             </div>
           </div>
@@ -1235,7 +1743,7 @@ const EditUserModal = ({ user, onClose, onSave }) => {
   );
 };
 
-// Delete User Modal
+// DELETE USER MODAL
 const DeleteUserModal = ({ user, onClose, onConfirm }) => {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
@@ -1243,7 +1751,6 @@ const DeleteUserModal = ({ user, onClose, onConfirm }) => {
   const handleDelete = async () => {
     setError("");
     setDeleting(true);
-
     try {
       await onConfirm(user.id);
       onClose();
@@ -1265,11 +1772,10 @@ const DeleteUserModal = ({ user, onClose, onConfirm }) => {
           <h2 className="text-xl font-semibold text-gray-900 text-center mb-2">
             Delete User
           </h2>
-
           <p className="text-sm text-gray-600 text-center mb-4">
             Are you sure you want to delete{" "}
             <span className="font-semibold">
-              {user.first_name} {user.last_name}
+              {user.firstname} {user.lastname}
             </span>
             ? This action cannot be undone.
           </p>

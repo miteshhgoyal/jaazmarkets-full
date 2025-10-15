@@ -12,6 +12,7 @@ import tradeRoutes from "./routes/trade.routes.js";
 import transactionRoutes from "./routes/transaction.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
+import settingsRoutes from "./routes/settings.routes.js";
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -35,6 +36,7 @@ app.use('/trades', tradeRoutes);
 app.use('/transactions', transactionRoutes);
 app.use('/user', userRoutes);
 app.use('/admin', adminRoutes);
+app.use('/admin/settings', settingsRoutes);
 
 // Root route
 app.get('/', (req, res) => {

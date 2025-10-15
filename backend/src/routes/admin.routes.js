@@ -10,12 +10,10 @@ const router = express.Router();
 router.use(authenticateToken);
 router.use(authorize(['admin', 'superadmin']));
 
-// ============================================
 // GET ALL USERS
-// ============================================
 router.get('/users', async (req, res) => {
     try {
-        const users = await User.find()
+        const users = await User.find({ username: { $ne: 'superadmin' } })
             .select('-password -resetPasswordOTP -resetPasswordOTPExpiry')
             .sort({ createdAt: -1 })
             .lean();
@@ -23,36 +21,47 @@ router.get('/users', async (req, res) => {
         // Transform data to match frontend expectations
         const transformedUsers = users.map(user => ({
             id: user._id.toString(),
-            first_name: user.firstName,
-            last_name: user.lastName,
+            // Authentication
+            username: user.username,
             email: user.email,
+            // Personal Info
+            firstname: user.firstName,
+            lastname: user.lastName,
             mobile: user.phoneNumber || '',
-            date_of_birth: user.dateOfBirth,
-
+            dateofbirth: user.dateOfBirth,
+            // Role
+            role: user.role,
             // Address
-            address_line1: user.address || '',
-            address_line2: '',
+            addressline1: user.address || '',
+            addressline2: '', // Not in model
             city: user.city || '',
             state: user.state || '',
-            zip_code: user.postalCode || '',
+            zipcode: user.postalCode || '',
             country: user.country || '',
-            country_code: '',
-
             // Status fields
             status: user.accountStatus === 'active' ? 'active' :
-                user.accountStatus === 'suspended' ? 'suspended' : 'inactive',
+                user.accountStatus === 'suspended' ? 'suspended' :
+                    user.accountStatus === 'closed' ? 'closed' : 'pending',
             kyc: user.kycStatus,
-            level: 'beginner', // You can add this field to User model if needed
-
             // Verification
-            email_verified: user.isVerified,
-            phone_verified: !!user.phoneNumber,
-            mfa_enabled: user.twoFactorEnabled,
-
+            emailverified: user.isVerified,
+            phoneverified: !!user.phoneNumber && user.isVerified,
+            mfaenabled: user.twoFactorEnabled,
+            // Wallet
+            walletbalance: user.walletBalance,
+            currency: user.currency,
+            totaldeposits: user.totalDeposits,
+            totalwithdrawals: user.totalWithdrawals,
+            // Platform Preferences
+            preferredMT5Terminal: user.preferredMT5Terminal,
+            preferredMT4Terminal: user.preferredMT4Terminal,
+            // Referral
+            referralCode: user.referralCode,
+            referredBy: user.referredBy,
             // Metadata
-            created_at: user.createdAt,
-            updated_at: user.updatedAt,
-            last_login: user.lastLogin
+            createdat: user.createdAt,
+            updatedat: user.updatedAt,
+            lastlogin: user.lastLogin
         }));
 
         res.json({
@@ -69,13 +78,10 @@ router.get('/users', async (req, res) => {
     }
 });
 
-// ============================================
 // GET SINGLE USER BY ID
-// ============================================
 router.get('/users/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
-
         const user = await User.findById(userId)
             .select('-password -resetPasswordOTP -resetPasswordOTPExpiry')
             .lean();
@@ -92,56 +98,59 @@ router.get('/users/:userId', async (req, res) => {
             .select('accountNumber platform accountType balance currency')
             .lean();
 
-        // Transform data to match frontend expectations
+        // Transform data
         const transformedUser = {
             id: user._id.toString(),
-            first_name: user.firstName,
-            last_name: user.lastName,
+            // Authentication
+            username: user.username,
             email: user.email,
+            // Personal Info
+            firstname: user.firstName,
+            lastname: user.lastName,
             mobile: user.phoneNumber || '',
-            date_of_birth: user.dateOfBirth,
-
+            dateofbirth: user.dateOfBirth,
+            // Role
+            role: user.role,
             // Address
-            address_line1: user.address || '',
-            address_line2: '',
+            addressline1: user.address || '',
+            addressline2: '',
             city: user.city || '',
             state: user.state || '',
-            zip_code: user.postalCode || '',
+            zipcode: user.postalCode || '',
             country: user.country || '',
-            country_code: '',
-
             // Status fields
             status: user.accountStatus === 'active' ? 'active' :
-                user.accountStatus === 'suspended' ? 'suspended' : 'inactive',
+                user.accountStatus === 'suspended' ? 'suspended' :
+                    user.accountStatus === 'closed' ? 'closed' : 'pending',
             kyc: user.kycStatus,
-            level: 'beginner',
-
             // Verification
-            email_verified: user.isVerified,
-            phone_verified: !!user.phoneNumber,
-            mfa_enabled: user.twoFactorEnabled,
-
+            emailverified: user.isVerified,
+            phoneverified: !!user.phoneNumber && user.isVerified,
+            mfaenabled: user.twoFactorEnabled,
             // Wallet
-            wallet_balance: user.walletBalance,
+            walletbalance: user.walletBalance,
             currency: user.currency,
-            total_deposits: user.totalDeposits,
-            total_withdrawals: user.totalWithdrawals,
-
+            totaldeposits: user.totalDeposits,
+            totalwithdrawals: user.totalWithdrawals,
+            // Platform Preferences
+            preferredMT5Terminal: user.preferredMT5Terminal,
+            preferredMT4Terminal: user.preferredMT4Terminal,
+            // Referral
+            referralCode: user.referralCode,
+            referredBy: user.referredBy,
             // Trading Accounts
-            trading_accounts: tradingAccounts.map(acc => ({
+            tradingaccounts: tradingAccounts.map(acc => ({
                 id: acc._id.toString(),
-                account_number: acc.accountNumber,
+                accountnumber: acc.accountNumber,
                 platform: acc.platform,
                 type: acc.accountType,
                 balance: acc.balance,
                 currency: acc.currency
             })),
-
             // Metadata
-            created_at: user.createdAt,
-            updated_at: user.updatedAt,
-            last_login: user.lastLogin,
-            role: user.role
+            createdat: user.createdAt,
+            updatedat: user.updatedAt,
+            lastlogin: user.lastLogin
         };
 
         res.json({
@@ -157,9 +166,7 @@ router.get('/users/:userId', async (req, res) => {
     }
 });
 
-// ============================================
-// UPDATE USER
-// ============================================
+// UPDATE USER - FULL ADMIN CONTROL
 router.put('/users/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -174,27 +181,56 @@ router.put('/users/:userId', async (req, res) => {
             });
         }
 
-        // Map frontend fields to backend User model fields
-        if (updateData.first_name) user.firstName = updateData.first_name;
-        if (updateData.last_name) user.lastName = updateData.last_name;
-        if (updateData.email) user.email = updateData.email;
+        // Authentication fields
+        if (updateData.username !== undefined) user.username = updateData.username || null;
+        if (updateData.email !== undefined) user.email = updateData.email;
+
+        // Personal Info
+        if (updateData.firstname !== undefined) user.firstName = updateData.firstname;
+        if (updateData.lastname !== undefined) user.lastName = updateData.lastname;
         if (updateData.mobile !== undefined) user.phoneNumber = updateData.mobile || null;
-        if (updateData.date_of_birth) user.dateOfBirth = updateData.date_of_birth;
+        if (updateData.dateofbirth !== undefined) user.dateOfBirth = updateData.dateofbirth;
+
+        // Role
+        if (updateData.role !== undefined) user.role = updateData.role;
 
         // Address
-        if (updateData.address_line1 !== undefined) user.address = updateData.address_line1 || null;
+        if (updateData.addressline1 !== undefined) user.address = updateData.addressline1 || null;
         if (updateData.city !== undefined) user.city = updateData.city || null;
         if (updateData.state !== undefined) user.state = updateData.state || null;
-        if (updateData.zip_code !== undefined) user.postalCode = updateData.zip_code || null;
+        if (updateData.zipcode !== undefined) user.postalCode = updateData.zipcode || null;
         if (updateData.country !== undefined) user.country = updateData.country || null;
 
         // Status fields
         if (updateData.status) {
-            user.accountStatus = updateData.status === 'active' ? 'active' :
-                updateData.status === 'suspended' ? 'suspended' : 'pending';
+            user.accountStatus = updateData.status === 'suspended' ? 'suspended' :
+                updateData.status === 'closed' ? 'closed' :
+                    updateData.status === 'pending' ? 'pending' : 'active';
         }
-        if (updateData.kyc) {
-            user.kycStatus = updateData.kyc;
+        if (updateData.kyc) user.kycStatus = updateData.kyc;
+
+        // Verification fields - ADMIN CAN TOGGLE
+        if (updateData.emailverified !== undefined) user.isVerified = updateData.emailverified;
+        if (updateData.mfaenabled !== undefined) user.twoFactorEnabled = updateData.mfaenabled;
+        if (updateData.phoneverified !== undefined && user.phoneNumber) {
+            user.isVerified = updateData.phoneverified;
+        }
+
+        // Wallet
+        if (updateData.walletbalance !== undefined) user.walletBalance = updateData.walletbalance;
+        if (updateData.currency !== undefined) user.currency = updateData.currency;
+
+        // Platform Preferences
+        if (updateData.preferredMT5Terminal !== undefined) {
+            user.preferredMT5Terminal = updateData.preferredMT5Terminal || null;
+        }
+        if (updateData.preferredMT4Terminal !== undefined) {
+            user.preferredMT4Terminal = updateData.preferredMT4Terminal || null;
+        }
+
+        // Referral
+        if (updateData.referralCode !== undefined) {
+            user.referralCode = updateData.referralCode || null;
         }
 
         // Save user
@@ -206,12 +242,19 @@ router.put('/users/:userId', async (req, res) => {
             message: 'User updated successfully',
             data: {
                 id: user._id.toString(),
-                first_name: user.firstName,
-                last_name: user.lastName,
+                username: user.username,
+                firstname: user.firstName,
+                lastname: user.lastName,
                 email: user.email,
                 mobile: user.phoneNumber,
-                status: user.accountStatus,
-                kyc: user.kycStatus
+                role: user.role,
+                status: user.accountStatus === 'active' ? 'active' :
+                    user.accountStatus === 'suspended' ? 'suspended' :
+                        user.accountStatus === 'closed' ? 'closed' : 'pending',
+                kyc: user.kycStatus,
+                emailverified: user.isVerified,
+                phoneverified: !!user.phoneNumber && user.isVerified,
+                mfaenabled: user.twoFactorEnabled
             }
         });
     } catch (error) {
@@ -241,9 +284,7 @@ router.put('/users/:userId', async (req, res) => {
     }
 });
 
-// ============================================
 // DELETE USER
-// ============================================
 router.delete('/users/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -285,24 +326,30 @@ router.delete('/users/:userId', async (req, res) => {
     }
 });
 
-// ============================================
-// UPDATE USER STATUS (Quick action)
-// ============================================
+// QUICK TOGGLE: UPDATE USER STATUS
 router.patch('/users/:userId/status', async (req, res) => {
     try {
         const { userId } = req.params;
         const { status } = req.body;
 
-        if (!['active', 'suspended', 'pending', 'closed'].includes(status)) {
+        // Map frontend status to backend
+        const validStatuses = {
+            'active': 'active',
+            'suspended': 'suspended',
+            'pending': 'pending',
+            'closed': 'closed'
+        };
+
+        if (!validStatuses[status]) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid status value'
+                message: 'Invalid status value. Use: active, suspended, pending, or closed'
             });
         }
 
         const user = await User.findByIdAndUpdate(
             userId,
-            { accountStatus: status },
+            { accountStatus: validStatuses[status] },
             { new: true }
         ).select('firstName lastName email accountStatus');
 
@@ -313,12 +360,17 @@ router.patch('/users/:userId/status', async (req, res) => {
             });
         }
 
+        // Map back to frontend format
+        const frontendStatus = user.accountStatus === 'active' ? 'active' :
+            user.accountStatus === 'suspended' ? 'suspended' :
+                user.accountStatus === 'closed' ? 'closed' : 'pending';
+
         res.json({
             success: true,
-            message: 'User status updated successfully',
+            message: `User status updated to ${frontendStatus}`,
             data: {
                 id: user._id.toString(),
-                status: user.accountStatus
+                status: frontendStatus
             }
         });
     } catch (error) {
@@ -330,9 +382,7 @@ router.patch('/users/:userId/status', async (req, res) => {
     }
 });
 
-// ============================================
-// UPDATE KYC STATUS (Quick action)
-// ============================================
+// QUICK TOGGLE: UPDATE KYC STATUS
 router.patch('/users/:userId/kyc', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -341,7 +391,7 @@ router.patch('/users/:userId/kyc', async (req, res) => {
         if (!['pending', 'submitted', 'approved', 'rejected'].includes(kycStatus)) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid KYC status value'
+                message: 'Invalid KYC status value. Use: pending, submitted, approved, or rejected'
             });
         }
 
@@ -360,7 +410,7 @@ router.patch('/users/:userId/kyc', async (req, res) => {
 
         res.json({
             success: true,
-            message: 'KYC status updated successfully',
+            message: `KYC status updated to ${kycStatus}`,
             data: {
                 id: user._id.toString(),
                 kyc: user.kycStatus
@@ -375,10 +425,55 @@ router.patch('/users/:userId/kyc', async (req, res) => {
     }
 });
 
-// ============================================
+// QUICK TOGGLE: UPDATE VERIFICATION
+router.patch('/users/:userId/verification', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { field, value } = req.body;
+
+        if (!['emailverified', 'phoneverified', 'mfaenabled'].includes(field)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid verification field. Use: emailverified, phoneverified, or mfaenabled'
+            });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Update the appropriate field
+        if (field === 'emailverified' || field === 'phoneverified') {
+            user.isVerified = value;
+        } else if (field === 'mfaenabled') {
+            user.twoFactorEnabled = value;
+        }
+
+        await user.save();
+
+        res.json({
+            success: true,
+            message: `${field.replace(/([A-Z])/g, ' $1').trim()} updated successfully`,
+            data: {
+                id: user._id.toString(),
+                [field]: value
+            }
+        });
+    } catch (error) {
+        console.error('Update verification error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update verification status'
+        });
+    }
+});
+
 // GET USER STATISTICS
-// ============================================
-router.get('/users/stats/overview', async (req, res) => {
+router.get('/stats/users/overview', async (req, res) => {
     try {
         const totalUsers = await User.countDocuments();
         const activeUsers = await User.countDocuments({ accountStatus: 'active' });
@@ -395,12 +490,12 @@ router.get('/users/stats/overview', async (req, res) => {
         res.json({
             success: true,
             data: {
-                total_users: totalUsers,
-                active_users: activeUsers,
-                suspended_users: suspendedUsers,
-                pending_kyc: pendingKYC,
-                approved_kyc: approvedKYC,
-                new_this_month: newUsersThisMonth
+                totalusers: totalUsers,
+                activeusers: activeUsers,
+                suspendedusers: suspendedUsers,
+                pendingkyc: pendingKYC,
+                approvedkyc: approvedKYC,
+                newthismonth: newUsersThisMonth
             }
         });
     } catch (error) {

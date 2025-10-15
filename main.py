@@ -49,22 +49,30 @@ def find_and_extract_files(target_files, root_dir='.', output_file='files-conten
 if __name__ == "__main__":
     # Define the files you want to search for
     files_to_find = [
+        # 'User.js',
+        # 'user.routes.js',
+        # 'account.routes.js',
+        # 'auth.routes.js',
+        # 'trade.routes.js',
+        # 'transaction.routes.js',
+        # 'Profile.jsx',
+        # 'Security.jsx',
+        # 'TradingTerminals.jsx',
+        # 'Setting.js',
+        # 'ProfileStatusCard.jsx',
+        # 'VerificationSteps.jsx',
+        # 'GridCard.jsx',
+        # 'ChangePasswordForm.jsx',
+        # 'ChangePhoneForm.jsx',
+        # 'ChangeTerminalForm.jsx',
+
+
+
+
+
+        "Users.jsx",
         'User.js',
-        'user.routes.js',
-        'account.routes.js',
-        'auth.routes.js',
-        'trade.routes.js',
-        'transaction.routes.js',
-        'Profile.jsx',
-        'Security.jsx',
-        'TradingTerminals.jsx',
-        'Setting.js',
-        'ProfileStatusCard.jsx',
-        'VerificationSteps.jsx',
-        'GridCard.jsx',
-        'ChangePasswordForm.jsx',
-        'ChangePhoneForm.jsx',
-        'ChangeTerminalForm.jsx',
+        'admin.routes.js',
     ]
     
     # Start the search from current directory
