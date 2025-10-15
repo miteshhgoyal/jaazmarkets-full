@@ -221,7 +221,7 @@ const Register = () => {
             </button>
           </form>
 
-          <p className="text-sm text-center text-gray-800 py-4">
+          {/* <p className="text-sm text-center text-gray-800 py-4">
             or sign up with
           </p>
 
@@ -233,7 +233,7 @@ const Register = () => {
           >
             <img src={google} alt="Google" className="w-4" />
             Google
-          </button>
+          </button> */}
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">

@@ -233,7 +233,7 @@ const Login = () => {
             </button>
           </form>
 
-          <p className="text-sm text-center text-gray-800 py-4">
+          {/* <p className="text-sm text-center text-gray-800 py-4">
             or sign in with
           </p>
 
@@ -245,7 +245,7 @@ const Login = () => {
           >
             <img src={google} className="w-4" alt="Google" />
             <span>Google</span>
-          </button>
+          </button> */}
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
