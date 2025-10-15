@@ -1,7 +1,7 @@
-import React, { useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import MetaHead from "../../components/MetaHead";
 import PageHeader from "../../components/ui/PageHeader";
-import { useData } from "../../hooks/useData";
+import { Link } from "react-router-dom";
 import {
   Users,
   Wallet,
@@ -11,36 +11,67 @@ import {
   Activity,
   CheckCircle,
   Clock,
-  XCircle,
-  ArrowUpRight,
-  ArrowDownRight,
-  CreditCard,
-  Award,
   AlertCircle,
+  ArrowUpRight,
+  Award,
   BarChart3,
+  RefreshCw,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import api from "../../services/api";
 
 const Dashboard = () => {
-  const { data: users, loading: usersLoading } = useData("users");
-  const { data: accounts, loading: accountsLoading } = useData("accounts");
-  const { data: deposits, loading: depositsLoading } = useData("deposits");
-  const { data: withdrawals, loading: withdrawalsLoading } =
-    useData("withdrawals");
+  // State management
+  const [users, setUsers] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [deposits, setDeposits] = useState([]);
+  const [withdrawals, setWithdrawals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const loading =
-    usersLoading || accountsLoading || depositsLoading || withdrawalsLoading;
+  // Fetch all data on mount
+  useEffect(() => {
+    fetchAllData();
+  }, []);
+
+  const fetchAllData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch all data in parallel
+      const [usersRes, accountsRes, depositsRes, withdrawalsRes] =
+        await Promise.all([
+          api.get("/admin/users?limit=1000"),
+          api.get("/account/admin/all?limit=1000"),
+          api.get("/transactions/admin/deposits?limit=1000"),
+          api.get("/transactions/admin/withdrawals?limit=1000"),
+        ]);
+
+      setUsers(usersRes.data.data || []);
+      setAccounts(accountsRes.data.data || []);
+      setDeposits(depositsRes.data.data || []);
+      setWithdrawals(withdrawalsRes.data.data || []);
+    } catch (err) {
+      console.error("Error fetching dashboard data:", err);
+      setError(err.response?.data?.message || "Failed to load dashboard data");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchAllData();
+  };
 
   // Calculate comprehensive statistics
   const stats = useMemo(() => {
     // User Statistics
     const totalUsers = users.length;
-    const activeUsers = users.filter(
-      (u) => u.accountStatus === "active"
-    ).length;
-    const verifiedUsers = users.filter(
-      (u) => u.kycStatus === "approved"
-    ).length;
+    const activeUsers = users.filter((u) => u.status === "active").length;
+    const verifiedUsers = users.filter((u) => u.kyc === "approved").length;
     const newUsersThisMonth = users.filter((u) => {
       const createdDate = new Date(u.createdAt);
       const now = new Date();
@@ -50,12 +81,17 @@ const Dashboard = () => {
       );
     }).length;
 
-    // Account Statistics
-    const allAccounts = [...(accounts.real || []), ...(accounts.demo || [])];
-    const realAccounts = accounts.real || [];
-    const demoAccounts = accounts.demo || [];
-    const archivedAccounts = accounts.archived || [];
+    // Trader Level Distribution
+    const traderLevels = users.reduce((acc, user) => {
+      const level = user.traderLevel || "beginner";
+      acc[level] = (acc[level] || 0) + 1;
+      return acc;
+    }, {});
 
+    // Account Statistics
+    const realAccounts = accounts.filter((a) => a.accountType === "Real");
+    const demoAccounts = accounts.filter((a) => a.accountType === "Demo");
+    const archivedAccounts = accounts.filter((a) => a.status === "closed");
     const totalBalance = realAccounts.reduce(
       (sum, acc) => sum + parseFloat(acc.balance || 0),
       0
@@ -71,7 +107,7 @@ const Dashboard = () => {
       (d) => d.status === "pending" || d.status === "processing"
     );
     const totalDeposited = completedDeposits.reduce(
-      (sum, d) => sum + parseFloat(d.amount),
+      (sum, d) => sum + parseFloat(d.amount || 0),
       0
     );
 
@@ -83,8 +119,9 @@ const Dashboard = () => {
         depositDate.getFullYear() === now.getFullYear()
       );
     });
+
     const depositsThisMonthAmount = depositsThisMonth.reduce(
-      (sum, d) => sum + parseFloat(d.amount),
+      (sum, d) => sum + parseFloat(d.amount || 0),
       0
     );
 
@@ -96,7 +133,7 @@ const Dashboard = () => {
       (w) => w.status === "pending" || w.status === "processing"
     );
     const totalWithdrawn = completedWithdrawals.reduce(
-      (sum, w) => sum + parseFloat(w.amount),
+      (sum, w) => sum + parseFloat(w.amount || 0),
       0
     );
 
@@ -108,8 +145,9 @@ const Dashboard = () => {
         withdrawalDate.getFullYear() === now.getFullYear()
       );
     });
+
     const withdrawalsThisMonthAmount = withdrawalsThisMonth.reduce(
-      (sum, w) => sum + parseFloat(w.amount),
+      (sum, w) => sum + parseFloat(w.amount || 0),
       0
     );
 
@@ -118,20 +156,12 @@ const Dashboard = () => {
     const netFlowThisMonth =
       depositsThisMonthAmount - withdrawalsThisMonthAmount;
 
-    // Trader Level Distribution
-    const traderLevels = users.reduce((acc, user) => {
-      acc[user.traderLevel] = (acc[user.traderLevel] || 0) + 1;
-      return acc;
-    }, {});
-
     // Recent Activity (last 7 days)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
     const recentDeposits = deposits.filter(
       (d) => new Date(d.createdAt) >= sevenDaysAgo
     ).length;
-
     const recentWithdrawals = withdrawals.filter(
       (w) => new Date(w.createdAt) >= sevenDaysAgo
     ).length;
@@ -145,7 +175,7 @@ const Dashboard = () => {
         traderLevels,
       },
       accounts: {
-        total: allAccounts.length,
+        total: accounts.length,
         real: realAccounts.length,
         demo: demoAccounts.length,
         archived: archivedAccounts.length,
@@ -183,7 +213,6 @@ const Dashboard = () => {
       ...deposits.map((d) => ({ ...d, type: "deposit" })),
       ...withdrawals.map((w) => ({ ...w, type: "withdrawal" })),
     ];
-
     return allTransactions
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
       .slice(0, 5);
@@ -191,8 +220,27 @@ const Dashboard = () => {
 
   // Top users by total deposits
   const topUsers = useMemo(() => {
-    return users.sort((a, b) => b.totalDeposits - a.totalDeposits).slice(0, 5);
-  }, [users]);
+    return users
+      .map((user) => {
+        const userDeposits = deposits.filter(
+          (d) => d.userId?._id === user._id && d.status === "completed"
+        );
+        const totalDeposits = userDeposits.reduce(
+          (sum, d) => sum + parseFloat(d.amount || 0),
+          0
+        );
+        const tradingAccounts = accounts.filter(
+          (a) => a.userId?._id === user._id || a.userId === user._id
+        );
+        return {
+          ...user,
+          totalDeposits,
+          tradingAccounts,
+        };
+      })
+      .sort((a, b) => b.totalDeposits - a.totalDeposits)
+      .slice(0, 5);
+  }, [users, deposits, accounts]);
 
   if (loading) {
     return (
@@ -207,9 +255,38 @@ const Dashboard = () => {
           subtitle="Manage all trading accounts and monitor performance"
         />
         <div className="flex justify-center items-center mt-20">
-          <div className="animate-pulse text-gray-600">
-            Loading dashboard...
+          <div className="flex items-center gap-3">
+            <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
+            <span className="text-gray-600">Loading dashboard...</span>
           </div>
+        </div>
+      </>
+    );
+  }
+
+  if (error) {
+    return (
+      <>
+        <MetaHead
+          title="Admin Dashboard"
+          description="Manage all trading accounts, view balances, equity, and overall performance."
+          keywords="trading accounts, account balance, equity, trading dashboard, portfolio management"
+        />
+        <PageHeader
+          title="Admin Dashboard"
+          subtitle="Manage all trading accounts and monitor performance"
+        />
+        <div className="flex flex-col justify-center items-center mt-20 gap-4">
+          <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+            <p className="text-red-600">Error: {error}</p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Retry
+          </button>
         </div>
       </>
     );
@@ -222,13 +299,12 @@ const Dashboard = () => {
         description="Manage all trading accounts, view balances, equity, and overall performance."
         keywords="trading accounts, account balance, equity, trading dashboard, portfolio management"
       />
-
       <PageHeader
         title="Admin Dashboard"
         subtitle="Manage all trading accounts and monitor performance"
       />
 
-      {/* Main Statistics Cards - Compact */}
+      {/* Main Statistics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mt-6">
         {/* Total Users */}
         <Link to="/admin/users" className="block">
@@ -246,17 +322,19 @@ const Dashboard = () => {
                 <Users className="w-5 h-5 text-blue-600" />
               </div>
             </div>
-            <p className="text-xs text-green-600 mb-2 flex items-center gap-1">
-              <ArrowUpRight className="w-3 h-3" />
-              {stats.users.newThisMonth} new this month
-            </p>
-            <div className="pt-2 border-t border-gray-100 flex justify-between text-xs">
-              <span className="text-gray-500">
-                Active: {stats.users.active}
-              </span>
-              <span className="text-gray-500">
-                Verified: {stats.users.verified}
-              </span>
+            <div>
+              <p className="text-xs text-green-600 mb-2 flex items-center gap-1">
+                <ArrowUpRight className="w-3 h-3" />
+                {stats.users.newThisMonth} new this month
+              </p>
+              <div className="pt-2 border-t border-gray-100 flex justify-between text-xs">
+                <span className="text-gray-500">
+                  Active: {stats.users.active}
+                </span>
+                <span className="text-gray-500">
+                  Verified: {stats.users.verified}
+                </span>
+              </div>
             </div>
           </div>
         </Link>
@@ -277,15 +355,19 @@ const Dashboard = () => {
                 <Wallet className="w-5 h-5 text-purple-600" />
               </div>
             </div>
-            <p className="text-xs text-blue-600 mb-2 flex items-center gap-1">
-              <Activity className="w-3 h-3" />
-              {stats.accounts.real} real accounts
-            </p>
-            <div className="pt-2 border-t border-gray-100 flex justify-between text-xs">
-              <span className="text-gray-500">Demo: {stats.accounts.demo}</span>
-              <span className="text-gray-500">
-                Archived: {stats.accounts.archived}
-              </span>
+            <div>
+              <p className="text-xs text-blue-600 mb-2 flex items-center gap-1">
+                <Activity className="w-3 h-3" />
+                {stats.accounts.real} real accounts
+              </p>
+              <div className="pt-2 border-t border-gray-100 flex justify-between text-xs">
+                <span className="text-gray-500">
+                  Demo: {stats.accounts.demo}
+                </span>
+                <span className="text-gray-500">
+                  Archived: {stats.accounts.archived}
+                </span>
+              </div>
             </div>
           </div>
         </Link>
@@ -306,17 +388,19 @@ const Dashboard = () => {
                 <TrendingUp className="w-5 h-5 text-green-600" />
               </div>
             </div>
-            <p className="text-xs text-green-600 mb-2 flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" />$
-              {stats.deposits.thisMonthAmount} this month
-            </p>
-            <div className="pt-2 border-t border-gray-100 flex justify-between text-xs">
-              <span className="text-gray-500">
-                Completed: {stats.deposits.completed}
-              </span>
-              <span className="text-orange-500">
-                Pending: {stats.deposits.pending}
-              </span>
+            <div>
+              <p className="text-xs text-green-600 mb-2 flex items-center gap-1">
+                <TrendingUp className="w-3 h-3" />$
+                {stats.deposits.thisMonthAmount} this month
+              </p>
+              <div className="pt-2 border-t border-gray-100 flex justify-between text-xs">
+                <span className="text-gray-500">
+                  Completed: {stats.deposits.completed}
+                </span>
+                <span className="text-orange-500">
+                  Pending: {stats.deposits.pending}
+                </span>
+              </div>
             </div>
           </div>
         </Link>
@@ -337,23 +421,25 @@ const Dashboard = () => {
                 <TrendingDown className="w-5 h-5 text-red-600" />
               </div>
             </div>
-            <p className="text-xs text-red-600 mb-2 flex items-center gap-1">
-              <TrendingDown className="w-3 h-3" />$
-              {stats.withdrawals.thisMonthAmount} this month
-            </p>
-            <div className="pt-2 border-t border-gray-100 flex justify-between text-xs">
-              <span className="text-gray-500">
-                Completed: {stats.withdrawals.completed}
-              </span>
-              <span className="text-orange-500">
-                Pending: {stats.withdrawals.pending}
-              </span>
+            <div>
+              <p className="text-xs text-red-600 mb-2 flex items-center gap-1">
+                <TrendingDown className="w-3 h-3" />$
+                {stats.withdrawals.thisMonthAmount} this month
+              </p>
+              <div className="pt-2 border-t border-gray-100 flex justify-between text-xs">
+                <span className="text-gray-500">
+                  Completed: {stats.withdrawals.completed}
+                </span>
+                <span className="text-orange-500">
+                  Pending: {stats.withdrawals.pending}
+                </span>
+              </div>
             </div>
           </div>
         </Link>
       </div>
 
-      {/* Financial Overview Cards - Compact */}
+      {/* Financial Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
         {/* Total Balance */}
         <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-4 text-white">
@@ -423,7 +509,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Recent Activity Section - Responsive */}
+      {/* Recent Activity Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
         {/* Recent Transactions */}
         <div className="bg-white border border-gray-200 rounded-xl p-4">
@@ -435,7 +521,6 @@ const Dashboard = () => {
               {stats.deposits.recent + stats.withdrawals.recent} in last 7 days
             </span>
           </div>
-
           <div className="space-y-2">
             {recentTransactions.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-6">
@@ -443,10 +528,14 @@ const Dashboard = () => {
               </p>
             ) : (
               recentTransactions.map((transaction) => {
-                const user = users.find((u) => u.id === transaction.userId);
+                const user = users.find(
+                  (u) =>
+                    u._id === transaction.userId?._id ||
+                    u._id === transaction.userId
+                );
                 return (
                   <div
-                    key={transaction.id}
+                    key={transaction._id}
                     className="flex items-center justify-between p-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                   >
                     <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -458,23 +547,21 @@ const Dashboard = () => {
                         }`}
                       >
                         {transaction.type === "deposit" ? (
-                          <TrendingUp
-                            className={`w-3.5 h-3.5 text-green-600`}
-                          />
+                          <TrendingUp className="w-3.5 h-3.5 text-green-600" />
                         ) : (
-                          <TrendingDown
-                            className={`w-3.5 h-3.5 text-red-600`}
-                          />
+                          <TrendingDown className="w-3.5 h-3.5 text-red-600" />
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-gray-900 truncate">
                           {user
-                            ? `${user.firstName} ${user.lastName}`
+                            ? `${user.firstName || ""} ${user.lastName || ""}`
                             : "Unknown"}
                         </p>
                         <p className="text-xs text-gray-500 truncate">
-                          {transaction.methodName}
+                          {transaction.paymentMethod ||
+                            transaction.withdrawalMethod ||
+                            "N/A"}
                         </p>
                       </div>
                     </div>
@@ -487,7 +574,7 @@ const Dashboard = () => {
                         }`}
                       >
                         {transaction.type === "deposit" ? "+" : "-"}$
-                        {parseFloat(transaction.amount).toFixed(2)}
+                        {parseFloat(transaction.amount || 0).toFixed(2)}
                       </p>
                       <StatusBadge status={transaction.status} />
                     </div>
@@ -504,7 +591,6 @@ const Dashboard = () => {
             <h3 className="text-base font-semibold text-gray-900">Top Users</h3>
             <Award className="w-4 h-4 text-yellow-500" />
           </div>
-
           <div className="space-y-2">
             {topUsers.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-6">
@@ -513,8 +599,8 @@ const Dashboard = () => {
             ) : (
               topUsers.map((user, index) => (
                 <Link
-                  key={user.id}
-                  to={`/admin/users`}
+                  key={user._id}
+                  to="/admin/users"
                   className="flex items-center justify-between p-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                 >
                   <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -523,7 +609,7 @@ const Dashboard = () => {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-gray-900 truncate">
-                        {user.firstName} {user.lastName}
+                        {user.firstName || ""} {user.lastName || ""}
                       </p>
                       <p className="text-xs text-gray-500 truncate">
                         {user.email}
@@ -545,7 +631,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Statistics Grid - Compact */}
+      {/* Statistics Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
         {/* Trader Level Distribution */}
         <div className="bg-white border border-gray-200 rounded-xl p-4">
@@ -561,7 +647,6 @@ const Dashboard = () => {
                 advanced: "bg-orange-500",
                 professional: "bg-purple-500",
               };
-
               return (
                 <div key={level}>
                   <div className="flex items-center justify-between mb-1">
@@ -578,7 +663,7 @@ const Dashboard = () => {
                         colors[level] || "bg-gray-500"
                       }`}
                       style={{ width: `${percentage}%` }}
-                    ></div>
+                    />
                   </div>
                 </div>
               );
@@ -651,7 +736,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Alerts Section - Compact */}
+      {/* Alerts Section */}
       {(stats.deposits.pending > 0 || stats.withdrawals.pending > 0) && (
         <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-xl p-4">
           <div className="flex items-start gap-2">
@@ -666,24 +751,24 @@ const Dashboard = () => {
                 {stats.withdrawals.pending} pending withdrawal
                 {stats.withdrawals.pending !== 1 ? "s" : ""}
               </p>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {stats.deposits.pending > 0 && (
-                  <Link
-                    to="/admin/deposits"
-                    className="text-xs font-medium text-yellow-900 hover:text-yellow-700 underline"
-                  >
-                    View Deposits →
-                  </Link>
-                )}
-                {stats.withdrawals.pending > 0 && (
-                  <Link
-                    to="/admin/withdrawals"
-                    className="text-xs font-medium text-yellow-900 hover:text-yellow-700 underline"
-                  >
-                    View Withdrawals →
-                  </Link>
-                )}
-              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {stats.deposits.pending > 0 && (
+                <Link
+                  to="/admin/deposits"
+                  className="text-xs font-medium text-yellow-900 hover:text-yellow-700 underline"
+                >
+                  View Deposits
+                </Link>
+              )}
+              {stats.withdrawals.pending > 0 && (
+                <Link
+                  to="/admin/withdrawals"
+                  className="text-xs font-medium text-yellow-900 hover:text-yellow-700 underline"
+                >
+                  View Withdrawals
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -701,6 +786,7 @@ const StatusBadge = ({ status }) => {
     failed: "bg-red-100 text-red-700",
     cancelled: "bg-gray-100 text-gray-700",
   };
+
   return (
     <span
       className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded ${
