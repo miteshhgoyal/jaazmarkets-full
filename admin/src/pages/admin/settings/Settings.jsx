@@ -1579,6 +1579,23 @@ const Settings = () => {
                 </div>
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Image URL
+                  </label>
+                  <input
+                    type="text"
+                    value={depositMethodForm.image}
+                    onChange={(e) =>
+                      setDepositMethodForm({
+                        ...depositMethodForm,
+                        image: e.target.value,
+                      })
+                    }
+                    placeholder="https://..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
                     Description
                   </label>
                   <textarea
@@ -1978,9 +1995,11 @@ const Settings = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                   >
                     <option value="Standard accounts">Standard accounts</option>
+                    <option value="Professional accounts">
+                      Professional accounts
+                    </option>
                     <option value="Premium accounts">Premium accounts</option>
                     <option value="VIP accounts">VIP accounts</option>
-                    <option value="Islamic accounts">Islamic accounts</option>
                   </select>
                 </div>
                 <div className="col-span-2">
