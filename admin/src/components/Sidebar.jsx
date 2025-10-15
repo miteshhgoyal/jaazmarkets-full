@@ -80,7 +80,7 @@ const Sidebar = ({ isOpen, onToggle, isCollapsed, toggleCollapsed }) => {
       icon: Dock,
     },
     {
-      name: "Settigns",
+      name: "Settings",
       icon: Settings2,
       href: "/admin/settings",
     },
