@@ -5,10 +5,10 @@ import dotenv from 'dotenv';
 
 dotenv.config({ quiet: true });
 
-const MONGO_URI = 'mongodb://localhost:27017/jaazcrm';
-// const MONGO_URI = process.env.NODE_ENV === 'development'
-//     ? process.env.MONGODB_URI
-//     : process.env.MONGODB_URI_PROD;
+// const MONGO_URI = 'mongodb://localhost:27017/jaazcrm';
+const MONGO_URI = process.env.NODE_ENV === 'development'
+    ? process.env.MONGODB_URI
+    : process.env.MONGODB_URI_PROD;
 
 const connectDB = async () => {
     try {
