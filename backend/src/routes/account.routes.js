@@ -281,12 +281,43 @@ router.get('/my-accounts/:accountId', authenticateToken, async (req, res) => {
     }
 });
 
-// ADMIN: GET ALL ACCOUNTS
-router.get('/all', authenticateToken, authorize(['admin', 'superadmin']), async (req, res) => {
+// ADMIN: MANAGE SETTINGS
+router.put('/settings', authenticateToken, authorize(['admin', 'superadmin']), async (req, res) => {
     try {
-        const { page = 1, limit = 10, accountType, platform, status, search } = req.query;
+        const updateData = req.body;
+        updateData.updatedBy = req.user.userId;
+
+        let settings = await Settings.findOne();
+
+        if (!settings) {
+            settings = new Settings(updateData);
+        } else {
+            Object.assign(settings, updateData);
+        }
+
+        await settings.save();
+
+        res.json({
+            success: true,
+            message: 'Settings updated successfully',
+            data: settings
+        });
+    } catch (error) {
+        console.error('Update settings error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update settings'
+        });
+    }
+});
+
+// ADMIN: GET ALL ACCOUNTS (Enhanced)
+router.get('/admin/all', authenticateToken, authorize(['admin', 'superadmin']), async (req, res) => {
+    try {
+        const { page = 1, limit = 1000, accountType, platform, status, search } = req.query;
 
         const query = {};
+
         if (accountType) query.accountType = accountType;
         if (platform) query.platform = platform;
         if (status) query.status = status;
@@ -298,7 +329,7 @@ router.get('/all', authenticateToken, authorize(['admin', 'superadmin']), async 
         }
 
         const accounts = await TradingAccount.find(query)
-            .populate('userId', 'firstName lastName email')
+            .populate('userId', 'firstName lastName email phoneNumber')
             .select('-password')
             .limit(limit * 1)
             .skip((page - 1) * limit)
@@ -322,8 +353,121 @@ router.get('/all', authenticateToken, authorize(['admin', 'superadmin']), async 
     }
 });
 
+// ADMIN: GET SINGLE ACCOUNT BY ID
+router.get('/admin/:accountId', authenticateToken, authorize(['admin', 'superadmin']), async (req, res) => {
+    try {
+        const { accountId } = req.params;
+
+        const account = await TradingAccount.findById(accountId)
+            .populate('userId', 'firstName lastName email phoneNumber')
+            .select('-password');
+
+        if (!account) {
+            return res.status(404).json({
+                success: false,
+                message: 'Account not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            data: account
+        });
+    } catch (error) {
+        console.error('Get account error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch account'
+        });
+    }
+});
+
+// ADMIN: UPDATE ACCOUNT (FULL UPDATE)
+router.put('/admin/:accountId', authenticateToken, authorize(['admin', 'superadmin']), async (req, res) => {
+    try {
+        const { accountId } = req.params;
+        const updateData = req.body;
+
+        // Don't allow updating account number, login, or password through this route
+        delete updateData.accountNumber;
+        delete updateData.login;
+        delete updateData.password;
+
+        const account = await TradingAccount.findByIdAndUpdate(
+            accountId,
+            updateData,
+            { new: true, runValidators: true }
+        )
+            .populate('userId', 'firstName lastName email')
+            .select('-password');
+
+        if (!account) {
+            return res.status(404).json({
+                success: false,
+                message: 'Account not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Account updated successfully',
+            data: account
+        });
+    } catch (error) {
+        console.error('Update account error:', error);
+
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({
+                success: false,
+                message: Object.values(error.errors).map(e => e.message).join(', ')
+            });
+        }
+
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update account'
+        });
+    }
+});
+
+// ADMIN: DELETE ACCOUNT
+router.delete('/admin/:accountId', authenticateToken, authorize(['admin', 'superadmin']), async (req, res) => {
+    try {
+        const { accountId } = req.params;
+
+        const account = await TradingAccount.findById(accountId);
+
+        if (!account) {
+            return res.status(404).json({
+                success: false,
+                message: 'Account not found'
+            });
+        }
+
+        // Remove account reference from user
+        await User.findByIdAndUpdate(
+            account.userId,
+            { $pull: { tradingAccounts: accountId } }
+        );
+
+        // Delete the account
+        await TradingAccount.findByIdAndDelete(accountId);
+
+        res.json({
+            success: true,
+            message: 'Account deleted successfully'
+        });
+    } catch (error) {
+        console.error('Delete account error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to delete account'
+        });
+    }
+});
+
 // ADMIN: UPDATE ACCOUNT STATUS
-router.patch('/:accountId/status', authenticateToken, authorize(['admin', 'superadmin']), async (req, res) => {
+router.patch('/admin/:accountId/status', authenticateToken, authorize(['admin', 'superadmin']), async (req, res) => {
     try {
         const { accountId } = req.params;
         const { status } = req.body;
@@ -364,7 +508,7 @@ router.patch('/:accountId/status', authenticateToken, authorize(['admin', 'super
 });
 
 // ADMIN: UPDATE ACCOUNT BALANCE
-router.patch('/:accountId/balance', authenticateToken, authorize(['admin', 'superadmin']), async (req, res) => {
+router.patch('/admin/:accountId/balance', authenticateToken, authorize(['admin', 'superadmin']), async (req, res) => {
     try {
         const { accountId } = req.params;
         const { balance, equity, freeMargin } = req.body;
@@ -397,36 +541,6 @@ router.patch('/:accountId/balance', authenticateToken, authorize(['admin', 'supe
         res.status(500).json({
             success: false,
             message: 'Failed to update account balance'
-        });
-    }
-});
-
-// ADMIN: MANAGE SETTINGS
-router.put('/settings', authenticateToken, authorize(['admin', 'superadmin']), async (req, res) => {
-    try {
-        const updateData = req.body;
-        updateData.updatedBy = req.user.userId;
-
-        let settings = await Settings.findOne();
-
-        if (!settings) {
-            settings = new Settings(updateData);
-        } else {
-            Object.assign(settings, updateData);
-        }
-
-        await settings.save();
-
-        res.json({
-            success: true,
-            message: 'Settings updated successfully',
-            data: settings
-        });
-    } catch (error) {
-        console.error('Update settings error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to update settings'
         });
     }
 });
