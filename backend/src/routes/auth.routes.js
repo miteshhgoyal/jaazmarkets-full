@@ -38,7 +38,6 @@ const sanitizeUser = (user) => {
     return {
         id: user._id,
         email: user.email,
-        username: user.username,
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
@@ -60,7 +59,7 @@ const sanitizeUser = (user) => {
 // SIGNUP - Register new user
 router.post('/signup', async (req, res) => {
     try {
-        const { email, password, firstName, lastName, mobile, username } = req.body;
+        const { email, password, firstName, lastName, mobile } = req.body;
 
         // Validation
         if (!email || !password || !firstName || !lastName) {
@@ -74,7 +73,6 @@ router.post('/signup', async (req, res) => {
         const existingUser = await User.findOne({
             $or: [
                 { email: email.toLowerCase() },
-                ...(username ? [{ username }] : []),
                 ...(mobile ? [{ phoneNumber: mobile }] : []),
             ],
         });
@@ -82,7 +80,7 @@ router.post('/signup', async (req, res) => {
         if (existingUser) {
             return res.status(400).json({
                 success: false,
-                message: 'User with this email, username, or phone already exists',
+                message: 'User with this email, or phone already exists',
             });
         }
 
@@ -92,7 +90,6 @@ router.post('/signup', async (req, res) => {
             password,
             firstName,
             lastName,
-            username,
             phoneNumber: mobile,
             role: 'user', // Default role
             accountStatus: 'pending',

@@ -13,7 +13,7 @@ router.use(authorize(['admin', 'superadmin']));
 // GET ALL USERS
 router.get('/users', async (req, res) => {
     try {
-        const users = await User.find({ username: { $ne: 'superadmin' } })
+        const users = await User.find({ email: { $ne: 'admin@jaaz.com' } })
             .select('-password -resetPasswordOTP -resetPasswordOTPExpiry')
             .sort({ createdAt: -1 })
             .lean();
@@ -21,8 +21,7 @@ router.get('/users', async (req, res) => {
         // Transform data to match frontend expectations
         const transformedUsers = users.map(user => ({
             id: user._id.toString(),
-            // Authentication
-            username: user.username,
+            // Authentication            
             email: user.email,
             // Personal Info
             firstname: user.firstName,
@@ -102,7 +101,6 @@ router.get('/users/:userId', async (req, res) => {
         const transformedUser = {
             id: user._id.toString(),
             // Authentication
-            username: user.username,
             email: user.email,
             // Personal Info
             firstname: user.firstName,
@@ -182,7 +180,6 @@ router.put('/users/:userId', async (req, res) => {
         }
 
         // Authentication fields
-        if (updateData.username !== undefined) user.username = updateData.username || null;
         if (updateData.email !== undefined) user.email = updateData.email;
 
         // Personal Info
@@ -242,7 +239,6 @@ router.put('/users/:userId', async (req, res) => {
             message: 'User updated successfully',
             data: {
                 id: user._id.toString(),
-                username: user.username,
                 firstname: user.firstName,
                 lastname: user.lastName,
                 email: user.email,

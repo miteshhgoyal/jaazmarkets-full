@@ -17,13 +17,6 @@ const userSchema = new mongoose.Schema({
         required: true,
         select: false
     },
-    username: {
-        type: String,
-        unique: true,
-        sparse: true,
-        trim: true,
-        index: true
-    },
 
     // Role
     role: {

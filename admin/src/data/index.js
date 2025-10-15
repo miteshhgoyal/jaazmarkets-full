@@ -13,7 +13,7 @@ export const mockData = {
             // Authentication & Security
             email: "john.smith@email.com",
             passwordHash: "$2b$10$abcd1234efgh5678ijkl", // Hashed password
-            username: "johnsmith_trader",
+            
 
             // Personal Information
             firstName: "John",
@@ -123,7 +123,7 @@ export const mockData = {
             id: "user_002",
             email: "priya.sharma@email.com",
             passwordHash: "$2b$10$xyz9876abc5432def",
-            username: "priya_trades",
+            
             firstName: "Priya",
             lastName: "Sharma",
             dateOfBirth: "1995-03-22",
@@ -198,7 +198,7 @@ export const mockData = {
             id: "user_003",
             email: "rajesh.kumar@email.com",
             passwordHash: "$2b$10$def4567ghi8901jkl",
-            username: "rajesh_fx",
+            
             firstName: "Rajesh",
             lastName: "Kumar",
             dateOfBirth: "1988-11-10",
@@ -284,7 +284,7 @@ export const mockData = {
             id: "user_004",
             email: "aisha.patel@email.com",
             passwordHash: "$2b$10$mno3456pqr7890stu",
-            username: "aisha_investor",
+            
             firstName: "Aisha",
             lastName: "Patel",
             dateOfBirth: "1992-07-18",
@@ -359,7 +359,7 @@ export const mockData = {
             id: "user_005",
             email: "vikram.singh@email.com",
             passwordHash: "$2b$10$vwx6789yza1234bcd",
-            username: "vikram_pro",
+            
             firstName: "Vikram",
             lastName: "Singh",
             dateOfBirth: "1985-02-28",
@@ -445,7 +445,7 @@ export const mockData = {
             id: "user_006",
             email: "meera.nair@email.com",
             passwordHash: "$2b$10$efg7890hij1234klm",
-            username: "meera_trader",
+            
             firstName: "Meera",
             lastName: "Nair",
             dateOfBirth: "1997-09-05",
@@ -520,7 +520,7 @@ export const mockData = {
             id: "user_007",
             email: "arjun.reddy@email.com",
             passwordHash: "$2b$10$nop8901qrs2345tuv",
-            username: "arjun_fx",
+            
             firstName: "Arjun",
             lastName: "Reddy",
             dateOfBirth: "1991-04-12",

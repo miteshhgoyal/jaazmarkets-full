@@ -218,7 +218,6 @@ const Users = () => {
         user.lastname?.toLowerCase().includes(searchLower) ||
         user.email?.toLowerCase().includes(searchLower) ||
         user.mobile?.toLowerCase().includes(searchLower) ||
-        user.username?.toLowerCase().includes(searchLower) ||
         user.id?.toLowerCase().includes(searchLower);
 
       const matchesStatus =
@@ -281,7 +280,6 @@ const Users = () => {
 
   const csvHeaders = [
     { label: "User ID", key: "id" },
-    { label: "Username", key: "username" },
     { label: "First Name", key: "firstname" },
     { label: "Last Name", key: "lastname" },
     { label: "Email", key: "email" },
@@ -355,7 +353,7 @@ const Users = () => {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by name, email, mobile, username or ID..."
+            placeholder="Search by name, email, mobile, or ID..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white"
@@ -461,19 +459,7 @@ const Users = () => {
                       />
                     </div>
                   </th>
-                  <th
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleSort("username")}
-                  >
-                    <div className="flex items-center gap-1">
-                      Username
-                      <SortIcon
-                        field="username"
-                        sortField={sortField}
-                        sortDirection={sortDirection}
-                      />
-                    </div>
-                  </th>
+
                   <th
                     className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                     onClick={() => handleSort("firstname")}
@@ -523,9 +509,7 @@ const Users = () => {
                     <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-600">
                       {user.id?.substring(0, 8)}...
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
-                      {user.username || "N/A"}
-                    </td>
+
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold text-xs">
@@ -917,7 +901,6 @@ const ViewUserModal = ({ user, onClose }) => {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <InfoField label="User ID" value={user.id} mono />
-              <InfoField label="Username" value={user.username || "Not set"} />
               <InfoField label="First Name" value={user.firstname} />
               <InfoField label="Last Name" value={user.lastname} />
               <InfoField
@@ -1212,7 +1195,6 @@ const InfoField = ({ label, value, icon, mono = false }) => (
 const EditUserModal = ({ user, onClose, onSave }) => {
   const [formData, setFormData] = useState({
     // Authentication
-    username: user.username || "",
     email: user.email || "",
 
     // Personal Info
@@ -1305,18 +1287,6 @@ const EditUserModal = ({ user, onClose, onSave }) => {
               Personal Information
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Username
-                </label>
-                <input
-                  type="text"
-                  name="username"
-                  value={formData.username}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   First Name *

@@ -36,7 +36,7 @@ const seedAdminUser = async () => {
         }
 
         // Check if admin user already exists
-        const existingAdmin = await User.findOne({ username: adminUsername });
+        const existingAdmin = await User.findOne({ email: adminEmail });
 
         if (existingAdmin) {
             console.log('✓ Admin user already exists');
@@ -45,7 +45,6 @@ const seedAdminUser = async () => {
 
         // Create admin user (password will be auto-hashed by pre-save hook)
         const admin = new User({
-            username: adminUsername,
             email: adminEmail,
             phoneNumber: adminPhone,
             password: adminPassword,
@@ -59,7 +58,6 @@ const seedAdminUser = async () => {
 
         await admin.save();
         console.log('✓ Admin user created successfully');
-        console.log(`  Username: ${adminUsername}`);
         console.log(`  Email: ${adminEmail}`);
     } catch (error) {
         console.error('Error seeding admin user:', error.message);
