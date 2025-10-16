@@ -40,12 +40,11 @@ const getOrCreateSettings = async () => {
             },
             blockBeeSettings: {
                 enabled: false,
-                apiKeyV2: '',
+                apiKeyV2: 'AoxpSRGjhuBkaUIS6Oj4tN23qWWYsElY1wC62iqkKZ1I',
                 supportedCoins: [],
                 depositSettings: {
                     minAmount: 10,
                     maxAmount: 100000,
-                    
                 },
                 withdrawalSettings: {
                     minAmount: 10,
