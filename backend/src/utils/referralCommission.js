@@ -18,10 +18,6 @@ export const calculateAndPayReferralCommission = async (trade) => {
         // Get referral settings
         const settings = await Settings.findOne();
 
-        if (!settings?.referralSettings?.enabled) {
-            return; // Referral system disabled
-        }
-
         // Calculate trade amount: volume * openPrice
         const tradeAmount = trade.volume * trade.openPrice;
 

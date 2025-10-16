@@ -215,14 +215,14 @@ router.put(
     authenticateToken,
     async (req, res) => {
         try {
-            const { enabled, commissionPercentage, minPayoutAmount, payoutMethod } = req.body;
+            const { commissionPercentage, minPayoutAmount, payoutMethod } = req.body;
 
             let settings = await Settings.findOne();
             if (!settings) {
                 settings = new Settings();
             }
 
-            if (enabled !== undefined) settings.referralSettings.enabled = enabled;
+
             if (commissionPercentage !== undefined)
                 settings.referralSettings.commissionPercentage = commissionPercentage;
             if (minPayoutAmount !== undefined)

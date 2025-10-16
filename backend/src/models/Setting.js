@@ -136,27 +136,13 @@ const settingsSchema = new mongoose.Schema({
 
     // BlockBee Configuration (NEW - replaces deposit/withdrawal methods)
     blockBeeSettings: {
-        enabled: {
-            type: Boolean,
-            default: true
-        },
+
         apiKeyV2: {
             type: String,
             required: false
         },
-        apiKeyPayout: {
-            type: String,
-            required: false
-        },
-        webhookBaseUrl: {
-            type: String,
-            required: false
-        },
-        defaultCurrency: {
-            type: String,
-            default: 'usd',
-            enum: ['usd', 'eur', 'gbp']
-        },
+
+
         // Supported coins for deposits/withdrawals
         supportedCoins: [{
             ticker: String,          // btc, eth, usdt_erc20, usdt_trc20, etc.
@@ -177,10 +163,7 @@ const settingsSchema = new mongoose.Schema({
                 type: Number,
                 default: 100000
             },
-            autoApprove: {
-                type: Boolean,
-                default: true
-            }
+            
         },
         // Withdrawal-specific settings
         withdrawalSettings: {
@@ -191,10 +174,6 @@ const settingsSchema = new mongoose.Schema({
             maxAmount: {
                 type: Number,
                 default: 50000
-            },
-            autoProcess: {
-                type: Boolean,
-                default: false        // Requires admin approval by default
             },
             feePercentage: {
                 type: Number,
@@ -209,10 +188,7 @@ const settingsSchema = new mongoose.Schema({
 
     // Referral Settings
     referralSettings: {
-        enabled: {
-            type: Boolean,
-            default: true
-        },
+
         commissionPercentage: {
             type: Number,
             default: 0.01,

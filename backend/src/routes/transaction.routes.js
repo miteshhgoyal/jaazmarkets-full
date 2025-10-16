@@ -19,17 +19,8 @@ const getBlockBeeSettings = async () => {
 
     const blockBee = settings.blockBeeSettings;
 
-    // Validate required settings
-    if (!blockBee.enabled) {
-        throw new Error('BlockBee is disabled in settings');
-    }
-
     if (!blockBee.apiKeyV2 || blockBee.apiKeyV2.trim() === '') {
         throw new Error('BlockBee API key is not configured');
-    }
-
-    if (!blockBee.webhookBaseUrl || blockBee.webhookBaseUrl.trim() === '') {
-        throw new Error('BlockBee webhook URL is not configured');
     }
 
     return blockBee;
@@ -1677,8 +1668,8 @@ router.post('/blockbee/deposit/create', authenticateToken, async (req, res) => {
         // Build BlockBee API request
         const params = new URLSearchParams({
             apikey: blockBeeSettings.apiKeyV2,
-            notify_url: `${blockBeeSettings.webhookBaseUrl}/api/transactions/blockbee/webhook/deposit?user_id=${userId}&trading_account_id=${tradingAccountId || ''}`,
-            currency: blockBeeSettings.defaultCurrency || 'usd',
+            notify_url: `https://api.blockbee.io/api/transactions/blockbee/webhook/deposit?user_id=${userId}&trading_account_id=${tradingAccountId || ''}`,
+            currency: 'usd',
             item_description: description || 'Account Deposit',
             post: '1'
         });
@@ -1703,7 +1694,7 @@ router.post('/blockbee/deposit/create', authenticateToken, async (req, res) => {
                 tradingAccountId: tradingAccountId || null,
                 transactionId,
                 amount: suggestedAmount || 0,
-                currency: blockBeeSettings.defaultCurrency?.toUpperCase() || 'USD',
+                currency: 'USD',
                 paymentMethod: 'blockbee_checkout',
                 blockBee: {
                     paymentId: result.payment_id,
@@ -1787,7 +1778,6 @@ router.post('/blockbee/webhook/deposit', express.json(), async (req, res) => {
 
         // Get BlockBee settings for auto-approve
         const settings = await Settings.findOne();
-        const autoApprove = settings?.blockBeeSettings?.depositSettings?.autoApprove !== false;
 
         // Update deposit with webhook data
         deposit.blockBee.uuid = uuid;
@@ -1814,40 +1804,37 @@ router.post('/blockbee/webhook/deposit', express.json(), async (req, res) => {
             deposit.blockBee.isWebhookProcessed = true;
             deposit.amount = paid_amount;
 
-            // Auto-approve if enabled in settings
-            if (autoApprove) {
-                deposit.status = 'completed';
-                deposit.completedAt = new Date();
 
-                // Update trading account balance if specified
-                if (trading_account_id && trading_account_id !== '') {
-                    const account = await TradingAccount.findById(trading_account_id);
-                    if (account) {
-                        account.balance += parseFloat(paid_amount);
-                        account.equity = account.balance;
-                        account.freeMargin = account.balance;
-                        await account.save();
+            deposit.status = 'completed';
+            deposit.completedAt = new Date();
 
-                        deposit.tradingAccountId = trading_account_id;
-                    }
+            // Update trading account balance if specified
+            if (trading_account_id && trading_account_id !== '') {
+                const account = await TradingAccount.findById(trading_account_id);
+                if (account) {
+                    account.balance += parseFloat(paid_amount);
+                    account.equity = account.balance;
+                    account.freeMargin = account.balance;
+                    await account.save();
+
+                    deposit.tradingAccountId = trading_account_id;
                 }
-
-                // Update user total deposits
-                await User.findByIdAndUpdate(
-                    user_id,
-                    { $inc: { totalDeposits: paid_amount } }
-                );
-
-                console.log(`✅ Deposit auto-approved: ${paid_amount} ${paid_coin} for user ${user_id}`);
-            } else {
-                deposit.status = 'processing'; // Requires admin approval
-                console.log(`⏳ Deposit pending admin approval: ${paid_amount} ${paid_coin} for user ${user_id}`);
             }
 
-            webhookLog.processed = true;
-            await webhookLog.save();
+            // Update user total deposits
+            await User.findByIdAndUpdate(
+                user_id,
+                { $inc: { totalDeposits: paid_amount } }
+            );
+
+            console.log(`✅ Deposit auto-approved: ${paid_amount} ${paid_coin} for user ${user_id}`);
+        } else {
+            deposit.status = 'processing'; // Requires admin approval
+            console.log(`⏳ Deposit pending admin approval: ${paid_amount} ${paid_coin} for user ${user_id}`);
         }
 
+        webhookLog.processed = true;
+        await webhookLog.save();
         await deposit.save();
 
         // Respond with *ok*

@@ -52,6 +52,11 @@ if __name__ == "__main__":
         'transaction.routes.js',
         'Depost.js',
         'Withdrawal.js',
+        'Setting.js',
+        'settings.routes.js',
+        'Settings.jsx',
+        'Deposit.jsx',
+        'Withdrawal.jsx',
         
     ]
     

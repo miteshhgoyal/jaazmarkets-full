@@ -24,6 +24,7 @@ import {
   ChevronDown,
   X,
   Users,
+  Bitcoin,
 } from "lucide-react";
 import api from "../../../services/api";
 
@@ -101,8 +102,6 @@ const Settings = () => {
     setLoading(true);
     try {
       const [
-        depositRes,
-        withdrawalRes,
         accountTypesRes,
         currenciesRes,
         leverageRes,
@@ -110,12 +109,10 @@ const Settings = () => {
         tradingRes,
         feesRes,
         systemRes,
-        paymentRes,
+
         referralRes,
         blockBeeRes,
       ] = await Promise.all([
-        api.get("/admin/settings/deposit-methods"),
-        api.get("/admin/settings/withdrawal-methods"),
         api.get("/admin/settings/account-types"),
         api.get("/admin/settings/currencies"),
         api.get("/admin/settings/leverage-options"),
@@ -123,7 +120,6 @@ const Settings = () => {
         api.get("/admin/settings/trading-settings"),
         api.get("/admin/settings/fees"),
         api.get("/admin/settings/system-settings"),
-        api.get("/admin/settings/payment-methods"),
         api.get("/refer/admin/settings"),
         api.get("/admin/settings/blockbee-settings"),
       ]);
@@ -666,37 +662,6 @@ const Settings = () => {
               </div>
 
               <div className="space-y-6">
-                {/* Enable/Disable Toggle */}
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">
-                      Enable BlockBee
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      Allow automated crypto transactions
-                    </p>
-                  </div>
-                  <button
-                    onClick={() =>
-                      setBlockBeeSettings({
-                        ...blockBeeSettings,
-                        enabled: !blockBeeSettings.enabled,
-                      })
-                    }
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      blockBeeSettings.enabled ? "bg-blue-600" : "bg-gray-300"
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        blockBeeSettings.enabled
-                          ? "translate-x-6"
-                          : "translate-x-1"
-                      }`}
-                    />
-                  </button>
-                </div>
-
                 {/* API Keys */}
                 <div className="grid grid-cols-1 gap-4">
                   <div>
@@ -715,44 +680,6 @@ const Settings = () => {
                       placeholder="Enter API Key V2"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Webhook Base URL
-                    </label>
-                    <input
-                      type="text"
-                      value={blockBeeSettings.webhookBaseUrl || ""}
-                      onChange={(e) =>
-                        setBlockBeeSettings({
-                          ...blockBeeSettings,
-                          webhookBaseUrl: e.target.value,
-                        })
-                      }
-                      placeholder="https://yourdomain.com"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Default Currency
-                    </label>
-                    <select
-                      value={blockBeeSettings.defaultCurrency || "usd"}
-                      onChange={(e) =>
-                        setBlockBeeSettings({
-                          ...blockBeeSettings,
-                          defaultCurrency: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                    >
-                      <option value="usd">USD</option>
-                      <option value="eur">EUR</option>
-                      <option value="gbp">GBP</option>
-                    </select>
                   </div>
                 </div>
 
@@ -803,30 +730,6 @@ const Settings = () => {
                         }
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                       />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={
-                            blockBeeSettings.depositSettings?.autoApprove ||
-                            false
-                          }
-                          onChange={(e) =>
-                            setBlockBeeSettings({
-                              ...blockBeeSettings,
-                              depositSettings: {
-                                ...blockBeeSettings.depositSettings,
-                                autoApprove: e.target.checked,
-                              },
-                            })
-                          }
-                          className="w-4 h-4"
-                        />
-                        <span className="text-sm text-gray-700">
-                          Auto-approve deposits
-                        </span>
-                      </label>
                     </div>
                   </div>
                 </div>
@@ -923,30 +826,6 @@ const Settings = () => {
                         }
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                       />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={
-                            blockBeeSettings.withdrawalSettings?.autoProcess ||
-                            false
-                          }
-                          onChange={(e) =>
-                            setBlockBeeSettings({
-                              ...blockBeeSettings,
-                              withdrawalSettings: {
-                                ...blockBeeSettings.withdrawalSettings,
-                                autoProcess: e.target.checked,
-                              },
-                            })
-                          }
-                          className="w-4 h-4"
-                        />
-                        <span className="text-sm text-gray-700">
-                          Auto-process withdrawals (skip admin approval)
-                        </span>
-                      </label>
                     </div>
                   </div>
                 </div>
@@ -1553,35 +1432,6 @@ const Settings = () => {
               </div>
 
               <div className="space-y-6">
-                {/* Enable/Disable Toggle */}
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="text-sm font-semibold text-gray-900">
-                        Enable Referral Program
-                      </label>
-                      <p className="text-xs text-gray-600 mt-0.5">
-                        Allow users to refer others and earn commissions on
-                        their trades
-                      </p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={referralSettings.enabled || false}
-                        onChange={(e) =>
-                          setReferralSettings({
-                            ...referralSettings,
-                            enabled: e.target.checked,
-                          })
-                        }
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    </label>
-                  </div>
-                </div>
-
                 {/* Commission Percentage */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-900 mb-2">

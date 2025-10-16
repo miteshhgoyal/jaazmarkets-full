@@ -41,18 +41,16 @@ const getOrCreateSettings = async () => {
             blockBeeSettings: {
                 enabled: false,
                 apiKeyV2: '',
-                webhookBaseUrl: '',
-                defaultCurrency: 'usd',
                 supportedCoins: [],
                 depositSettings: {
                     minAmount: 10,
                     maxAmount: 100000,
-                    autoApprove: true
+                    
                 },
                 withdrawalSettings: {
                     minAmount: 10,
                     maxAmount: 50000,
-                    autoProcess: false,
+                    
                     feePercentage: 0,
                     fixedFee: 0
                 }
@@ -620,21 +618,17 @@ router.put('/blockbee-settings', async (req, res) => {
     try {
         const settings = await getOrCreateSettings();
         const {
-            enabled,
             apiKeyV2,
-            webhookBaseUrl,
-            defaultCurrency,
+
             supportedCoins,
             depositSettings,
             withdrawalSettings
         } = req.body;
 
-        if (enabled !== undefined) settings.blockBeeSettings.enabled = enabled;
         if (apiKeyV2 !== undefined && !apiKeyV2.startsWith('***')) {
             settings.blockBeeSettings.apiKeyV2 = apiKeyV2;
         }
-        if (webhookBaseUrl !== undefined) settings.blockBeeSettings.webhookBaseUrl = webhookBaseUrl;
-        if (defaultCurrency !== undefined) settings.blockBeeSettings.defaultCurrency = defaultCurrency;
+
         if (supportedCoins !== undefined) settings.blockBeeSettings.supportedCoins = supportedCoins;
         if (depositSettings !== undefined) {
             settings.blockBeeSettings.depositSettings = {
@@ -960,9 +954,9 @@ router.get('/referral-settings', async (req, res) => {
 router.put('/referral-settings', async (req, res) => {
     try {
         const settings = await getOrCreateSettings();
-        const { enabled, commissionPercentage, minPayoutAmount, payoutMethod } = req.body;
+        const { commissionPercentage, minPayoutAmount, payoutMethod } = req.body;
 
-        if (enabled !== undefined) settings.referralSettings.enabled = enabled;
+
         if (commissionPercentage !== undefined) settings.referralSettings.commissionPercentage = commissionPercentage;
         if (minPayoutAmount !== undefined) settings.referralSettings.minPayoutAmount = minPayoutAmount;
         if (payoutMethod !== undefined) settings.referralSettings.payoutMethod = payoutMethod;
