@@ -34,8 +34,7 @@ const Settings = () => {
   const [error, setError] = useState("");
 
   // State for all settings
-  const [depositMethods, setDepositMethods] = useState([]);
-  const [withdrawalMethods, setWithdrawalMethods] = useState([]);
+
   const [accountTypes, setAccountTypes] = useState([]);
   const [currencies, setCurrencies] = useState([]);
   const [leverageOptions, setLeverageOptions] = useState([]);
@@ -43,52 +42,15 @@ const Settings = () => {
   const [tradingSettings, setTradingSettings] = useState({});
   const [fees, setFees] = useState({});
   const [systemSettings, setSystemSettings] = useState({});
-  const [paymentMethods, setPaymentMethods] = useState({});
+
   const [referralSettings, setReferralSettings] = useState({});
 
   // Modal states
-  const [showDepositMethodModal, setShowDepositMethodModal] = useState(false);
-  const [showWithdrawalMethodModal, setShowWithdrawalMethodModal] =
-    useState(false);
+
   const [showAccountTypeModal, setShowAccountTypeModal] = useState(false);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [showPlatformModal, setShowPlatformModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
-
-  // Form states
-  const [depositMethodForm, setDepositMethodForm] = useState({
-    name: "",
-    type: "crypto",
-    currencyType: "",
-    network: "",
-    walletAddress: "",
-    minDeposit: 10,
-    maxDeposit: "",
-    fee: 0,
-    feePercentage: 0,
-    processingTime: "",
-    image: "",
-    description: "",
-    isActive: true,
-    recommended: false,
-  });
-
-  const [withdrawalMethodForm, setWithdrawalMethodForm] = useState({
-    name: "",
-    type: "crypto",
-    currencyType: "",
-    network: "",
-    minWithdrawal: 10,
-    maxWithdrawal: "",
-    fee: 0,
-    feePercentage: 0,
-    processingTime: "",
-    image: "",
-    description: "",
-    limits: "",
-    isActive: true,
-    recommended: false,
-  });
 
   const [accountTypeForm, setAccountTypeForm] = useState({
     name: "",
@@ -116,6 +78,20 @@ const Settings = () => {
     serverUrl: "",
   });
 
+  const [blockBeeSettings, setBlockBeeSettings] = useState({});
+  const [supportedCoins, setSupportedCoins] = useState([]);
+  const [showBlockBeeModal, setShowBlockBeeModal] = useState(false);
+  const [showCoinModal, setShowCoinModal] = useState(false);
+  const [coinForm, setCoinForm] = useState({
+    ticker: "",
+    name: "",
+    network: "",
+    isActive: true,
+    minDeposit: 10,
+    minWithdrawal: 10,
+    icon: "",
+  });
+
   // Fetch all settings on component mount
   useEffect(() => {
     fetchAllSettings();
@@ -136,6 +112,7 @@ const Settings = () => {
         systemRes,
         paymentRes,
         referralRes,
+        blockBeeRes,
       ] = await Promise.all([
         api.get("/admin/settings/deposit-methods"),
         api.get("/admin/settings/withdrawal-methods"),
@@ -148,10 +125,9 @@ const Settings = () => {
         api.get("/admin/settings/system-settings"),
         api.get("/admin/settings/payment-methods"),
         api.get("/refer/admin/settings"),
+        api.get("/admin/settings/blockbee-settings"),
       ]);
 
-      setDepositMethods(depositRes.data.data || []);
-      setWithdrawalMethods(withdrawalRes.data.data || []);
       setAccountTypes(accountTypesRes.data.data || []);
       setCurrencies(currenciesRes.data.data || []);
       setLeverageOptions(leverageRes.data.data || []);
@@ -159,7 +135,9 @@ const Settings = () => {
       setTradingSettings(tradingRes.data.data || {});
       setFees(feesRes.data.data || {});
       setSystemSettings(systemRes.data.data || {});
-      setPaymentMethods(paymentRes.data.data || {});
+      setBlockBeeSettings(blockBeeRes.data.data || {});
+      setSupportedCoins(blockBeeRes.data.data?.supportedCoins || []);
+
       setReferralSettings(referralRes.data.data || {});
     } catch (err) {
       console.error("Error fetching settings:", err);
@@ -169,154 +147,80 @@ const Settings = () => {
     }
   };
 
-  // ==================== DEPOSIT METHODS ====================
+  const handleUpdateBlockBeeSettings = async () => {
+    try {
+      await api.put("/admin/settings/blockbee-settings", blockBeeSettings);
+      showSuccessMessage();
+    } catch (err) {
+      setError(
+        err.response?.data?.message || "Failed to update BlockBee settings"
+      );
+    }
+  };
 
-  const handleCreateDepositMethod = async () => {
+  const handleAddCoin = async () => {
     try {
       const res = await api.post(
-        "/admin/settings/deposit-methods",
-        depositMethodForm
+        "/admin/settings/blockbee-settings/coins",
+        coinForm
       );
-      setDepositMethods([...depositMethods, res.data.data]);
-      setShowDepositMethodModal(false);
-      resetDepositMethodForm();
+      setSupportedCoins([...supportedCoins, res.data.data]);
+      setShowCoinModal(false);
+      resetCoinForm();
       showSuccessMessage();
     } catch (err) {
-      setError(
-        err.response?.data?.message || "Failed to create deposit method"
-      );
+      setError(err.response?.data?.message || "Failed to add coin");
     }
   };
 
-  const handleUpdateDepositMethod = async () => {
+  const handleUpdateCoin = async () => {
     try {
       const res = await api.put(
-        `/admin/settings/deposit-methods/${editingItem.id}`,
-        depositMethodForm
+        `/admin/settings/blockbee-settings/coins/${editingItem.ticker}`,
+        coinForm
       );
-      setDepositMethods(
-        depositMethods.map((m) => (m.id === editingItem.id ? res.data.data : m))
-      );
-      setShowDepositMethodModal(false);
-      setEditingItem(null);
-      resetDepositMethodForm();
-      showSuccessMessage();
-    } catch (err) {
-      setError(
-        err.response?.data?.message || "Failed to update deposit method"
-      );
-    }
-  };
-
-  const handleDeleteDepositMethod = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this deposit method?"))
-      return;
-
-    try {
-      await api.delete(`/admin/settings/deposit-methods/${id}`);
-      setDepositMethods(depositMethods.filter((m) => m.id !== id));
-      showSuccessMessage();
-    } catch (err) {
-      setError(
-        err.response?.data?.message || "Failed to delete deposit method"
-      );
-    }
-  };
-
-  const resetDepositMethodForm = () => {
-    setDepositMethodForm({
-      name: "",
-      type: "crypto",
-      currencyType: "",
-      network: "",
-      walletAddress: "",
-      minDeposit: 10,
-      maxDeposit: "",
-      fee: 0,
-      feePercentage: 0,
-      processingTime: "",
-      image: "",
-      description: "",
-      isActive: true,
-      recommended: false,
-    });
-  };
-
-  // ==================== WITHDRAWAL METHODS ====================
-
-  const handleCreateWithdrawalMethod = async () => {
-    try {
-      const res = await api.post(
-        "/admin/settings/withdrawal-methods",
-        withdrawalMethodForm
-      );
-      setWithdrawalMethods([...withdrawalMethods, res.data.data]);
-      setShowWithdrawalMethodModal(false);
-      resetWithdrawalMethodForm();
-      showSuccessMessage();
-    } catch (err) {
-      setError(
-        err.response?.data?.message || "Failed to create withdrawal method"
-      );
-    }
-  };
-
-  const handleUpdateWithdrawalMethod = async () => {
-    try {
-      const res = await api.put(
-        `/admin/settings/withdrawal-methods/${editingItem.id}`,
-        withdrawalMethodForm
-      );
-      setWithdrawalMethods(
-        withdrawalMethods.map((m) =>
-          m.id === editingItem.id ? res.data.data : m
+      setSupportedCoins(
+        supportedCoins.map((c) =>
+          c.ticker === editingItem.ticker ? res.data.data : c
         )
       );
-      setShowWithdrawalMethodModal(false);
+      setShowCoinModal(false);
       setEditingItem(null);
-      resetWithdrawalMethodForm();
+      resetCoinForm();
       showSuccessMessage();
     } catch (err) {
-      setError(
-        err.response?.data?.message || "Failed to update withdrawal method"
-      );
+      setError(err.response?.data?.message || "Failed to update coin");
     }
   };
 
-  const handleDeleteWithdrawalMethod = async (id) => {
-    if (
-      !window.confirm("Are you sure you want to delete this withdrawal method?")
-    )
-      return;
+  const handleDeleteCoin = async (ticker) => {
+    if (!window.confirm(`Delete ${ticker} coin?`)) return;
 
     try {
-      await api.delete(`/admin/settings/withdrawal-methods/${id}`);
-      setWithdrawalMethods(withdrawalMethods.filter((m) => m.id !== id));
+      await api.delete(`/admin/settings/blockbee-settings/coins/${ticker}`);
+      setSupportedCoins(supportedCoins.filter((c) => c.ticker !== ticker));
       showSuccessMessage();
     } catch (err) {
-      setError(
-        err.response?.data?.message || "Failed to delete withdrawal method"
-      );
+      setError(err.response?.data?.message || "Failed to delete coin");
     }
   };
 
-  const resetWithdrawalMethodForm = () => {
-    setWithdrawalMethodForm({
+  const resetCoinForm = () => {
+    setCoinForm({
+      ticker: "",
       name: "",
-      type: "crypto",
-      currencyType: "",
       network: "",
-      minWithdrawal: 10,
-      maxWithdrawal: "",
-      fee: 0,
-      feePercentage: 0,
-      processingTime: "",
-      image: "",
-      description: "",
-      limits: "",
       isActive: true,
-      recommended: false,
+      minDeposit: 10,
+      minWithdrawal: 10,
+      icon: "",
     });
+  };
+
+  const openEditCoinModal = (coin) => {
+    setEditingItem(coin);
+    setCoinForm(coin);
+    setShowCoinModal(true);
   };
 
   // ==================== ACCOUNT TYPES ====================
@@ -610,12 +514,6 @@ const Settings = () => {
   };
 
   const tabs = [
-    { id: "deposit-methods", label: "Deposit Methods", icon: Wallet },
-    {
-      id: "withdrawal-methods",
-      label: "Withdrawal Methods",
-      icon: CreditCard,
-    },
     { id: "account-types", label: "Account Types", icon: DollarSign },
     { id: "currencies", label: "Currencies", icon: Globe },
     { id: "leverage", label: "Leverage Options", icon: TrendingUp },
@@ -624,6 +522,7 @@ const Settings = () => {
     { id: "fees", label: "Fees", icon: DollarSign },
     { id: "system-settings", label: "System Settings", icon: Clock },
     { id: "referral-settings", label: "Referral Settings", icon: Users },
+    { id: "blockbee-settings", label: "BlockBee (Crypto)", icon: Bitcoin },
   ];
 
   if (loading) {
@@ -693,138 +592,6 @@ const Settings = () => {
         </div>
 
         <div className="p-6">
-          {/* DEPOSIT METHODS TAB */}
-          {activeTab === "deposit-methods" && (
-            <div>
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Deposit Methods
-                  </h3>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Configure deposit payment methods for users
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    resetDepositMethodForm();
-                    setEditingItem(null);
-                    setShowDepositMethodModal(true);
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Method
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                {depositMethods.map((method) => (
-                  <div
-                    key={method.id}
-                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
-                  >
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">
-                        {method.name}
-                        {method.recommended && (
-                          <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-                            Recommended
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Type: {method.type} • Min: ${method.minDeposit} • Fee:{" "}
-                        {method.fee}% •{" "}
-                        {method.isActive ? "Active" : "Inactive"}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => openEditDepositMethodModal(method)}
-                        className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteDepositMethod(method.id)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* WITHDRAWAL METHODS TAB */}
-          {activeTab === "withdrawal-methods" && (
-            <div>
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Withdrawal Methods
-                  </h3>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Configure withdrawal payment methods for users
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    resetWithdrawalMethodForm();
-                    setEditingItem(null);
-                    setShowWithdrawalMethodModal(true);
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Method
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                {withdrawalMethods.map((method) => (
-                  <div
-                    key={method.id}
-                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
-                  >
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">
-                        {method.name}
-                        {method.recommended && (
-                          <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-                            Recommended
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Type: {method.type} • Min: ${method.minWithdrawal} •
-                        Fee: {method.fee}% •{" "}
-                        {method.isActive ? "Active" : "Inactive"}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => openEditWithdrawalMethodModal(method)}
-                        className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteWithdrawalMethod(method.id)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* ACCOUNT TYPES TAB */}
           {activeTab === "account-types" && (
             <div>
@@ -882,6 +649,370 @@ const Settings = () => {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "blockbee-settings" && (
+            <div>
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  BlockBee Crypto Settings
+                </h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Configure automated cryptocurrency deposits and withdrawals
+                  via BlockBee
+                </p>
+              </div>
+
+              <div className="space-y-6">
+                {/* Enable/Disable Toggle */}
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">
+                      Enable BlockBee
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Allow automated crypto transactions
+                    </p>
+                  </div>
+                  <button
+                    onClick={() =>
+                      setBlockBeeSettings({
+                        ...blockBeeSettings,
+                        enabled: !blockBeeSettings.enabled,
+                      })
+                    }
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      blockBeeSettings.enabled ? "bg-blue-600" : "bg-gray-300"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        blockBeeSettings.enabled
+                          ? "translate-x-6"
+                          : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* API Keys */}
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      BlockBee API Key (V2)
+                    </label>
+                    <input
+                      type="password"
+                      value={blockBeeSettings.apiKeyV2 || ""}
+                      onChange={(e) =>
+                        setBlockBeeSettings({
+                          ...blockBeeSettings,
+                          apiKeyV2: e.target.value,
+                        })
+                      }
+                      placeholder="Enter API Key V2"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Webhook Base URL
+                    </label>
+                    <input
+                      type="text"
+                      value={blockBeeSettings.webhookBaseUrl || ""}
+                      onChange={(e) =>
+                        setBlockBeeSettings({
+                          ...blockBeeSettings,
+                          webhookBaseUrl: e.target.value,
+                        })
+                      }
+                      placeholder="https://yourdomain.com"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Default Currency
+                    </label>
+                    <select
+                      value={blockBeeSettings.defaultCurrency || "usd"}
+                      onChange={(e) =>
+                        setBlockBeeSettings({
+                          ...blockBeeSettings,
+                          defaultCurrency: e.target.value,
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    >
+                      <option value="usd">USD</option>
+                      <option value="eur">EUR</option>
+                      <option value="gbp">GBP</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Deposit Settings */}
+                <div className="border-t border-gray-200 pt-6">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-4">
+                    Deposit Settings
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Min Amount ($)
+                      </label>
+                      <input
+                        type="number"
+                        value={
+                          blockBeeSettings.depositSettings?.minAmount || 10
+                        }
+                        onChange={(e) =>
+                          setBlockBeeSettings({
+                            ...blockBeeSettings,
+                            depositSettings: {
+                              ...blockBeeSettings.depositSettings,
+                              minAmount: parseFloat(e.target.value),
+                            },
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Max Amount ($)
+                      </label>
+                      <input
+                        type="number"
+                        value={
+                          blockBeeSettings.depositSettings?.maxAmount || 100000
+                        }
+                        onChange={(e) =>
+                          setBlockBeeSettings({
+                            ...blockBeeSettings,
+                            depositSettings: {
+                              ...blockBeeSettings.depositSettings,
+                              maxAmount: parseFloat(e.target.value),
+                            },
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={
+                            blockBeeSettings.depositSettings?.autoApprove ||
+                            false
+                          }
+                          onChange={(e) =>
+                            setBlockBeeSettings({
+                              ...blockBeeSettings,
+                              depositSettings: {
+                                ...blockBeeSettings.depositSettings,
+                                autoApprove: e.target.checked,
+                              },
+                            })
+                          }
+                          className="w-4 h-4"
+                        />
+                        <span className="text-sm text-gray-700">
+                          Auto-approve deposits
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Withdrawal Settings */}
+                <div className="border-t border-gray-200 pt-6">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-4">
+                    Withdrawal Settings
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Min Amount ($)
+                      </label>
+                      <input
+                        type="number"
+                        value={
+                          blockBeeSettings.withdrawalSettings?.minAmount || 10
+                        }
+                        onChange={(e) =>
+                          setBlockBeeSettings({
+                            ...blockBeeSettings,
+                            withdrawalSettings: {
+                              ...blockBeeSettings.withdrawalSettings,
+                              minAmount: parseFloat(e.target.value),
+                            },
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Max Amount ($)
+                      </label>
+                      <input
+                        type="number"
+                        value={
+                          blockBeeSettings.withdrawalSettings?.maxAmount ||
+                          50000
+                        }
+                        onChange={(e) =>
+                          setBlockBeeSettings({
+                            ...blockBeeSettings,
+                            withdrawalSettings: {
+                              ...blockBeeSettings.withdrawalSettings,
+                              maxAmount: parseFloat(e.target.value),
+                            },
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Fee Percentage (%)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={
+                          blockBeeSettings.withdrawalSettings?.feePercentage ||
+                          0
+                        }
+                        onChange={(e) =>
+                          setBlockBeeSettings({
+                            ...blockBeeSettings,
+                            withdrawalSettings: {
+                              ...blockBeeSettings.withdrawalSettings,
+                              feePercentage: parseFloat(e.target.value),
+                            },
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Fixed Fee ($)
+                      </label>
+                      <input
+                        type="number"
+                        value={
+                          blockBeeSettings.withdrawalSettings?.fixedFee || 0
+                        }
+                        onChange={(e) =>
+                          setBlockBeeSettings({
+                            ...blockBeeSettings,
+                            withdrawalSettings: {
+                              ...blockBeeSettings.withdrawalSettings,
+                              fixedFee: parseFloat(e.target.value),
+                            },
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={
+                            blockBeeSettings.withdrawalSettings?.autoProcess ||
+                            false
+                          }
+                          onChange={(e) =>
+                            setBlockBeeSettings({
+                              ...blockBeeSettings,
+                              withdrawalSettings: {
+                                ...blockBeeSettings.withdrawalSettings,
+                                autoProcess: e.target.checked,
+                              },
+                            })
+                          }
+                          className="w-4 h-4"
+                        />
+                        <span className="text-sm text-gray-700">
+                          Auto-process withdrawals (skip admin approval)
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Supported Coins */}
+                <div className="border-t border-gray-200 pt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-sm font-semibold text-gray-900">
+                      Supported Coins
+                    </h4>
+                    <button
+                      onClick={() => {
+                        resetCoinForm();
+                        setEditingItem(null);
+                        setShowCoinModal(true);
+                      }}
+                      className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Add Coin
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {supportedCoins.map((coin) => (
+                      <div
+                        key={coin.ticker}
+                        className="p-4 bg-gray-50 rounded-lg border border-gray-200"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {coin.name} ({coin.ticker})
+                            </p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              Network: {coin.network} • Min: ${coin.minDeposit}{" "}
+                              • {coin.isActive ? "Active" : "Inactive"}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => openEditCoinModal(coin)}
+                              className="p-1.5 text-gray-600 hover:bg-gray-200 rounded transition-colors"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCoin(coin.ticker)}
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleUpdateBlockBeeSettings}
+                  className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  <Save className="w-4 h-4" />
+                  Save BlockBee Settings
+                </button>
               </div>
             </div>
           )}
@@ -1567,18 +1698,17 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* MODALS */}
-      {/* Deposit Method Modal */}
-      {showDepositMethodModal && (
+      {/* Coin Modal */}
+      {showCoinModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl max-w-md w-full">
             <div className="p-6 border-b border-gray-200 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">
-                {editingItem ? "Edit" : "Add"} Deposit Method
+                {editingItem ? "Edit" : "Add"} Supported Coin
               </h3>
               <button
                 onClick={() => {
-                  setShowDepositMethodModal(false);
+                  setShowCoinModal(false);
                   setEditingItem(null);
                 }}
               >
@@ -1586,103 +1716,68 @@ const Settings = () => {
               </button>
             </div>
             <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Ticker * (e.g., btc, usdt_erc20)
+                </label>
+                <input
+                  type="text"
+                  value={coinForm.ticker}
+                  onChange={(e) =>
+                    setCoinForm({
+                      ...coinForm,
+                      ticker: e.target.value.toLowerCase(),
+                    })
+                  }
+                  disabled={editingItem !== null}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-100"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Name *
+                </label>
+                <input
+                  type="text"
+                  value={coinForm.name}
+                  onChange={(e) =>
+                    setCoinForm({
+                      ...coinForm,
+                      name: e.target.value,
+                    })
+                  }
+                  placeholder="Bitcoin"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Network *
+                </label>
+                <input
+                  type="text"
+                  value={coinForm.network}
+                  onChange={(e) =>
+                    setCoinForm({
+                      ...coinForm,
+                      network: e.target.value,
+                    })
+                  }
+                  placeholder="BTC, ERC20, TRC20, etc."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                />
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={depositMethodForm.name}
-                    onChange={(e) =>
-                      setDepositMethodForm({
-                        ...depositMethodForm,
-                        name: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Type *
-                  </label>
-                  <select
-                    value={depositMethodForm.type}
-                    onChange={(e) =>
-                      setDepositMethodForm({
-                        ...depositMethodForm,
-                        type: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  >
-                    <option value="crypto">Crypto</option>
-                    <option value="bank">Bank</option>
-                    <option value="card">Card</option>
-                    <option value="wallet">Wallet</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Currency Type
-                  </label>
-                  <input
-                    type="text"
-                    value={depositMethodForm.currencyType}
-                    onChange={(e) =>
-                      setDepositMethodForm({
-                        ...depositMethodForm,
-                        currencyType: e.target.value,
-                      })
-                    }
-                    placeholder="BTC, USDT, INR, etc."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Network
-                  </label>
-                  <input
-                    type="text"
-                    value={depositMethodForm.network}
-                    onChange={(e) =>
-                      setDepositMethodForm({
-                        ...depositMethodForm,
-                        network: e.target.value,
-                      })
-                    }
-                    placeholder="ERC20, TRC20, etc."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Wallet Address
-                  </label>
-                  <input
-                    type="text"
-                    value={depositMethodForm.walletAddress}
-                    onChange={(e) =>
-                      setDepositMethodForm({
-                        ...depositMethodForm,
-                        walletAddress: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Min Deposit * ($)
+                    Min Deposit ($)
                   </label>
                   <input
                     type="number"
-                    value={depositMethodForm.minDeposit}
+                    value={coinForm.minDeposit}
                     onChange={(e) =>
-                      setDepositMethodForm({
-                        ...depositMethodForm,
+                      setCoinForm({
+                        ...coinForm,
                         minDeposit: parseFloat(e.target.value),
                       })
                     }
@@ -1691,417 +1786,59 @@ const Settings = () => {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Max Deposit ($)
+                    Min Withdrawal ($)
                   </label>
                   <input
                     type="number"
-                    value={depositMethodForm.maxDeposit}
+                    value={coinForm.minWithdrawal}
                     onChange={(e) =>
-                      setDepositMethodForm({
-                        ...depositMethodForm,
-                        maxDeposit: parseFloat(e.target.value) || "",
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Fee ($)
-                  </label>
-                  <input
-                    type="number"
-                    value={depositMethodForm.fee}
-                    onChange={(e) =>
-                      setDepositMethodForm({
-                        ...depositMethodForm,
-                        fee: parseFloat(e.target.value),
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Fee Percentage (%)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={depositMethodForm.feePercentage}
-                    onChange={(e) =>
-                      setDepositMethodForm({
-                        ...depositMethodForm,
-                        feePercentage: parseFloat(e.target.value),
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Processing Time
-                  </label>
-                  <input
-                    type="text"
-                    value={depositMethodForm.processingTime}
-                    onChange={(e) =>
-                      setDepositMethodForm({
-                        ...depositMethodForm,
-                        processingTime: e.target.value,
-                      })
-                    }
-                    placeholder="e.g., Instant, 1-3 hours"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Image URL
-                  </label>
-                  <input
-                    type="text"
-                    value={depositMethodForm.image}
-                    onChange={(e) =>
-                      setDepositMethodForm({
-                        ...depositMethodForm,
-                        image: e.target.value,
-                      })
-                    }
-                    placeholder="https://..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Description
-                  </label>
-                  <textarea
-                    value={depositMethodForm.description}
-                    onChange={(e) =>
-                      setDepositMethodForm({
-                        ...depositMethodForm,
-                        description: e.target.value,
-                      })
-                    }
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div className="flex items-center gap-4">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={depositMethodForm.isActive}
-                      onChange={(e) =>
-                        setDepositMethodForm({
-                          ...depositMethodForm,
-                          isActive: e.target.checked,
-                        })
-                      }
-                      className="w-4 h-4"
-                    />
-                    <span className="text-sm text-gray-700">Active</span>
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={depositMethodForm.recommended}
-                      onChange={(e) =>
-                        setDepositMethodForm({
-                          ...depositMethodForm,
-                          recommended: e.target.checked,
-                        })
-                      }
-                      className="w-4 h-4"
-                    />
-                    <span className="text-sm text-gray-700">Recommended</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-            <div className="p-6 border-t border-gray-200 flex items-center justify-end gap-3">
-              <button
-                onClick={() => {
-                  setShowDepositMethodModal(false);
-                  setEditingItem(null);
-                }}
-                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={
-                  editingItem
-                    ? handleUpdateDepositMethod
-                    : handleCreateDepositMethod
-                }
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                {editingItem ? "Update" : "Create"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Withdrawal Method Modal */}
-      {showWithdrawalMethodModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">
-                {editingItem ? "Edit" : "Add"} Withdrawal Method
-              </h3>
-              <button
-                onClick={() => {
-                  setShowWithdrawalMethodModal(false);
-                  setEditingItem(null);
-                }}
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={withdrawalMethodForm.name}
-                    onChange={(e) =>
-                      setWithdrawalMethodForm({
-                        ...withdrawalMethodForm,
-                        name: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Type *
-                  </label>
-                  <select
-                    value={withdrawalMethodForm.type}
-                    onChange={(e) =>
-                      setWithdrawalMethodForm({
-                        ...withdrawalMethodForm,
-                        type: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  >
-                    <option value="crypto">Crypto</option>
-                    <option value="bank">Bank</option>
-                    <option value="card">Card</option>
-                    <option value="wallet">Wallet</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Currency Type
-                  </label>
-                  <input
-                    type="text"
-                    value={withdrawalMethodForm.currencyType}
-                    onChange={(e) =>
-                      setWithdrawalMethodForm({
-                        ...withdrawalMethodForm,
-                        currencyType: e.target.value,
-                      })
-                    }
-                    placeholder="BTC, USDT, INR, etc."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Network
-                  </label>
-                  <input
-                    type="text"
-                    value={withdrawalMethodForm.network}
-                    onChange={(e) =>
-                      setWithdrawalMethodForm({
-                        ...withdrawalMethodForm,
-                        network: e.target.value,
-                      })
-                    }
-                    placeholder="ERC20, TRC20, etc."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Min Withdrawal * ($)
-                  </label>
-                  <input
-                    type="number"
-                    value={withdrawalMethodForm.minWithdrawal}
-                    onChange={(e) =>
-                      setWithdrawalMethodForm({
-                        ...withdrawalMethodForm,
+                      setCoinForm({
+                        ...coinForm,
                         minWithdrawal: parseFloat(e.target.value),
                       })
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Max Withdrawal ($)
-                  </label>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Icon URL (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={coinForm.icon}
+                  onChange={(e) =>
+                    setCoinForm({
+                      ...coinForm,
+                      icon: e.target.value,
+                    })
+                  }
+                  placeholder="https://..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                />
+              </div>
+              <div>
+                <label className="flex items-center gap-2">
                   <input
-                    type="number"
-                    value={withdrawalMethodForm.maxWithdrawal}
+                    type="checkbox"
+                    checked={coinForm.isActive}
                     onChange={(e) =>
-                      setWithdrawalMethodForm({
-                        ...withdrawalMethodForm,
-                        maxWithdrawal: parseFloat(e.target.value) || "",
+                      setCoinForm({
+                        ...coinForm,
+                        isActive: e.target.checked,
                       })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    className="w-4 h-4"
                   />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Fee ($)
-                  </label>
-                  <input
-                    type="number"
-                    value={withdrawalMethodForm.fee}
-                    onChange={(e) =>
-                      setWithdrawalMethodForm({
-                        ...withdrawalMethodForm,
-                        fee: parseFloat(e.target.value),
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Fee Percentage (%)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={withdrawalMethodForm.feePercentage}
-                    onChange={(e) =>
-                      setWithdrawalMethodForm({
-                        ...withdrawalMethodForm,
-                        feePercentage: parseFloat(e.target.value),
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Processing Time
-                  </label>
-                  <input
-                    type="text"
-                    value={withdrawalMethodForm.processingTime}
-                    onChange={(e) =>
-                      setWithdrawalMethodForm({
-                        ...withdrawalMethodForm,
-                        processingTime: e.target.value,
-                      })
-                    }
-                    placeholder="e.g., 1-3 business days"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Image URL
-                  </label>
-                  <input
-                    type="text"
-                    value={withdrawalMethodForm.image}
-                    onChange={(e) =>
-                      setWithdrawalMethodForm({
-                        ...withdrawalMethodForm,
-                        image: e.target.value,
-                      })
-                    }
-                    placeholder="https://..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Description
-                  </label>
-                  <textarea
-                    value={withdrawalMethodForm.description}
-                    onChange={(e) =>
-                      setWithdrawalMethodForm({
-                        ...withdrawalMethodForm,
-                        description: e.target.value,
-                      })
-                    }
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Limits
-                  </label>
-                  <input
-                    type="text"
-                    value={withdrawalMethodForm.limits}
-                    onChange={(e) =>
-                      setWithdrawalMethodForm({
-                        ...withdrawalMethodForm,
-                        limits: e.target.value,
-                      })
-                    }
-                    placeholder="e.g., Max 3 withdrawals per day"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div className="flex items-center gap-4">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={withdrawalMethodForm.isActive}
-                      onChange={(e) =>
-                        setWithdrawalMethodForm({
-                          ...withdrawalMethodForm,
-                          isActive: e.target.checked,
-                        })
-                      }
-                      className="w-4 h-4"
-                    />
-                    <span className="text-sm text-gray-700">Active</span>
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={withdrawalMethodForm.recommended}
-                      onChange={(e) =>
-                        setWithdrawalMethodForm({
-                          ...withdrawalMethodForm,
-                          recommended: e.target.checked,
-                        })
-                      }
-                      className="w-4 h-4"
-                    />
-                    <span className="text-sm text-gray-700">Recommended</span>
-                  </label>
-                </div>
+                  <span className="text-sm text-gray-700">Active</span>
+                </label>
               </div>
             </div>
             <div className="p-6 border-t border-gray-200 flex items-center justify-end gap-3">
               <button
                 onClick={() => {
-                  setShowWithdrawalMethodModal(false);
+                  setShowCoinModal(false);
                   setEditingItem(null);
                 }}
                 className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
@@ -2109,11 +1846,7 @@ const Settings = () => {
                 Cancel
               </button>
               <button
-                onClick={
-                  editingItem
-                    ? handleUpdateWithdrawalMethod
-                    : handleCreateWithdrawalMethod
-                }
+                onClick={editingItem ? handleUpdateCoin : handleAddCoin}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 {editingItem ? "Update" : "Create"}

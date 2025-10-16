@@ -1,5 +1,6 @@
+// routes/admin.settings.routes.js
 import express from 'express';
-import Settings from '../models/Setting.js';
+import Settings from '../models/Settings.js';
 import { authenticateToken, authorize } from '../middlewares/auth.js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -7,6 +8,7 @@ const router = express.Router();
 
 // Apply authentication and admin authorization to all routes
 router.use(authenticateToken);
+router.use(authorize(['admin', 'superadmin']));
 
 // Helper function to get or create settings document
 const getOrCreateSettings = async () => {
@@ -17,20 +19,6 @@ const getOrCreateSettings = async () => {
             currencies: [],
             leverageOptions: [],
             platforms: [],
-            depositMethods: [],
-            withdrawalMethods: [],
-            paymentMethods: {
-                crypto: {
-                    enabled: true,
-                    cryptocurrencies: []
-                },
-                bankTransfer: {
-                    enabled: true,
-                    minDeposit: 10,
-                    minWithdrawal: 10,
-                    processingTime: '1-3 business days'
-                }
-            },
             tradingSettings: {
                 minTradeSize: 0.01,
                 maxTradeSize: 100,
@@ -47,7 +35,34 @@ const getOrCreateSettings = async () => {
                 registrationEnabled: true,
                 kycRequired: true,
                 minWithdrawal: 10,
-                maxWithdrawal: 50000
+                maxWithdrawal: 50000,
+                minDeposit: 10,
+                maxDeposit: 100000
+            },
+            blockBeeSettings: {
+                enabled: false,
+                apiKeyV2: '',
+                webhookBaseUrl: '',
+                defaultCurrency: 'usd',
+                supportedCoins: [],
+                depositSettings: {
+                    minAmount: 10,
+                    maxAmount: 100000,
+                    autoApprove: true
+                },
+                withdrawalSettings: {
+                    minAmount: 10,
+                    maxAmount: 50000,
+                    autoProcess: false,
+                    feePercentage: 0,
+                    fixedFee: 0
+                }
+            },
+            referralSettings: {
+                enabled: true,
+                commissionPercentage: 0.01,
+                minPayoutAmount: 10,
+                payoutMethod: 'wallet'
             }
         });
         await settings.save();
@@ -575,298 +590,205 @@ router.delete('/platforms/:name', async (req, res) => {
     }
 });
 
-// ==================== DEPOSIT METHODS CRUD ====================
+// ==================== BLOCKBEE SETTINGS (NEW) ====================
 
-// GET ALL DEPOSIT METHODS
-router.get('/deposit-methods', async (req, res) => {
+// GET BLOCKBEE SETTINGS
+router.get('/blockbee-settings', async (req, res) => {
     try {
         const settings = await getOrCreateSettings();
+
+        // Mask API keys in response (security)
+        const blockBeeSettings = settings.blockBeeSettings ? settings.blockBeeSettings.toObject() : {};
+        if (blockBeeSettings.apiKeyV2 && blockBeeSettings.apiKeyV2.length > 4) {
+            blockBeeSettings.apiKeyV2 = '***' + blockBeeSettings.apiKeyV2.slice(-4);
+        }
+
         res.json({
             success: true,
-            data: settings.depositMethods,
-            total: settings.depositMethods.length
+            data: blockBeeSettings
         });
     } catch (error) {
-        console.error('Get deposit methods error:', error);
+        console.error('Get BlockBee settings error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to fetch deposit methods'
+            message: 'Failed to fetch BlockBee settings'
         });
     }
 });
 
-// CREATE DEPOSIT METHOD
-router.post('/deposit-methods', async (req, res) => {
+// UPDATE BLOCKBEE SETTINGS
+router.put('/blockbee-settings', async (req, res) => {
     try {
-        const { name, type, currencyType, network, walletAddress, minDeposit, maxDeposit, fee, feePercentage, processingTime, image, description, isActive, recommended, bankDetails } = req.body;
+        const settings = await getOrCreateSettings();
+        const {
+            enabled,
+            apiKeyV2,
+            webhookBaseUrl,
+            defaultCurrency,
+            supportedCoins,
+            depositSettings,
+            withdrawalSettings
+        } = req.body;
 
-        if (!name || !type || !minDeposit) {
+        if (enabled !== undefined) settings.blockBeeSettings.enabled = enabled;
+        if (apiKeyV2 !== undefined && !apiKeyV2.startsWith('***')) {
+            settings.blockBeeSettings.apiKeyV2 = apiKeyV2;
+        }
+        if (webhookBaseUrl !== undefined) settings.blockBeeSettings.webhookBaseUrl = webhookBaseUrl;
+        if (defaultCurrency !== undefined) settings.blockBeeSettings.defaultCurrency = defaultCurrency;
+        if (supportedCoins !== undefined) settings.blockBeeSettings.supportedCoins = supportedCoins;
+        if (depositSettings !== undefined) {
+            settings.blockBeeSettings.depositSettings = {
+                ...settings.blockBeeSettings.depositSettings.toObject(),
+                ...depositSettings
+            };
+        }
+        if (withdrawalSettings !== undefined) {
+            settings.blockBeeSettings.withdrawalSettings = {
+                ...settings.blockBeeSettings.withdrawalSettings.toObject(),
+                ...withdrawalSettings
+            };
+        }
+
+        settings.updatedBy = req.user.userId;
+        await settings.save();
+
+        // Mask API key in response
+        const response = settings.blockBeeSettings.toObject();
+        if (response.apiKeyV2 && response.apiKeyV2.length > 4) {
+            response.apiKeyV2 = '***' + response.apiKeyV2.slice(-4);
+        }
+
+        res.json({
+            success: true,
+            message: 'BlockBee settings updated successfully',
+            data: response
+        });
+    } catch (error) {
+        console.error('Update BlockBee settings error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update BlockBee settings'
+        });
+    }
+});
+
+// ADD SUPPORTED COIN TO BLOCKBEE
+router.post('/blockbee-settings/coins', async (req, res) => {
+    try {
+        const { ticker, name, network, isActive, minDeposit, minWithdrawal, icon } = req.body;
+
+        if (!ticker || !name || !network) {
             return res.status(400).json({
                 success: false,
-                message: 'Name, type, and minDeposit are required'
+                message: 'Ticker, name, and network are required'
             });
         }
 
         const settings = await getOrCreateSettings();
 
-        const newMethod = {
-            id: uuidv4(),
+        // Check if coin already exists
+        const existingCoin = settings.blockBeeSettings.supportedCoins.find(c => c.ticker === ticker);
+        if (existingCoin) {
+            return res.status(400).json({
+                success: false,
+                message: 'Coin already exists'
+            });
+        }
+
+        const newCoin = {
+            ticker,
             name,
-            type,
-            currencyType: currencyType || '',
-            network: network || '',
-            walletAddress: walletAddress || '',
-            minDeposit,
-            maxDeposit: maxDeposit || null,
-            fee: fee || 0,
-            feePercentage: feePercentage || 0,
-            processingTime: processingTime || '',
-            image: image || '',
-            description: description || '',
+            network,
             isActive: isActive !== undefined ? isActive : true,
-            recommended: recommended || false,
-            bankDetails: bankDetails || {}
+            minDeposit: minDeposit || 10,
+            minWithdrawal: minWithdrawal || 10,
+            icon: icon || ''
         };
 
-        settings.depositMethods.push(newMethod);
+        settings.blockBeeSettings.supportedCoins.push(newCoin);
         settings.updatedBy = req.user.userId;
         await settings.save();
 
         res.status(201).json({
             success: true,
-            message: 'Deposit method created successfully',
-            data: newMethod
+            message: 'Supported coin added successfully',
+            data: newCoin
         });
     } catch (error) {
-        console.error('Create deposit method error:', error);
+        console.error('Add supported coin error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to create deposit method'
+            message: 'Failed to add supported coin'
         });
     }
 });
 
-// UPDATE DEPOSIT METHOD
-router.put('/deposit-methods/:id', async (req, res) => {
+// UPDATE SUPPORTED COIN
+router.put('/blockbee-settings/coins/:ticker', async (req, res) => {
     try {
         const settings = await getOrCreateSettings();
-        const index = settings.depositMethods.findIndex(m => m.id === req.params.id);
+        const index = settings.blockBeeSettings.supportedCoins.findIndex(c => c.ticker === req.params.ticker);
 
         if (index === -1) {
             return res.status(404).json({
                 success: false,
-                message: 'Deposit method not found'
+                message: 'Coin not found'
             });
         }
 
-        const { name, type, currencyType, network, walletAddress, minDeposit, maxDeposit, fee, feePercentage, processingTime, image, description, isActive, recommended, bankDetails } = req.body;
+        const { name, network, isActive, minDeposit, minWithdrawal, icon } = req.body;
 
-        if (name !== undefined) settings.depositMethods[index].name = name;
-        if (type !== undefined) settings.depositMethods[index].type = type;
-        if (currencyType !== undefined) settings.depositMethods[index].currencyType = currencyType;
-        if (network !== undefined) settings.depositMethods[index].network = network;
-        if (walletAddress !== undefined) settings.depositMethods[index].walletAddress = walletAddress;
-        if (minDeposit !== undefined) settings.depositMethods[index].minDeposit = minDeposit;
-        if (maxDeposit !== undefined) settings.depositMethods[index].maxDeposit = maxDeposit;
-        if (fee !== undefined) settings.depositMethods[index].fee = fee;
-        if (feePercentage !== undefined) settings.depositMethods[index].feePercentage = feePercentage;
-        if (processingTime !== undefined) settings.depositMethods[index].processingTime = processingTime;
-        if (image !== undefined) settings.depositMethods[index].image = image;
-        if (description !== undefined) settings.depositMethods[index].description = description;
-        if (isActive !== undefined) settings.depositMethods[index].isActive = isActive;
-        if (recommended !== undefined) settings.depositMethods[index].recommended = recommended;
-        if (bankDetails !== undefined) settings.depositMethods[index].bankDetails = bankDetails;
+        if (name !== undefined) settings.blockBeeSettings.supportedCoins[index].name = name;
+        if (network !== undefined) settings.blockBeeSettings.supportedCoins[index].network = network;
+        if (isActive !== undefined) settings.blockBeeSettings.supportedCoins[index].isActive = isActive;
+        if (minDeposit !== undefined) settings.blockBeeSettings.supportedCoins[index].minDeposit = minDeposit;
+        if (minWithdrawal !== undefined) settings.blockBeeSettings.supportedCoins[index].minWithdrawal = minWithdrawal;
+        if (icon !== undefined) settings.blockBeeSettings.supportedCoins[index].icon = icon;
 
         settings.updatedBy = req.user.userId;
         await settings.save();
 
         res.json({
             success: true,
-            message: 'Deposit method updated successfully',
-            data: settings.depositMethods[index]
+            message: 'Supported coin updated successfully',
+            data: settings.blockBeeSettings.supportedCoins[index]
         });
     } catch (error) {
-        console.error('Update deposit method error:', error);
+        console.error('Update supported coin error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to update deposit method'
+            message: 'Failed to update supported coin'
         });
     }
 });
 
-// DELETE DEPOSIT METHOD
-router.delete('/deposit-methods/:id', async (req, res) => {
+// DELETE SUPPORTED COIN
+router.delete('/blockbee-settings/coins/:ticker', async (req, res) => {
     try {
         const settings = await getOrCreateSettings();
-        const index = settings.depositMethods.findIndex(m => m.id === req.params.id);
+        const index = settings.blockBeeSettings.supportedCoins.findIndex(c => c.ticker === req.params.ticker);
 
         if (index === -1) {
             return res.status(404).json({
                 success: false,
-                message: 'Deposit method not found'
+                message: 'Coin not found'
             });
         }
 
-        settings.depositMethods.splice(index, 1);
+        settings.blockBeeSettings.supportedCoins.splice(index, 1);
         settings.updatedBy = req.user.userId;
         await settings.save();
 
         res.json({
             success: true,
-            message: 'Deposit method deleted successfully'
+            message: 'Supported coin deleted successfully'
         });
     } catch (error) {
-        console.error('Delete deposit method error:', error);
+        console.error('Delete supported coin error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to delete deposit method'
-        });
-    }
-});
-
-// ==================== WITHDRAWAL METHODS CRUD ====================
-
-// GET ALL WITHDRAWAL METHODS
-router.get('/withdrawal-methods', async (req, res) => {
-    try {
-        const settings = await getOrCreateSettings();
-        res.json({
-            success: true,
-            data: settings.withdrawalMethods,
-            total: settings.withdrawalMethods.length
-        });
-    } catch (error) {
-        console.error('Get withdrawal methods error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to fetch withdrawal methods'
-        });
-    }
-});
-
-// CREATE WITHDRAWAL METHOD
-router.post('/withdrawal-methods', async (req, res) => {
-    try {
-        const { name, type, currencyType, network, minWithdrawal, maxWithdrawal, fee, feePercentage, processingTime, image, description, limits, isActive, recommended } = req.body;
-
-        if (!name || !type || !minWithdrawal) {
-            return res.status(400).json({
-                success: false,
-                message: 'Name, type, and minWithdrawal are required'
-            });
-        }
-
-        const settings = await getOrCreateSettings();
-
-        const newMethod = {
-            id: uuidv4(),
-            name,
-            type,
-            currencyType: currencyType || '',
-            network: network || '',
-            minWithdrawal,
-            maxWithdrawal: maxWithdrawal || null,
-            fee: fee || 0,
-            feePercentage: feePercentage || 0,
-            processingTime: processingTime || '',
-            image: image || '',
-            description: description || '',
-            limits: limits || '',
-            isActive: isActive !== undefined ? isActive : true,
-            recommended: recommended || false
-        };
-
-        settings.withdrawalMethods.push(newMethod);
-        settings.updatedBy = req.user.userId;
-        await settings.save();
-
-        res.status(201).json({
-            success: true,
-            message: 'Withdrawal method created successfully',
-            data: newMethod
-        });
-    } catch (error) {
-        console.error('Create withdrawal method error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to create withdrawal method'
-        });
-    }
-});
-
-// UPDATE WITHDRAWAL METHOD
-router.put('/withdrawal-methods/:id', async (req, res) => {
-    try {
-        const settings = await getOrCreateSettings();
-        const index = settings.withdrawalMethods.findIndex(m => m.id === req.params.id);
-
-        if (index === -1) {
-            return res.status(404).json({
-                success: false,
-                message: 'Withdrawal method not found'
-            });
-        }
-
-        const { name, type, currencyType, network, minWithdrawal, maxWithdrawal, fee, feePercentage, processingTime, image, description, limits, isActive, recommended } = req.body;
-
-        if (name !== undefined) settings.withdrawalMethods[index].name = name;
-        if (type !== undefined) settings.withdrawalMethods[index].type = type;
-        if (currencyType !== undefined) settings.withdrawalMethods[index].currencyType = currencyType;
-        if (network !== undefined) settings.withdrawalMethods[index].network = network;
-        if (minWithdrawal !== undefined) settings.withdrawalMethods[index].minWithdrawal = minWithdrawal;
-        if (maxWithdrawal !== undefined) settings.withdrawalMethods[index].maxWithdrawal = maxWithdrawal;
-        if (fee !== undefined) settings.withdrawalMethods[index].fee = fee;
-        if (feePercentage !== undefined) settings.withdrawalMethods[index].feePercentage = feePercentage;
-        if (processingTime !== undefined) settings.withdrawalMethods[index].processingTime = processingTime;
-        if (image !== undefined) settings.withdrawalMethods[index].image = image;
-        if (description !== undefined) settings.withdrawalMethods[index].description = description;
-        if (limits !== undefined) settings.withdrawalMethods[index].limits = limits;
-        if (isActive !== undefined) settings.withdrawalMethods[index].isActive = isActive;
-        if (recommended !== undefined) settings.withdrawalMethods[index].recommended = recommended;
-
-        settings.updatedBy = req.user.userId;
-        await settings.save();
-
-        res.json({
-            success: true,
-            message: 'Withdrawal method updated successfully',
-            data: settings.withdrawalMethods[index]
-        });
-    } catch (error) {
-        console.error('Update withdrawal method error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to update withdrawal method'
-        });
-    }
-});
-
-// DELETE WITHDRAWAL METHOD
-router.delete('/withdrawal-methods/:id', async (req, res) => {
-    try {
-        const settings = await getOrCreateSettings();
-        const index = settings.withdrawalMethods.findIndex(m => m.id === req.params.id);
-
-        if (index === -1) {
-            return res.status(404).json({
-                success: false,
-                message: 'Withdrawal method not found'
-            });
-        }
-
-        settings.withdrawalMethods.splice(index, 1);
-        settings.updatedBy = req.user.userId;
-        await settings.save();
-
-        res.json({
-            success: true,
-            message: 'Withdrawal method deleted successfully'
-        });
-    } catch (error) {
-        console.error('Delete withdrawal method error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to delete withdrawal method'
+            message: 'Failed to delete supported coin'
         });
     }
 });
@@ -989,13 +911,15 @@ router.get('/system-settings', async (req, res) => {
 router.put('/system-settings', async (req, res) => {
     try {
         const settings = await getOrCreateSettings();
-        const { maintenanceMode, registrationEnabled, kycRequired, minWithdrawal, maxWithdrawal } = req.body;
+        const { maintenanceMode, registrationEnabled, kycRequired, minWithdrawal, maxWithdrawal, minDeposit, maxDeposit } = req.body;
 
         if (maintenanceMode !== undefined) settings.systemSettings.maintenanceMode = maintenanceMode;
         if (registrationEnabled !== undefined) settings.systemSettings.registrationEnabled = registrationEnabled;
         if (kycRequired !== undefined) settings.systemSettings.kycRequired = kycRequired;
         if (minWithdrawal !== undefined) settings.systemSettings.minWithdrawal = minWithdrawal;
         if (maxWithdrawal !== undefined) settings.systemSettings.maxWithdrawal = maxWithdrawal;
+        if (minDeposit !== undefined) settings.systemSettings.minDeposit = minDeposit;
+        if (maxDeposit !== undefined) settings.systemSettings.maxDeposit = maxDeposit;
 
         settings.updatedBy = req.user.userId;
         await settings.save();
@@ -1014,75 +938,49 @@ router.put('/system-settings', async (req, res) => {
     }
 });
 
-// ==================== PAYMENT METHODS (CRYPTO & BANK) ====================
+// ==================== REFERRAL SETTINGS ====================
 
-// GET PAYMENT METHODS
-router.get('/payment-methods', async (req, res) => {
+// GET REFERRAL SETTINGS
+router.get('/referral-settings', async (req, res) => {
     try {
         const settings = await getOrCreateSettings();
         res.json({
             success: true,
-            data: settings.paymentMethods
+            data: settings.referralSettings
         });
     } catch (error) {
-        console.error('Get payment methods error:', error);
+        console.error('Get referral settings error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to fetch payment methods'
+            message: 'Failed to fetch referral settings'
         });
     }
 });
 
-// UPDATE CRYPTO PAYMENT SETTINGS
-router.put('/payment-methods/crypto', async (req, res) => {
+// UPDATE REFERRAL SETTINGS
+router.put('/referral-settings', async (req, res) => {
     try {
         const settings = await getOrCreateSettings();
-        const { enabled, cryptocurrencies } = req.body;
+        const { enabled, commissionPercentage, minPayoutAmount, payoutMethod } = req.body;
 
-        if (enabled !== undefined) settings.paymentMethods.crypto.enabled = enabled;
-        if (cryptocurrencies !== undefined) settings.paymentMethods.crypto.cryptocurrencies = cryptocurrencies;
+        if (enabled !== undefined) settings.referralSettings.enabled = enabled;
+        if (commissionPercentage !== undefined) settings.referralSettings.commissionPercentage = commissionPercentage;
+        if (minPayoutAmount !== undefined) settings.referralSettings.minPayoutAmount = minPayoutAmount;
+        if (payoutMethod !== undefined) settings.referralSettings.payoutMethod = payoutMethod;
 
         settings.updatedBy = req.user.userId;
         await settings.save();
 
         res.json({
             success: true,
-            message: 'Crypto payment settings updated successfully',
-            data: settings.paymentMethods.crypto
+            message: 'Referral settings updated successfully',
+            data: settings.referralSettings
         });
     } catch (error) {
-        console.error('Update crypto payment error:', error);
+        console.error('Update referral settings error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to update crypto payment settings'
-        });
-    }
-});
-
-// UPDATE BANK TRANSFER SETTINGS
-router.put('/payment-methods/bank-transfer', async (req, res) => {
-    try {
-        const settings = await getOrCreateSettings();
-        const { enabled, minDeposit, minWithdrawal, processingTime } = req.body;
-
-        if (enabled !== undefined) settings.paymentMethods.bankTransfer.enabled = enabled;
-        if (minDeposit !== undefined) settings.paymentMethods.bankTransfer.minDeposit = minDeposit;
-        if (minWithdrawal !== undefined) settings.paymentMethods.bankTransfer.minWithdrawal = minWithdrawal;
-        if (processingTime !== undefined) settings.paymentMethods.bankTransfer.processingTime = processingTime;
-
-        settings.updatedBy = req.user.userId;
-        await settings.save();
-
-        res.json({
-            success: true,
-            message: 'Bank transfer settings updated successfully',
-            data: settings.paymentMethods.bankTransfer
-        });
-    } catch (error) {
-        console.error('Update bank transfer error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to update bank transfer settings'
+            message: 'Failed to update referral settings'
         });
     }
 });

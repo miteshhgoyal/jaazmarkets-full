@@ -64,6 +64,21 @@ const withdrawalSchema = new mongoose.Schema({
         walletId: String
     },
 
+    // BlockBee Integration Fields (NEW - for automated payouts)
+    blockBee: {
+        payoutId: String,              // BlockBee payout batch ID
+        payoutRequestId: String,       // Individual payout request ID
+        coin: String,                  // Crypto ticker (btc, eth, usdt_erc20, etc.)
+        blockBeeStatus: {              // BlockBee-specific status
+            type: String,
+            enum: ['created', 'processing', 'done', 'error'],
+        },
+        txHash: String,                // Blockchain transaction hash
+        lastStatusCheck: Date,         // Last time status was checked
+        errorMessage: String,          // Error from BlockBee if any
+        createdAt: Date                // When added to BlockBee
+    },
+
     // Status
     status: {
         type: String,
@@ -85,8 +100,10 @@ const withdrawalSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// Index for queries
+// Indexes
 withdrawalSchema.index({ userId: 1, status: 1, createdAt: -1 });
+withdrawalSchema.index({ 'blockBee.payoutId': 1 });
+withdrawalSchema.index({ 'blockBee.blockBeeStatus': 1 });
 
 const Withdrawal = mongoose.model('Withdrawal', withdrawalSchema);
 export default Withdrawal;

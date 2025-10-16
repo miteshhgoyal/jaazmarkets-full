@@ -15,7 +15,7 @@ const settingsSchema = new mongoose.Schema({
         },
         category: {
             type: String,
-            enum: ['Standard accounts', 'Professional accounts'],
+            enum: ['Standard accounts', 'Professional accounts', 'Premium accounts', 'VIP accounts'],
             required: true
         },
         description: String,
@@ -63,37 +63,6 @@ const settingsSchema = new mongoose.Schema({
         },
         serverUrl: String
     }],
-
-    // Payment Methods
-    paymentMethods: {
-        crypto: {
-            enabled: {
-                type: Boolean,
-                default: true
-            },
-            cryptocurrencies: [{
-                name: String,
-                symbol: String,
-                network: String,
-                walletAddress: String,
-                minDeposit: Number,
-                minWithdrawal: Number,
-                isActive: {
-                    type: Boolean,
-                    default: true
-                }
-            }]
-        },
-        bankTransfer: {
-            enabled: {
-                type: Boolean,
-                default: true
-            },
-            minDeposit: Number,
-            minWithdrawal: Number,
-            processingTime: String
-        }
-    },
 
     // Trading Settings
     tradingSettings: {
@@ -154,54 +123,89 @@ const settingsSchema = new mongoose.Schema({
         maxWithdrawal: {
             type: Number,
             default: 50000
+        },
+        minDeposit: {
+            type: Number,
+            default: 10
+        },
+        maxDeposit: {
+            type: Number,
+            default: 100000
         }
     },
 
-    // PAYMENT METHODS FOR DEPOSITS
-    depositMethods: [{
-        id: { type: String, required: true, unique: true },
-        name: { type: String, required: true },
-        type: { type: String, enum: ['crypto', 'bank', 'card', 'wallet'], required: true },
-        currencyType: String, // BTC, USDT, INR, etc.
-        network: String, // ERC20, TRC20, BTC, etc.
-        walletAddress: String, // For crypto
-        minDeposit: { type: Number, required: true },
-        maxDeposit: Number,
-        fee: { type: Number, default: 0 },
-        feePercentage: { type: Number, default: 0 },
-        processingTime: String,
-        image: String,
-        description: String,
-        isActive: { type: Boolean, default: true },
-        recommended: { type: Boolean, default: false },
-        bankDetails: {
-            bankName: String,
-            accountNumber: String,
-            accountHolderName: String,
-            ifscCode: String,
-            swiftCode: String,
-            branchName: String
+    // BlockBee Configuration (NEW - replaces deposit/withdrawal methods)
+    blockBeeSettings: {
+        enabled: {
+            type: Boolean,
+            default: true
+        },
+        apiKeyV2: {
+            type: String,
+            required: false
+        },
+        apiKeyPayout: {
+            type: String,
+            required: false
+        },
+        webhookBaseUrl: {
+            type: String,
+            required: false
+        },
+        defaultCurrency: {
+            type: String,
+            default: 'usd',
+            enum: ['usd', 'eur', 'gbp']
+        },
+        // Supported coins for deposits/withdrawals
+        supportedCoins: [{
+            ticker: String,          // btc, eth, usdt_erc20, usdt_trc20, etc.
+            name: String,            // Bitcoin, Ethereum, etc.
+            network: String,         // BTC, ETH, ERC20, TRC20, etc.
+            isActive: Boolean,
+            minDeposit: Number,
+            minWithdrawal: Number,
+            icon: String
+        }],
+        // Deposit-specific settings
+        depositSettings: {
+            minAmount: {
+                type: Number,
+                default: 10
+            },
+            maxAmount: {
+                type: Number,
+                default: 100000
+            },
+            autoApprove: {
+                type: Boolean,
+                default: true
+            }
+        },
+        // Withdrawal-specific settings
+        withdrawalSettings: {
+            minAmount: {
+                type: Number,
+                default: 10
+            },
+            maxAmount: {
+                type: Number,
+                default: 50000
+            },
+            autoProcess: {
+                type: Boolean,
+                default: false        // Requires admin approval by default
+            },
+            feePercentage: {
+                type: Number,
+                default: 0
+            },
+            fixedFee: {
+                type: Number,
+                default: 0
+            }
         }
-    }],
-
-    // PAYMENT METHODS FOR WITHDRAWALS
-    withdrawalMethods: [{
-        id: { type: String, required: true, unique: true },
-        name: { type: String, required: true },
-        type: { type: String, enum: ['crypto', 'bank', 'wallet'], required: true },
-        currencyType: String,
-        network: String,
-        minWithdrawal: { type: Number, required: true },
-        maxWithdrawal: Number,
-        fee: { type: Number, default: 0 },
-        feePercentage: { type: Number, default: 0 },
-        processingTime: String,
-        image: String,
-        description: String,
-        limits: String,
-        isActive: { type: Boolean, default: true },
-        recommended: { type: Boolean, default: false }
-    }],
+    },
 
     // Referral Settings
     referralSettings: {
