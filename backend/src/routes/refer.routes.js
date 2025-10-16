@@ -23,7 +23,7 @@ router.get("/my-referral", authenticateToken, async (req, res) => {
             return res.status(404).json({ success: false, message: "User not found" });
         }
 
-        const referralLink = `${process.env.CORS_ORIGIN}/register?ref=${user.email}`;
+        const referralLink = `${process.env.FRONTEND_URL}/register?ref=${user.email}`;
         const totalReferrals = await User.countDocuments({ referredBy: req.user.userId });
 
         res.json({

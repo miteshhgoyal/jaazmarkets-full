@@ -1,8 +1,15 @@
+// backend/src/routes/auth.js
 import express from 'express';
 import User from '../models/User.js';
 import { authenticateToken, authorize } from '../middlewares/auth.js';
 import jwt from 'jsonwebtoken';
-import { sendPasswordResetEmail, generateOTP } from '../services/emailService.js';
+import {
+    sendPasswordResetEmail,
+    sendRegistrationEmail,
+    generateOTP,
+    generateTradingPassword,
+    generateAccountNumber
+} from '../services/emailService.js';
 
 const router = express.Router();
 
@@ -18,7 +25,7 @@ const generateTokens = (user) => {
             role: user.role,
         },
         process.env.JWT_SECRET,
-        { expiresIn: '15m' } // Short-lived access token
+        { expiresIn: '15m' }
     );
 
     const refreshToken = jwt.sign(
@@ -28,7 +35,7 @@ const generateTokens = (user) => {
             role: user.role,
         },
         process.env.JWT_REFRESH_SECRET,
-        { expiresIn: '7d' } // Long-lived refresh token
+        { expiresIn: '7d' }
     );
 
     return { accessToken, refreshToken };
@@ -93,7 +100,10 @@ router.post("/signup", async (req, res) => {
                 });
             }
         }
-        // =============================
+
+        // ===== AUTO-GENERATE TRADING CREDENTIALS =====
+        const tradingPassword = generateTradingPassword();
+        const accountNumber = generateAccountNumber();
 
         // Create new user
         const user = new User({
@@ -105,14 +115,34 @@ router.post("/signup", async (req, res) => {
             role: "user",
             accountStatus: "pending",
             isVerified: false,
-            referredBy: referrerId, // Add this
+            referredBy: referrerId,
         });
 
         await user.save();
 
+        // ===== SEND REGISTRATION EMAIL WITH ALL CREDENTIALS =====
+        try {
+            await sendRegistrationEmail({
+                email: user.email,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                portalPassword: password,
+                tradingPassword: tradingPassword,
+                accountNumber: accountNumber,
+                currency: user.currency,
+            });
+            console.log(`Registration email sent to ${user.email}`);
+        } catch (emailError) {
+            console.error('Registration email failed:', emailError);
+        }
+
         res.status(201).json({
             success: true,
-            message: "Registration successful. Please login to continue.",
+            message: "Registration successful! Check your email for complete login details.",
+            data: {
+                email: user.email,
+                accountNumber: accountNumber
+            }
         });
     } catch (error) {
         console.error("Signup error:", error);
