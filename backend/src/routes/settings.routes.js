@@ -1,5 +1,5 @@
 import express from 'express';
-import Settings from '../models/Settings.js';
+import Settings from '../models/Setting.js';
 import { authenticateToken, authorize } from '../middlewares/auth.js';
 import { v4 as uuidv4 } from 'uuid';
 
