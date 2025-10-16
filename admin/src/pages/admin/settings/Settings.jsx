@@ -1,3 +1,4 @@
+// admin/src/pages/admin/settings/Settings.jsx - COMPLETE FILE
 import React, { useState, useEffect } from "react";
 import MetaHead from "../../../components/MetaHead";
 import PageHeader from "../../../components/ui/PageHeader";
@@ -22,6 +23,7 @@ import {
   Clock,
   ChevronDown,
   X,
+  Users,
 } from "lucide-react";
 import api from "../../../services/api";
 
@@ -555,6 +557,21 @@ const Settings = () => {
     }
   };
 
+  // ==================== REFERRAL SETTINGS ====================
+
+  const handleUpdateReferralSettings = async () => {
+    try {
+      const res = await api.put("/refer/admin/settings", referralSettings);
+      if (res.data.success) {
+        showSuccessMessage();
+      }
+    } catch (err) {
+      setError(
+        err.response?.data?.message || "Failed to update referral settings"
+      );
+    }
+  };
+
   // ==================== UTILITY FUNCTIONS ====================
 
   const showSuccessMessage = () => {
@@ -869,133 +886,6 @@ const Settings = () => {
             </div>
           )}
 
-          {/* Referral Settings Tab */}
-          {activeTab === "referral-settings" && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold mb-4">
-                Referral Program Settings
-              </h3>
-
-              <div className="space-y-4">
-                {/* Enable/Disable */}
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <label className="font-medium text-gray-900">
-                      Enable Referral Program
-                    </label>
-                    <p className="text-sm text-gray-600">
-                      Allow users to refer others and earn commissions
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={referralSettings.enabled || false}
-                      onChange={(e) =>
-                        setReferralSettings({
-                          ...referralSettings,
-                          enabled: e.target.checked,
-                        })
-                      }
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-
-                {/* Commission Percentage */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Commission Percentage (% of trade amount)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    max="5"
-                    value={referralSettings.commissionPercentage || 0.01}
-                    onChange={(e) =>
-                      setReferralSettings({
-                        ...referralSettings,
-                        commissionPercentage: parseFloat(e.target.value),
-                      })
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    Referrers earn this % of total trade amount (volume × price)
-                  </p>
-                </div>
-
-                {/* Min Payout Amount */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Minimum Payout Amount ($)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={referralSettings.minPayoutAmount || 10}
-                    onChange={(e) =>
-                      setReferralSettings({
-                        ...referralSettings,
-                        minPayoutAmount: parseFloat(e.target.value),
-                      })
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                {/* Payout Method */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Payout Method
-                  </label>
-                  <select
-                    value={referralSettings.payoutMethod || "wallet"}
-                    onChange={(e) =>
-                      setReferralSettings({
-                        ...referralSettings,
-                        payoutMethod: e.target.value,
-                      })
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="wallet">Automatic (To Wallet)</option>
-                    <option value="manual">Manual Approval</option>
-                  </select>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {referralSettings.payoutMethod === "wallet"
-                      ? "Commissions are automatically added to referrer's wallet"
-                      : "Admin must manually approve commission payouts"}
-                  </p>
-                </div>
-
-                {/* Save Button */}
-                <button
-                  onClick={async () => {
-                    try {
-                      const res = await api.put(
-                        "/refer/admin/settings",
-                        referralSettings
-                      );
-                      if (res.data.success) {
-                        setSaveSuccess(true);
-                        setTimeout(() => setSaveSuccess(false), 3000);
-                      }
-                    } catch (err) {
-                      setError("Failed to save settings");
-                    }
-                  }}
-                  className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
-                >
-                  <Save className="w-5 h-5" />
-                  Save Referral Settings
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* CURRENCIES TAB */}
           {activeTab === "currencies" && (
             <div>
@@ -1160,7 +1050,7 @@ const Settings = () => {
           )}
 
           {/* TRADING SETTINGS TAB */}
-          {activeTab === "trading" && (
+          {activeTab === "trading-settings" && (
             <div>
               <div className="mb-6">
                 <h3 className="text-lg font-semibold text-gray-900">
@@ -1360,7 +1250,7 @@ const Settings = () => {
           )}
 
           {/* SYSTEM SETTINGS TAB */}
-          {activeTab === "system" && (
+          {activeTab === "system-settings" && (
             <div>
               <div className="mb-6">
                 <h3 className="text-lg font-semibold text-gray-900">
@@ -1515,6 +1405,162 @@ const Settings = () => {
                   <Save className="w-4 h-4" />
                   Save System Settings
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* REFERRAL SETTINGS TAB */}
+          {activeTab === "referral-settings" && (
+            <div>
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Referral Program Settings
+                </h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Configure referral commission rates and payout settings
+                </p>
+              </div>
+
+              <div className="space-y-6">
+                {/* Enable/Disable Toggle */}
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-sm font-semibold text-gray-900">
+                        Enable Referral Program
+                      </label>
+                      <p className="text-xs text-gray-600 mt-0.5">
+                        Allow users to refer others and earn commissions on
+                        their trades
+                      </p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={referralSettings.enabled || false}
+                        onChange={(e) =>
+                          setReferralSettings({
+                            ...referralSettings,
+                            enabled: e.target.checked,
+                          })
+                        }
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Commission Percentage */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                    Commission Percentage (% of trade amount)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.001"
+                      min="0"
+                      max="5"
+                      value={referralSettings.commissionPercentage || 0.01}
+                      onChange={(e) =>
+                        setReferralSettings({
+                          ...referralSettings,
+                          commissionPercentage: parseFloat(e.target.value),
+                        })
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                      %
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Referrers earn this percentage of total trade amount (volume
+                    × price). Recommended: 0.001% - 0.1%
+                  </p>
+                  <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-xs text-blue-800">
+                      <strong>Example:</strong> 0.01% commission on a $10,000
+                      trade = $1.00 earnings
+                    </p>
+                  </div>
+                </div>
+
+                {/* Min Payout Amount */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                    Minimum Payout Amount ($)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={referralSettings.minPayoutAmount || 10}
+                    onChange={(e) =>
+                      setReferralSettings({
+                        ...referralSettings,
+                        minPayoutAmount: parseFloat(e.target.value),
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <p className="text-xs text-gray-600 mt-1">
+                    Minimum commission amount required before payout
+                  </p>
+                </div>
+
+                {/* Payout Method */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                    Payout Method
+                  </label>
+                  <select
+                    value={referralSettings.payoutMethod || "wallet"}
+                    onChange={(e) =>
+                      setReferralSettings({
+                        ...referralSettings,
+                        payoutMethod: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="wallet">Automatic (To Wallet)</option>
+                    <option value="manual">Manual Approval</option>
+                  </select>
+                  <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <p className="text-xs text-gray-700">
+                      {referralSettings.payoutMethod === "wallet" ? (
+                        <>
+                          <strong>Automatic:</strong> Commissions are instantly
+                          added to referrer's wallet balance on every trade
+                          close.
+                        </>
+                      ) : (
+                        <>
+                          <strong>Manual:</strong> Admin must review and approve
+                          commission payouts manually.
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Save Button */}
+                <div className="flex items-center gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={handleUpdateReferralSettings}
+                    className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                  >
+                    <Save className="w-4 h-4" />
+                    Save Referral Settings
+                  </button>
+                  <button
+                    onClick={fetchAllSettings}
+                    className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
+                  >
+                    Reset
+                  </button>
+                </div>
               </div>
             </div>
           )}

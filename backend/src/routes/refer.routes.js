@@ -188,81 +188,177 @@ router.get("/referral/:userId/trades", authenticateToken, async (req, res) => {
 // ============================================
 
 // GET REFERRAL SETTINGS
-router.get("/admin/settings", authenticateToken, authorize("admin", "superadmin"), async (req, res) => {
-    try {
-        const settings = await Settings.findOne();
-        res.json({
-            success: true,
-            data: settings?.referralSettings || {
-                enabled: true,
-                commissionPercentage: 0.01,
-                minPayoutAmount: 10,
-                payoutMethod: "wallet",
-            },
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Failed to fetch settings" });
+router.get(
+    "/admin/settings",
+    authenticateToken,
+    authorize("admin", "superadmin"),
+    async (req, res) => {
+        try {
+            const settings = await Settings.findOne();
+            res.json({
+                success: true,
+                data: settings?.referralSettings || {
+                    enabled: true,
+                    commissionPercentage: 0.01,
+                    minPayoutAmount: 10,
+                    payoutMethod: "wallet",
+                },
+            });
+        } catch (error) {
+            res.status(500).json({ success: false, message: "Failed to fetch settings" });
+        }
     }
-});
+);
 
 // UPDATE REFERRAL SETTINGS
-router.put("/admin/settings", authenticateToken, authorize("admin", "superadmin"), async (req, res) => {
-    try {
-        const { enabled, commissionPercentage, minPayoutAmount, payoutMethod } = req.body;
+router.put(
+    "/admin/settings",
+    authenticateToken,
+    authorize("admin", "superadmin"),
+    async (req, res) => {
+        try {
+            const { enabled, commissionPercentage, minPayoutAmount, payoutMethod } = req.body;
 
-        let settings = await Settings.findOne();
-        if (!settings) {
-            settings = new Settings();
+            let settings = await Settings.findOne();
+            if (!settings) {
+                settings = new Settings();
+            }
+
+            if (enabled !== undefined) settings.referralSettings.enabled = enabled;
+            if (commissionPercentage !== undefined)
+                settings.referralSettings.commissionPercentage = commissionPercentage;
+            if (minPayoutAmount !== undefined)
+                settings.referralSettings.minPayoutAmount = minPayoutAmount;
+            if (payoutMethod !== undefined)
+                settings.referralSettings.payoutMethod = payoutMethod;
+
+            settings.updatedBy = req.user.userId;
+            await settings.save();
+
+            res.json({
+                success: true,
+                message: "Referral settings updated successfully",
+                data: settings.referralSettings,
+            });
+        } catch (error) {
+            res.status(500).json({ success: false, message: "Failed to update settings" });
         }
-
-        if (enabled !== undefined) settings.referralSettings.enabled = enabled;
-        if (commissionPercentage !== undefined)
-            settings.referralSettings.commissionPercentage = commissionPercentage;
-        if (minPayoutAmount !== undefined)
-            settings.referralSettings.minPayoutAmount = minPayoutAmount;
-        if (payoutMethod !== undefined)
-            settings.referralSettings.payoutMethod = payoutMethod;
-
-        settings.updatedBy = req.user.userId;
-        await settings.save();
-
-        res.json({
-            success: true,
-            message: "Referral settings updated successfully",
-            data: settings.referralSettings,
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Failed to update settings" });
     }
-});
+);
 
 // GET ALL REFERRAL STATS (Admin)
-router.get("/admin/stats", authenticateToken, authorize("admin", "superadmin"), async (req, res) => {
-    try {
-        const totalReferrers = await User.countDocuments({ totalReferrals: { $gt: 0 } });
-        const totalReferred = await User.countDocuments({ referredBy: { $ne: null } });
+router.get(
+    "/admin/stats",
+    authenticateToken,
+    authorize("admin", "superadmin"),
+    async (req, res) => {
+        try {
+            const totalReferrers = await User.countDocuments({ totalReferrals: { $gt: 0 } });
+            const totalReferred = await User.countDocuments({ referredBy: { $ne: null } });
 
-        const totalEarnings = await User.aggregate([
-            { $group: { _id: null, total: { $sum: "$referralEarnings" } } }
-        ]);
+            const totalEarnings = await User.aggregate([
+                { $group: { _id: null, total: { $sum: "$referralEarnings" } } },
+            ]);
 
-        const topReferrers = await User.find({ totalReferrals: { $gt: 0 } })
-            .select("firstName lastName email totalReferrals referralEarnings")
-            .sort({ totalReferrals: -1 })
-            .limit(10);
+            const topReferrers = await User.find({ totalReferrals: { $gt: 0 } })
+                .select("firstName lastName email totalReferrals referralEarnings")
+                .sort({ totalReferrals: -1 })
+                .limit(10);
 
-        res.json({
-            success: true,
-            data: {
-                totalReferrers,
-                totalReferred,
-                totalEarningsPaid: totalEarnings[0]?.total || 0,
-                topReferrers,
-            },
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Failed to fetch stats" });
+            res.json({
+                success: true,
+                data: {
+                    totalReferrers,
+                    totalReferred,
+                    totalEarningsPaid: totalEarnings[0]?.total || 0,
+                    topReferrers,
+                },
+            });
+        } catch (error) {
+            res.status(500).json({ success: false, message: "Failed to fetch stats" });
+        }
     }
-});
+);
+
+// GET USER'S REFERRALS (Admin)
+router.get(
+    "/admin/user/:userId/referrals",
+    authenticateToken,
+    authorize("admin", "superadmin"),
+    async (req, res) => {
+        try {
+            const { userId } = req.params;
+
+            const user = await User.findById(userId).select(
+                "firstName lastName email referralEarnings"
+            );
+
+            if (!user) {
+                return res.status(404).json({ success: false, message: "User not found" });
+            }
+
+            const settings = await Settings.findOne();
+            const commissionRate = settings?.referralSettings?.commissionPercentage || 0.01;
+
+            const referredUsers = await User.find({ referredBy: userId })
+                .select("firstName lastName email createdAt")
+                .sort({ createdAt: -1 });
+
+            const referralsWithDetails = await Promise.all(
+                referredUsers.map(async (refUser) => {
+                    const accounts = await TradingAccount.find({ userId: refUser._id }).select(
+                        "accountNumber accountType balance equity platform leverage"
+                    );
+
+                    const totalTrades = await Trade.countDocuments({
+                        userId: refUser._id,
+                        status: "closed",
+                    });
+
+                    const trades = await Trade.find({
+                        userId: refUser._id,
+                        status: "closed",
+                    }).select("volume openPrice profitLoss");
+
+                    let totalTradeAmount = 0;
+                    let totalProfitLoss = 0;
+
+                    trades.forEach((trade) => {
+                        const tradeAmount = trade.volume * trade.openPrice;
+                        totalTradeAmount += tradeAmount;
+                        totalProfitLoss += trade.profitLoss || 0;
+                    });
+
+                    const myCommission = (totalTradeAmount * commissionRate) / 100;
+
+                    return {
+                        id: refUser._id,
+                        name: `${refUser.firstName} ${refUser.lastName}`,
+                        email: refUser.email,
+                        joinedAt: refUser.createdAt,
+                        stats: {
+                            totalAccounts: accounts.length,
+                            totalTrades,
+                            totalTradeAmount,
+                            totalProfitLoss,
+                            myCommission,
+                        },
+                    };
+                })
+            );
+
+            res.json({
+                success: true,
+                data: {
+                    user,
+                    referrals: referralsWithDetails,
+                },
+            });
+        } catch (error) {
+            console.error("Get user referrals error:", error);
+            res.status(500).json({ success: false, message: "Failed to fetch user referrals" });
+        }
+    }
+);
 
 export default router;

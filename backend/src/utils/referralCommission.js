@@ -37,9 +37,17 @@ export const calculateAndPayReferralCommission = async (trade) => {
                 },
             });
 
-            console.log(`Referral commission: $${commissionAmount.toFixed(4)} (${commissionRate}% of $${tradeAmount.toFixed(2)}) paid for trade ${trade.tradeId}`);
+            console.log(
+                `Referral commission paid: $${commissionAmount.toFixed(
+                    4
+                )} (${commissionRate}% of $${tradeAmount.toFixed(2)}) for trade ${trade.tradeId}`
+            );
+        } else {
+            console.log(
+                `📋 Manual payout required: $${commissionAmount.toFixed(4)} for trade ${trade.tradeId
+                }`
+            );
         }
-
     } catch (error) {
         console.error("Calculate referral commission error:", error);
     }

@@ -19,6 +19,7 @@ const ReferEarn = () => {
   const [loading, setLoading] = useState(true);
   const [referralData, setReferralData] = useState(null);
   const [referrals, setReferrals] = useState([]);
+  const [commissionRate, setCommissionRate] = useState(0.01);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -48,6 +49,7 @@ const ReferEarn = () => {
       const response = await api.get("/refer/my-referrals");
       if (response.data.success) {
         setReferrals(response.data.data.referrals);
+        setCommissionRate(response.data.data.commissionRate || 0.01);
       }
     } catch (error) {
       console.error(error);
@@ -100,7 +102,7 @@ const ReferEarn = () => {
   };
 
   const totalCommissionEarned = referrals.reduce(
-    (sum, ref) => sum + ref.stats.myCommission,
+    (sum, ref) => sum + (ref.stats?.myCommission || 0),
     0
   );
 
@@ -122,7 +124,7 @@ const ReferEarn = () => {
 
       <PageHeader
         title="Refer & Earn"
-        subtitle="Earn 5% commission on every profitable trade your referrals make"
+        subtitle={`Earn ${commissionRate}% commission on every trade your referrals make`}
       />
 
       <div className="py-8 space-y-6">
@@ -222,8 +224,9 @@ const ReferEarn = () => {
           <div className="mt-4 p-4 bg-blue-50 rounded-lg">
             <p className="text-sm text-blue-800">
               <strong>How it works:</strong> Share your referral link with
-              friends. When they register and make profitable trades, you earn
-              5% commission on their profits automatically!
+              friends. When they register and trade, you earn {commissionRate}%
+              commission on their total trade amount (volume × price)
+              automatically!
             </p>
           </div>
         </Card>
@@ -266,7 +269,7 @@ const ReferEarn = () => {
                     <div className="text-right">
                       <p className="text-sm text-gray-600">My Commission</p>
                       <p className="text-xl font-bold text-green-600">
-                        ${referral.stats.myCommission.toFixed(2)}
+                        ${referral.stats.myCommission.toFixed(4)}
                       </p>
                     </div>
                   </div>
@@ -286,7 +289,13 @@ const ReferEarn = () => {
                       </p>
                     </div>
                     <div className="bg-gray-50 p-3 rounded">
-                      <p className="text-xs text-gray-600">Their Profit/Loss</p>
+                      <p className="text-xs text-gray-600">Trade Volume</p>
+                      <p className="text-lg font-semibold">
+                        ${referral.stats.totalTradeAmount.toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded">
+                      <p className="text-xs text-gray-600">Their P/L</p>
                       <p
                         className={`text-lg font-semibold ${
                           referral.stats.totalProfitLoss >= 0
@@ -295,12 +304,6 @@ const ReferEarn = () => {
                         }`}
                       >
                         ${referral.stats.totalProfitLoss.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="bg-gray-50 p-3 rounded">
-                      <p className="text-xs text-gray-600">Volume</p>
-                      <p className="text-lg font-semibold">
-                        {referral.stats.totalVolume.toFixed(2)}
                       </p>
                     </div>
                   </div>
@@ -368,6 +371,9 @@ const ReferEarn = () => {
                               <p className="text-gray-600">
                                 {trade.openPrice} → {trade.closePrice}
                               </p>
+                              <p className="text-blue-600">
+                                Trade Amount: ${trade.tradeAmount.toFixed(2)}
+                              </p>
                               <p className="text-gray-500">
                                 {new Date(trade.closeTime).toLocaleString()}
                               </p>
@@ -382,8 +388,8 @@ const ReferEarn = () => {
                               >
                                 ${trade.profitLoss.toFixed(2)}
                               </p>
-                              <p className="text-green-600 text-xs">
-                                +${trade.myCommission.toFixed(2)}
+                              <p className="text-green-600 text-xs mt-1">
+                                Commission: +${trade.myCommission.toFixed(4)}
                               </p>
                             </div>
                           </div>
