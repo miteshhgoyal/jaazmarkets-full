@@ -1,4 +1,3 @@
-// routes/admin.settings.routes.js
 import express from 'express';
 import Settings from '../models/Settings.js';
 import { authenticateToken, authorize } from '../middlewares/auth.js';
