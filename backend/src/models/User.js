@@ -17,6 +17,11 @@ const userSchema = new mongoose.Schema({
         required: true,
         select: false
     },
+    tradingPassword: {
+        type: String,
+        required: false,
+        select: false 
+    },
 
     // Role
     role: {
@@ -42,6 +47,14 @@ const userSchema = new mongoose.Schema({
         type: String,
         unique: true,
         sparse: true
+    },
+
+    // Account Number
+    accountNumber: {
+        type: String,
+        unique: true,
+        sparse: true,
+        index: true
     },
 
     // Address
@@ -119,7 +132,7 @@ const userSchema = new mongoose.Schema({
         enum: ['MT4 WebTerminal', 'MT4 Desktop', 'MT4 Mobile'],
         default: null
     },
-    
+
     referralCode: {
         type: String,
         unique: true,
@@ -151,9 +164,21 @@ userSchema.pre('save', async function (next) {
     next();
 });
 
+// Hash trading password before saving
+userSchema.pre('save', async function (next) {
+    if (!this.isModified('tradingPassword') || !this.tradingPassword) return next();
+    this.tradingPassword = await bcrypt.hash(this.tradingPassword, 12);
+    next();
+});
+
 // Compare password method
 userSchema.methods.comparePassword = async function (candidatePassword) {
     return await bcrypt.compare(candidatePassword, this.password);
+};
+
+// Compare trading password method
+userSchema.methods.compareTradingPassword = async function (candidateTradingPassword) {
+    return await bcrypt.compare(candidateTradingPassword, this.tradingPassword);
 };
 
 // Generate OTP

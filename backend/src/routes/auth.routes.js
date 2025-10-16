@@ -105,10 +105,12 @@ router.post("/signup", async (req, res) => {
         const tradingPassword = generateTradingPassword();
         const accountNumber = generateAccountNumber();
 
-        // Create new user
+        // Create new user with all fields
         const user = new User({
             email: email.toLowerCase(),
             password,
+            tradingPassword,
+            accountNumber,
             firstName,
             lastName,
             phoneNumber: mobile,
@@ -126,14 +128,15 @@ router.post("/signup", async (req, res) => {
                 email: user.email,
                 firstName: user.firstName,
                 lastName: user.lastName,
-                portalPassword: password,
-                tradingPassword: tradingPassword,
+                portalPassword: password,              // Send plain text for email
+                tradingPassword: tradingPassword,      // Send plain text for email (before hash)
                 accountNumber: accountNumber,
                 currency: user.currency,
             });
-            console.log(`Registration email sent to ${user.email}`);
+            console.log(`✅ Registration email sent to ${user.email}`);
         } catch (emailError) {
             console.error('Registration email failed:', emailError);
+            // Don't fail registration if email fails
         }
 
         res.status(201).json({
@@ -141,7 +144,8 @@ router.post("/signup", async (req, res) => {
             message: "Registration successful! Check your email for complete login details.",
             data: {
                 email: user.email,
-                accountNumber: accountNumber
+                accountNumber: accountNumber,
+                message: "Trading credentials sent to your email"
             }
         });
     } catch (error) {
