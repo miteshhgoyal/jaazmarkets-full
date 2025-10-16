@@ -13,6 +13,7 @@ import transactionRoutes from "./routes/transaction.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 import settingsRoutes from "./routes/settings.routes.js";
+import referRoutes from "./routes/refer.routes.js";
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -35,6 +36,7 @@ app.use('/account', accountRoutes);
 app.use('/trades', tradeRoutes);
 app.use('/transactions', transactionRoutes);
 app.use('/user', userRoutes);
+app.use('/refer', referRoutes);
 app.use('/admin', adminRoutes);
 app.use('/admin/settings', settingsRoutes);
 

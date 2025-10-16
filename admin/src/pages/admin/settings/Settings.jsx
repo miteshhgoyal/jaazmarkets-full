@@ -42,6 +42,7 @@ const Settings = () => {
   const [fees, setFees] = useState({});
   const [systemSettings, setSystemSettings] = useState({});
   const [paymentMethods, setPaymentMethods] = useState({});
+  const [referralSettings, setReferralSettings] = useState({});
 
   // Modal states
   const [showDepositMethodModal, setShowDepositMethodModal] = useState(false);
@@ -132,6 +133,7 @@ const Settings = () => {
         feesRes,
         systemRes,
         paymentRes,
+        referralRes,
       ] = await Promise.all([
         api.get("/admin/settings/deposit-methods"),
         api.get("/admin/settings/withdrawal-methods"),
@@ -143,6 +145,7 @@ const Settings = () => {
         api.get("/admin/settings/fees"),
         api.get("/admin/settings/system-settings"),
         api.get("/admin/settings/payment-methods"),
+        api.get("/refer/admin/settings"),
       ]);
 
       setDepositMethods(depositRes.data.data || []);
@@ -155,6 +158,7 @@ const Settings = () => {
       setFees(feesRes.data.data || {});
       setSystemSettings(systemRes.data.data || {});
       setPaymentMethods(paymentRes.data.data || {});
+      setReferralSettings(referralRes.data.data || {});
     } catch (err) {
       console.error("Error fetching settings:", err);
       setError("Failed to load settings");
@@ -589,19 +593,20 @@ const Settings = () => {
   };
 
   const tabs = [
-    { id: "deposit-methods", label: "Deposit Methods", icon: TrendingUp },
+    { id: "deposit-methods", label: "Deposit Methods", icon: Wallet },
     {
       id: "withdrawal-methods",
       label: "Withdrawal Methods",
-      icon: TrendingDown,
+      icon: CreditCard,
     },
-    { id: "account-types", label: "Account Types", icon: CreditCard },
-    { id: "currencies", label: "Currencies", icon: DollarSign },
-    { id: "leverage", label: "Leverage Options", icon: SettingsIcon },
-    { id: "platforms", label: "Platforms", icon: Globe },
-    { id: "trading", label: "Trading Settings", icon: TrendingUp },
-    { id: "fees", label: "Fees & Charges", icon: DollarSign },
-    { id: "system", label: "System Settings", icon: Shield },
+    { id: "account-types", label: "Account Types", icon: DollarSign },
+    { id: "currencies", label: "Currencies", icon: Globe },
+    { id: "leverage", label: "Leverage Options", icon: TrendingUp },
+    { id: "platforms", label: "Platforms", icon: SettingsIcon },
+    { id: "trading-settings", label: "Trading Settings", icon: Shield },
+    { id: "fees", label: "Fees", icon: DollarSign },
+    { id: "system-settings", label: "System Settings", icon: Clock },
+    { id: "referral-settings", label: "Referral Settings", icon: Users },
   ];
 
   if (loading) {
@@ -860,6 +865,133 @@ const Settings = () => {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Referral Settings Tab */}
+          {activeTab === "referral-settings" && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold mb-4">
+                Referral Program Settings
+              </h3>
+
+              <div className="space-y-4">
+                {/* Enable/Disable */}
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div>
+                    <label className="font-medium text-gray-900">
+                      Enable Referral Program
+                    </label>
+                    <p className="text-sm text-gray-600">
+                      Allow users to refer others and earn commissions
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={referralSettings.enabled || false}
+                      onChange={(e) =>
+                        setReferralSettings({
+                          ...referralSettings,
+                          enabled: e.target.checked,
+                        })
+                      }
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  </label>
+                </div>
+
+                {/* Commission Percentage */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Commission Percentage (% of trade amount)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.001"
+                    min="0"
+                    max="5"
+                    value={referralSettings.commissionPercentage || 0.01}
+                    onChange={(e) =>
+                      setReferralSettings({
+                        ...referralSettings,
+                        commissionPercentage: parseFloat(e.target.value),
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-sm text-gray-500 mt-1">
+                    Referrers earn this % of total trade amount (volume × price)
+                  </p>
+                </div>
+
+                {/* Min Payout Amount */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Minimum Payout Amount ($)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={referralSettings.minPayoutAmount || 10}
+                    onChange={(e) =>
+                      setReferralSettings({
+                        ...referralSettings,
+                        minPayoutAmount: parseFloat(e.target.value),
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Payout Method */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Payout Method
+                  </label>
+                  <select
+                    value={referralSettings.payoutMethod || "wallet"}
+                    onChange={(e) =>
+                      setReferralSettings({
+                        ...referralSettings,
+                        payoutMethod: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="wallet">Automatic (To Wallet)</option>
+                    <option value="manual">Manual Approval</option>
+                  </select>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {referralSettings.payoutMethod === "wallet"
+                      ? "Commissions are automatically added to referrer's wallet"
+                      : "Admin must manually approve commission payouts"}
+                  </p>
+                </div>
+
+                {/* Save Button */}
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await api.put(
+                        "/refer/admin/settings",
+                        referralSettings
+                      );
+                      if (res.data.success) {
+                        setSaveSuccess(true);
+                        setTimeout(() => setSaveSuccess(false), 3000);
+                      }
+                    } catch (err) {
+                      setError("Failed to save settings");
+                    }
+                  }}
+                  className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
+                >
+                  <Save className="w-5 h-5" />
+                  Save Referral Settings
+                </button>
               </div>
             </div>
           )}

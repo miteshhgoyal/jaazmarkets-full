@@ -108,6 +108,7 @@ const userSchema = new mongoose.Schema({
     resetPasswordOTP: String,
     resetPasswordOTPExpiry: Date,
 
+    // Terminal Preferences
     preferredMT5Terminal: {
         type: String,
         enum: ['MT5 WebTerminal', 'MT5 Desktop', 'MT5 Mobile'],
@@ -118,8 +119,7 @@ const userSchema = new mongoose.Schema({
         enum: ['MT4 WebTerminal', 'MT4 Desktop', 'MT4 Mobile'],
         default: null
     },
-
-    // Referral
+    
     referralCode: {
         type: String,
         unique: true,
@@ -128,8 +128,18 @@ const userSchema = new mongoose.Schema({
     },
     referredBy: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
+        ref: 'User',
+        index: true
+    },
+    referralEarnings: {
+        type: Number,
+        default: 0
+    },
+    totalReferrals: {
+        type: Number,
+        default: 0
     }
+
 }, {
     timestamps: true
 });

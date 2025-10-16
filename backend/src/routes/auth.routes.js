@@ -57,32 +57,43 @@ const sanitizeUser = (user) => {
 // ============================================
 
 // SIGNUP - Register new user
-router.post('/signup', async (req, res) => {
+router.post("/signup", async (req, res) => {
     try {
-        const { email, password, firstName, lastName, mobile } = req.body;
+        const { email, password, firstName, lastName, mobile, referralCode } = req.body;
 
         // Validation
         if (!email || !password || !firstName || !lastName) {
             return res.status(400).json({
                 success: false,
-                message: 'Email, password, first name, and last name are required',
+                message: "Email, password, first name, and last name are required",
             });
         }
 
         // Check if user already exists
         const existingUser = await User.findOne({
-            $or: [
-                { email: email.toLowerCase() },
-                ...(mobile ? [{ phoneNumber: mobile }] : []),
-            ],
+            $or: [{ email: email.toLowerCase() }, ...(mobile ? [{ phoneNumber: mobile }] : [])],
         });
 
         if (existingUser) {
             return res.status(400).json({
                 success: false,
-                message: 'User with this email, or phone already exists',
+                message: "User with this email or phone already exists",
             });
         }
+
+        // ===== REFERRAL HANDLING =====
+        let referrerId = null;
+        if (referralCode) {
+            const referrer = await User.findOne({ email: referralCode });
+            if (referrer) {
+                referrerId = referrer._id;
+                // Increment referrer's total referrals
+                await User.findByIdAndUpdate(referrer._id, {
+                    $inc: { totalReferrals: 1 },
+                });
+            }
+        }
+        // =============================
 
         // Create new user
         const user = new User({
@@ -91,22 +102,23 @@ router.post('/signup', async (req, res) => {
             firstName,
             lastName,
             phoneNumber: mobile,
-            role: 'user', // Default role
-            accountStatus: 'pending',
+            role: "user",
+            accountStatus: "pending",
             isVerified: false,
+            referredBy: referrerId, // Add this
         });
 
         await user.save();
 
         res.status(201).json({
             success: true,
-            message: 'Registration successful. Please login to continue.',
+            message: "Registration successful. Please login to continue.",
         });
     } catch (error) {
-        console.error('Signup error:', error);
+        console.error("Signup error:", error);
         res.status(500).json({
             success: false,
-            message: error.message || 'Registration failed',
+            message: error.message || "Registration failed",
         });
     }
 });

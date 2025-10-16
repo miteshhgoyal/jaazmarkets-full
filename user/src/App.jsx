@@ -48,6 +48,7 @@ import Profile from "./pages/settings/Profile";
 import Security from "./pages/settings/Security";
 import TradingTerminals from "./pages/settings/TradingTerminals";
 import Transfer from "./pages/payments-wallet/Transfer";
+import ReferEarn from "./pages/others/ReferEarn";
 
 const DefaultRoute = () => {
   const { isAuthenticated, loading } = useAuth();
@@ -231,6 +232,7 @@ function App() {
               {/* Other Routes */}
               <Route path="/copy-trading" element={<CopyTrading />} />
               <Route path="/support-hub" element={<SupportHub />} />
+              <Route path="/refer-earn" element={<ReferEarn />} />
 
               {/* Settings Routes */}
               <Route path="/settings/profile" element={<Profile />} />

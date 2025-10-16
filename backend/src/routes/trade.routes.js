@@ -3,6 +3,7 @@ import express from 'express';
 import Trade from '../models/Trade.js';
 import TradingAccount from '../models/TradingAccount.js';
 import { authenticateToken, authorize } from '../middlewares/auth.js';
+import { calculateAndPayReferralCommission } from '../utils/referralCommission.js';
 
 const router = express.Router();
 
@@ -237,6 +238,10 @@ router.patch('/:tradeId/close', authenticateToken, async (req, res) => {
             }
         );
 
+        // ===== CALCULATE & PAY REFERRAL COMMISSION =====
+        await calculateAndPayReferralCommission(trade);
+        // ===============================================
+
         res.json({
             success: true,
             message: 'Trade closed successfully',
@@ -316,6 +321,12 @@ router.patch('/:tradeId', authenticateToken, authorize(['admin', 'superadmin']),
                 message: 'Trade not found'
             });
         }
+
+        // ===== IF ADMIN CLOSES TRADE, CALCULATE COMMISSION =====
+        if (updateData.status === 'closed' && trade.status === 'closed') {
+            await calculateAndPayReferralCommission(trade);
+        }
+        // =======================================================
 
         res.json({
             success: true,

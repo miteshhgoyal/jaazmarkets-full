@@ -39,6 +39,7 @@ import {
   Newspaper,
   CalendarDays,
   Users,
+  Users2,
 } from "lucide-react";
 
 const Sidebar = ({ isOpen, onToggle, isCollapsed, toggleCollapsed }) => {
@@ -89,11 +90,11 @@ const Sidebar = ({ isOpen, onToggle, isCollapsed, toggleCollapsed }) => {
         // },
       ],
     },
-    // {
-    //   name: "Copy Trading",
-    //   href: "/copy-trading",
-    //   icon: Copy, // Keeping Copy as it's perfect for copy trading
-    // },
+    {
+      name: "Refer & Earn",
+      href: "/refer-earn",
+      icon: Users2,
+    },
     {
       name: "Settings",
       href: "/settings",

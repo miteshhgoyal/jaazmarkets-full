@@ -203,6 +203,29 @@ const settingsSchema = new mongoose.Schema({
         recommended: { type: Boolean, default: false }
     }],
 
+    // Referral Settings
+    referralSettings: {
+        enabled: {
+            type: Boolean,
+            default: true
+        },
+        commissionPercentage: {
+            type: Number,
+            default: 0.01,
+            min: 0,
+            max: 5
+        },
+        minPayoutAmount: {
+            type: Number,
+            default: 10
+        },
+        payoutMethod: {
+            type: String,
+            enum: ['wallet', 'manual'],
+            default: 'wallet'
+        }
+    },
+
     // Updated By
     updatedBy: {
         type: mongoose.Schema.Types.ObjectId,

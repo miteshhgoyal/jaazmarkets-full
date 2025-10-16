@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { User, Lock, Mail, Eye, EyeOff, Phone } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../services/api";
-import google from "../assets/google.svg";
 import MetaHead from "../components/MetaHead";
 
 const Register = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams(); // Add this
 
   const pageConfig = {
     title: "Create Account",
@@ -63,16 +63,33 @@ const Register = () => {
       required: true,
       hasToggle: true,
     },
+    // ADD REFERRAL FIELD
+    {
+      name: "referralCode",
+      label: "Referral Code (Optional)",
+      type: "text",
+      placeholder: "Enter referral code if you have one",
+      icon: User,
+      required: false,
+    },
   ];
 
   const initialFormData = fieldConfigs.reduce(
-    (acc, f) => ({ ...acc, [f.name]: "" }),
+    (acc, f) => ({ ...acc, [name]: "" }),
     {}
   );
   const [formData, setFormData] = useState(initialFormData);
   const [passwordVisibility, setPasswordVisibility] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
+
+  // ADD THIS: Auto-fill referral code from URL
+  useEffect(() => {
+    const refCode = searchParams.get("ref");
+    if (refCode) {
+      setFormData((prev) => ({ ...prev, referralCode: refCode }));
+    }
+  }, [searchParams]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -104,17 +121,16 @@ const Register = () => {
     if (!validateForm()) return;
     setIsLoading(true);
     try {
-      // Use /auth/signup endpoint
       const res = await api.post("/auth/signup", {
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
         mobile: formData.mobile,
         password: formData.password,
+        referralCode: formData.referralCode, // Add this
       });
 
       if (res.data.success) {
-        // Redirect to login with success message
         navigate("/login", {
           state: {
             message: "Account created successfully! Please login to continue.",
@@ -128,10 +144,6 @@ const Register = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleGoogle = () => {
-    console.log("Google sign-in");
   };
 
   const renderField = (f) => {
@@ -220,20 +232,6 @@ const Register = () => {
                 : pageConfig.submitButton.default}
             </button>
           </form>
-
-          {/* <p className="text-sm text-center text-gray-800 py-4">
-            or sign up with
-          </p>
-
-          <button
-            type="button"
-            onClick={handleGoogle}
-            disabled={isLoading}
-            className="w-full bg-gray-200 text-sm py-2 px-4 rounded-md flex justify-center items-center gap-2 hover:bg-gray-300 disabled:opacity-50"
-          >
-            <img src={google} alt="Google" className="w-4" />
-            Google
-          </button> */}
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
