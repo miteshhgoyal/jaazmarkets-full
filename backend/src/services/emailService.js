@@ -158,7 +158,7 @@ const registrationEmailHTML = (userData) => `
                                             <tr>
                                                 <td></td>
                                                 <td style="padding-top: 0; padding-bottom: 10px; color: #92400e; font-size: 12px; font-weight: 600;">
-                                                    ⚠️ For MT4/MT5 platform login
+                                                    ⚠For MT4/MT5 platform login
                                                 </td>
                                             </tr>
                                         </table>
@@ -329,7 +329,7 @@ Portal Password: ${userData.portalPassword || '(Your signup password)'}
                  For web dashboard login
 
 Trading Password: ${userData.tradingPassword}
-                 ⚠️ For MT4/MT5 platform login
+                 ⚠For MT4/MT5 platform login
 
 Account Number: ${userData.accountNumber || 'Pending'}
 
@@ -465,7 +465,7 @@ export const sendRegistrationEmail = async (userData) => {
                 address: process.env.EMAIL_USER
             },
             to: userData.email,
-            subject: '✅ Your Jaaz Markets Account - Login Credentials',
+            subject: 'Your Jaaz Markets Account - Login Credentials',
             html: registrationEmailHTML(userData),
             text: registrationEmailText(userData),
         };

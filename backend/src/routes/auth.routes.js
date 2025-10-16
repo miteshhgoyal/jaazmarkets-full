@@ -133,7 +133,7 @@ router.post("/signup", async (req, res) => {
                 accountNumber: accountNumber,
                 currency: user.currency,
             });
-            console.log(`✅ Registration email sent to ${user.email}`);
+            console.log(`Registration email sent to ${user.email}`);
         } catch (emailError) {
             console.error('Registration email failed:', emailError);
             // Don't fail registration if email fails

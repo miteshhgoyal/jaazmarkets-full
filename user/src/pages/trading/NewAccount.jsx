@@ -570,7 +570,7 @@ const NewAccount = () => {
 
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
                 <p className="text-sm text-yellow-800 font-semibold mb-1">
-                  ⚠️ Important: Save your credentials
+                  ⚠Important: Save your credentials
                 </p>
                 <p className="text-sm text-yellow-700">
                   Your password will only be shown once. Please save it
