@@ -161,7 +161,7 @@ const ReferEarn = () => {
           <Card className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Pending Commission</p>
+                <p className="text-sm text-gray-600 mb-1">Total Commission</p>
                 <p className="text-3xl font-bold text-yellow-600">
                   ${totalCommissionEarned.toFixed(2)}
                 </p>

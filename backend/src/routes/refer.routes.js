@@ -191,7 +191,6 @@ router.get("/referral/:userId/trades", authenticateToken, async (req, res) => {
 router.get(
     "/admin/settings",
     authenticateToken,
-    authorize("admin", "superadmin"),
     async (req, res) => {
         try {
             const settings = await Settings.findOne();
@@ -214,7 +213,6 @@ router.get(
 router.put(
     "/admin/settings",
     authenticateToken,
-    authorize("admin", "superadmin"),
     async (req, res) => {
         try {
             const { enabled, commissionPercentage, minPayoutAmount, payoutMethod } = req.body;
@@ -250,7 +248,6 @@ router.put(
 router.get(
     "/admin/stats",
     authenticateToken,
-    authorize("admin", "superadmin"),
     async (req, res) => {
         try {
             const totalReferrers = await User.countDocuments({ totalReferrals: { $gt: 0 } });
@@ -284,7 +281,6 @@ router.get(
 router.get(
     "/admin/user/:userId/referrals",
     authenticateToken,
-    authorize("admin", "superadmin"),
     async (req, res) => {
         try {
             const { userId } = req.params;

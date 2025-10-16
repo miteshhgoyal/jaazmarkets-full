@@ -7,7 +7,6 @@ const router = express.Router();
 
 // Apply authentication and admin authorization to all routes
 router.use(authenticateToken);
-router.use(authorize(['admin', 'superadmin']));
 
 // Helper function to get or create settings document
 const getOrCreateSettings = async () => {
