@@ -7,11 +7,14 @@ import {
   Loader2,
   CheckCircle,
   XCircle,
-  ExternalLink,
   Info,
   Zap,
   Wallet,
   DollarSign,
+  RefreshCw,
+  Clock,
+  Download,
+  QrCode,
 } from "lucide-react";
 import { Card } from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
@@ -34,10 +37,12 @@ const Deposits = () => {
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [depositAmount, setDepositAmount] = useState("");
   const [amountError, setAmountError] = useState("");
+  const [selectedCrypto, setSelectedCrypto] = useState("bep20/usdt");
 
-  // BlockBee state
-  const [blockBeePaymentUrl, setBlockBeePaymentUrl] = useState(null);
-  const [blockBeePaymentId, setBlockBeePaymentId] = useState(null);
+  // BlockBee direct payment state
+  const [paymentAddress, setPaymentAddress] = useState(null);
+  const [qrCode, setQrCode] = useState(null);
+  const [qrCodeUrl, setQrCodeUrl] = useState(null);
   const [depositId, setDepositId] = useState(null);
   const [transactionId, setTransactionId] = useState(null);
 
@@ -45,14 +50,73 @@ const Deposits = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [depositStatus, setDepositStatus] = useState(null);
   const [depositResult, setDepositResult] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  // Payment verification state
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationProgress, setVerificationProgress] = useState(0);
+  const [paymentReceived, setPaymentReceived] = useState(false);
+  const [confirmations, setConfirmations] = useState(0);
 
   // UI state
   const [showConfirmation, setShowConfirmation] = useState(false);
+
+  // Crypto options
+  const cryptoOptions = [
+    {
+      value: "bep20/usdt",
+      label: "USDT (BEP20)",
+      network: "Binance Smart Chain",
+      icon: "💰",
+      color: "from-yellow-400 to-yellow-600",
+    },
+    {
+      value: "trc20/usdt",
+      label: "USDT (TRC20)",
+      network: "Tron Network",
+      icon: "💰",
+      color: "from-red-400 to-red-600",
+    },
+  ];
 
   // Fetch trading accounts on mount
   useEffect(() => {
     fetchAccounts();
   }, []);
+
+  // Start payment verification polling when deposit is created
+  useEffect(() => {
+    let pollInterval;
+    let progressInterval;
+
+    if (depositStatus === "success" && depositId && !paymentReceived) {
+      setIsVerifying(true);
+
+      // Initial check after 5 seconds
+      const initialTimeout = setTimeout(() => {
+        checkPaymentStatus();
+      }, 5000);
+
+      // Poll every 10 seconds
+      pollInterval = setInterval(() => {
+        checkPaymentStatus();
+      }, 10000);
+
+      // Simulate progress bar animation
+      progressInterval = setInterval(() => {
+        setVerificationProgress((prev) => {
+          if (prev >= 95) return 95;
+          return prev + 1;
+        });
+      }, 1000);
+
+      return () => {
+        clearTimeout(initialTimeout);
+        if (pollInterval) clearInterval(pollInterval);
+        if (progressInterval) clearInterval(progressInterval);
+      };
+    }
+  }, [depositStatus, depositId, paymentReceived]);
 
   const fetchAccounts = async () => {
     setLoading(true);
@@ -78,6 +142,34 @@ const Deposits = () => {
     }
   };
 
+  // Check payment status from backend
+  const checkPaymentStatus = async () => {
+    try {
+      const response = await api.get(`/transactions/deposits/${depositId}`);
+
+      if (response.data.success) {
+        const deposit = response.data.data;
+
+        if (deposit.blockBee?.confirmations) {
+          setConfirmations(deposit.blockBee.confirmations);
+        }
+
+        if (deposit.status === "completed") {
+          setPaymentReceived(true);
+          setIsVerifying(false);
+          setVerificationProgress(100);
+          toast.success("Payment received and confirmed! 🎉");
+        } else if (
+          deposit.blockBee?.blockBeeStatus === "pending_confirmation"
+        ) {
+          toast.info("Payment detected! Waiting for confirmations...");
+        }
+      }
+    } catch (error) {
+      console.error("Payment status check error:", error);
+    }
+  };
+
   // Handle query parameters for account pre-selection
   useEffect(() => {
     if (accounts.length === 0) return;
@@ -100,10 +192,17 @@ const Deposits = () => {
     setDepositStatus(null);
     setDepositResult(null);
     setShowConfirmation(false);
-    setBlockBeePaymentUrl(null);
-    setBlockBeePaymentId(null);
+    setPaymentAddress(null);
+    setQrCode(null);
+    setQrCodeUrl(null);
     setDepositId(null);
     setTransactionId(null);
+    setSelectedCrypto("bep20/usdt");
+    setCopied(false);
+    setIsVerifying(false);
+    setVerificationProgress(0);
+    setPaymentReceived(false);
+    setConfirmations(0);
   };
 
   const validateAmount = (amount) => {
@@ -151,7 +250,6 @@ const Deposits = () => {
     setShowConfirmation(true);
   };
 
-  // Create BlockBee deposit link
   const handleCreateDeposit = async () => {
     setIsProcessing(true);
     setDepositStatus("pending");
@@ -159,23 +257,32 @@ const Deposits = () => {
     try {
       const depositData = {
         tradingAccountId: selectedAccount._id,
-        suggestedAmount: parseFloat(depositAmount),
-        description: `Deposit to ${selectedAccount.accountNumber} (${selectedAccount.platform})`,
+        amount: parseFloat(depositAmount),
+        ticker: selectedCrypto,
       };
 
+      console.log("Creating deposit with:", depositData);
+
       const response = await api.post(
-        "/transactions/blockbee/deposit/create",
+        "/transactions/deposits/blockbee/create",
         depositData
       );
+
+      console.log("BlockBee API Response:", response.data);
 
       if (response.data.success) {
         setDepositStatus("success");
         setDepositResult(response.data.data);
-        setBlockBeePaymentUrl(response.data.data.paymentUrl);
-        setBlockBeePaymentId(response.data.data.paymentId);
+        setPaymentAddress(response.data.data.paymentAddress);
+
+        console.log("QR Code (base64):", response.data.data.qrCode);
+        console.log("QR Code URL:", response.data.data.qrCodeUrl);
+
+        setQrCode(response.data.data.qrCode);
+        setQrCodeUrl(response.data.data.qrCodeUrl);
         setDepositId(response.data.data.depositId);
         setTransactionId(response.data.data.transactionId);
-        toast.success("Deposit link created successfully!");
+        toast.success("Payment address created successfully!");
       } else {
         setDepositStatus("error");
         setDepositResult({ error: response.data.message });
@@ -185,13 +292,41 @@ const Deposits = () => {
       console.error("Deposit creation error:", error);
       setDepositStatus("error");
       setDepositResult({
-        error: error.response?.data?.message || "Failed to create deposit link",
+        error:
+          error.response?.data?.message || "Failed to create payment address",
       });
       toast.error(
-        error.response?.data?.message || "Failed to create deposit link"
+        error.response?.data?.message || "Failed to create payment address"
       );
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleCopyAddress = () => {
+    if (paymentAddress) {
+      navigator.clipboard.writeText(paymentAddress);
+      setCopied(true);
+      toast.success("Address copied to clipboard!");
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleDownloadQR = () => {
+    if (qrCode) {
+      const link = document.createElement("a");
+      link.href = `data:image/png;base64,${qrCode}`;
+      link.download = `payment-qr-${transactionId}.png`;
+      link.click();
+      toast.success("QR code downloaded!");
+    } else if (paymentAddress) {
+      const link = document.createElement("a");
+      link.href = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(
+        paymentAddress
+      )}`;
+      link.download = `payment-qr-${transactionId}.png`;
+      link.click();
+      toast.success("QR code downloaded!");
     }
   };
 
@@ -213,6 +348,60 @@ const Deposits = () => {
   };
 
   const isFormValid = selectedAccount && depositAmount && !amountError;
+
+  const getSelectedCryptoInfo = () => {
+    return cryptoOptions.find((c) => c.value === selectedCrypto);
+  };
+
+  // QR Code Display Component with Multiple Fallbacks
+  const QRCodeDisplay = ({ address, qrCodeBase64, qrCodeURL }) => {
+    const [qrError, setQrError] = useState(false);
+    const [useGenerated, setUseGenerated] = useState(false);
+
+    let qrSource = null;
+
+    if (qrCodeBase64 && !qrError && !useGenerated) {
+      qrSource = `data:image/png;base64,${qrCodeBase64}`;
+    } else if (qrCodeURL && !qrError && !useGenerated) {
+      qrSource = qrCodeURL;
+    } else if (address) {
+      qrSource = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
+        address
+      )}&format=png&margin=10`;
+    }
+
+    if (!qrSource) return null;
+
+    return (
+      <div className="mb-8">
+        <div className="bg-white p-6 rounded-xl border-2 border-gray-200 inline-block shadow-lg">
+          <img
+            src={qrSource}
+            alt="Payment QR Code"
+            className="w-64 h-64 mx-auto"
+            onError={(e) => {
+              console.error("QR Code failed to load, trying fallback");
+              setQrError(true);
+              setUseGenerated(true);
+            }}
+          />
+        </div>
+        <p className="text-sm text-gray-600 mt-3 mb-3">
+          <QrCode size={16} className="inline mr-2" />
+          Scan this QR code with your crypto wallet
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleDownloadQR}
+          className="text-xs"
+        >
+          <Download size={14} className="mr-2" />
+          Download QR Code
+        </Button>
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -253,7 +442,7 @@ const Deposits = () => {
     <div className="min-h-screen bg-gray-50">
       <MetaHead
         title="Deposit Funds - Cryptocurrency Payment"
-        description="Deposit funds to your trading account using cryptocurrency. Support for 100+ cryptocurrencies with instant confirmation."
+        description="Deposit funds to your trading account using cryptocurrency. Support for multiple cryptocurrencies with instant confirmation."
         keywords="deposit funds, crypto deposit, bitcoin deposit, cryptocurrency payment, instant deposit"
       />
 
@@ -261,155 +450,275 @@ const Deposits = () => {
         title="Deposit Funds"
         subtitle={
           depositStatus === "success"
-            ? "Payment link created successfully"
+            ? paymentReceived
+              ? "✅ Payment received and confirmed!"
+              : "Payment address created - Send crypto to complete deposit"
             : depositStatus === "error"
-            ? "Failed to create deposit link"
+            ? "Failed to create payment address"
             : showConfirmation
             ? "Confirm your deposit"
-            : "Choose account and amount"
+            : "Choose account, amount, and cryptocurrency"
         }
       />
 
       <div className="max-w-4xl mx-auto py-6 px-4">
-        {/* Success Screen - BlockBee Payment Link Created */}
-        {depositStatus === "success" && blockBeePaymentUrl && (
+        {/* Success Screen - Show Payment Address & QR Code */}
+        {depositStatus === "success" && paymentAddress && (
           <div className="max-w-2xl mx-auto">
             <Card className="p-8">
               <div className="text-center">
-                <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <CheckCircle className="text-white" size={40} />
-                </div>
-                <h2 className="text-3xl font-bold mb-2 text-gray-900">
-                  Payment Link Created!
-                </h2>
-                <p className="text-gray-600 mb-8">
-                  Your secure cryptocurrency payment link is ready
-                </p>
+                {paymentReceived ? (
+                  <>
+                    <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
+                      <CheckCircle className="text-white" size={40} />
+                    </div>
+                    <h2 className="text-3xl font-bold mb-2 text-green-900">
+                      Payment Confirmed! 🎉
+                    </h2>
+                    <p className="text-gray-600 mb-8">
+                      Your deposit has been successfully credited to your
+                      account
+                    </p>
 
-                <div className="space-y-4 mb-8">
-                  <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-6 border border-blue-200">
-                    <div className="text-sm text-blue-600 font-medium mb-2">
-                      Suggested Amount
-                    </div>
-                    <div className="text-4xl font-bold text-blue-900 mb-4">
-                      ${depositAmount} USD
-                    </div>
-                    <div className="text-xs text-blue-700 mb-6">
-                      You can pay with any supported cryptocurrency
+                    <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border-2 border-green-200 mb-8">
+                      <div className="text-4xl font-bold text-green-900 mb-2">
+                        ${depositAmount} USD
+                      </div>
+                      <div className="text-sm text-green-700">
+                        Credited to {selectedAccount?.accountNumber}
+                      </div>
                     </div>
 
-                    <Button
-                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
-                      size="lg"
-                      onClick={() => window.open(blockBeePaymentUrl, "_blank")}
-                    >
-                      <ExternalLink size={18} className="mr-2" />
-                      Open Payment Page
-                    </Button>
-                  </div>
+                    <div className="space-y-3">
+                      <Button
+                        className="w-full bg-gradient-to-r from-blue-600 to-purple-600"
+                        size="lg"
+                        onClick={handleViewHistory}
+                      >
+                        View Transaction History
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={resetSelection}
+                      >
+                        Make Another Deposit
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-20 h-20 bg-gradient-to-br from-blue-400 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <Wallet className="text-white" size={40} />
+                    </div>
+                    <h2 className="text-3xl font-bold mb-2 text-gray-900">
+                      Payment Address Created!
+                    </h2>
+                    <p className="text-gray-600 mb-8">
+                      Send {getSelectedCryptoInfo()?.label} to the address below
+                    </p>
 
-                  {transactionId && (
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <div className="text-xs text-gray-600 mb-1">
-                        Transaction ID
-                      </div>
-                      <div className="font-mono text-sm text-gray-900 break-all">
-                        {transactionId}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="bg-white rounded-lg p-4 border">
-                      <div className="text-gray-600 mb-1">Account</div>
-                      <div className="font-medium">
-                        {selectedAccount?.accountNumber}
-                      </div>
-                    </div>
-                    <div className="bg-white rounded-lg p-4 border">
-                      <div className="text-gray-600 mb-1">Platform</div>
-                      <div className="font-medium">
-                        {selectedAccount?.platform}
-                      </div>
-                    </div>
-                    <div className="bg-white rounded-lg p-4 border">
-                      <div className="text-gray-600 mb-1">Status</div>
-                      <div className="font-medium text-amber-600">
-                        Awaiting Payment
-                      </div>
-                    </div>
-                    <div className="bg-white rounded-lg p-4 border">
-                      <div className="text-gray-600 mb-1">Payment ID</div>
-                      <div className="font-mono text-xs">
-                        {blockBeePaymentId?.slice(0, 10)}...
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    size="lg"
-                    onClick={handleViewHistory}
-                  >
-                    View Transaction History
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full"
-                    onClick={resetSelection}
-                  >
-                    Make Another Deposit
-                  </Button>
-                </div>
-
-                <div className="mt-8 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl">
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
-                      <Info size={20} className="text-white" />
-                    </div>
-                    <div className="text-left">
-                      <div className="font-semibold text-blue-900 mb-2">
-                        How it works:
-                      </div>
-                      <ul className="text-sm text-blue-800 space-y-2">
-                        <li className="flex items-start gap-2">
-                          <span className="text-blue-600 font-bold">1.</span>
-                          <span>
-                            Click "Open Payment Page" to access BlockBee's
-                            secure checkout
+                    {isVerifying && (
+                      <div className="mb-8 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border-2 border-blue-200">
+                        <div className="flex items-center justify-center gap-3 mb-4">
+                          <Loader2
+                            className="animate-spin text-blue-600"
+                            size={24}
+                          />
+                          <span className="text-blue-900 font-semibold">
+                            Verifying Payment...
                           </span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <span className="text-blue-600 font-bold">2.</span>
-                          <span>
-                            Choose from 100+ supported cryptocurrencies
-                            (Bitcoin, Ethereum, USDT, etc.)
+                        </div>
+
+                        <div className="relative w-full h-3 bg-blue-200 rounded-full overflow-hidden">
+                          <div
+                            className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-1000 ease-out"
+                            style={{ width: `${verificationProgress}%` }}
+                          >
+                            <div className="absolute inset-0 bg-white/30 animate-pulse"></div>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 flex items-center justify-between text-sm">
+                          <div className="text-blue-700 flex items-center gap-2">
+                            <Clock size={16} />
+                            <span>Checking blockchain...</span>
+                          </div>
+                          <span className="text-blue-900 font-semibold">
+                            {verificationProgress}%
                           </span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <span className="text-blue-600 font-bold">3.</span>
-                          <span>
-                            Scan QR code or copy the wallet address provided
-                          </span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <span className="text-blue-600 font-bold">4.</span>
-                          <span>Send payment from your crypto wallet</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <span className="text-blue-600 font-bold">5.</span>
-                          <span>
-                            Your account will be credited automatically after
-                            blockchain confirmation (usually within minutes)
-                          </span>
-                        </li>
-                      </ul>
+                        </div>
+
+                        {confirmations > 0 && (
+                          <div className="mt-3 p-3 bg-green-100 border border-green-300 rounded-lg">
+                            <div className="flex items-center gap-2 text-green-800">
+                              <CheckCircle size={16} />
+                              <span className="text-sm font-medium">
+                                {confirmations} confirmation
+                                {confirmations > 1 ? "s" : ""} received
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <QRCodeDisplay
+                      address={paymentAddress}
+                      qrCodeBase64={qrCode}
+                      qrCodeURL={qrCodeUrl}
+                    />
+
+                    <div className="mb-8">
+                      <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-6 border-2 border-blue-200">
+                        <div className="text-sm text-blue-600 font-medium mb-3">
+                          {getSelectedCryptoInfo()?.label} Payment Address
+                        </div>
+                        <div className="bg-white rounded-lg p-4 mb-4">
+                          <div className="font-mono text-sm break-all text-gray-900">
+                            {paymentAddress}
+                          </div>
+                        </div>
+                        <Button
+                          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+                          onClick={handleCopyAddress}
+                        >
+                          {copied ? (
+                            <>
+                              <Check size={18} className="mr-2" />
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={18} className="mr-2" />
+                              Copy Address
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                </div>
+
+                    <div className="space-y-4 mb-8">
+                      <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border-2 border-green-200">
+                        <div className="text-sm text-green-600 font-medium mb-2">
+                          Amount to Send
+                        </div>
+                        <div className="text-4xl font-bold text-green-900 mb-2">
+                          ${depositAmount} USD
+                        </div>
+                        <div className="text-xs text-green-700">
+                          (Equivalent in {getSelectedCryptoInfo()?.label})
+                        </div>
+                      </div>
+
+                      {transactionId && (
+                        <div className="bg-gray-50 rounded-lg p-4">
+                          <div className="text-xs text-gray-600 mb-1">
+                            Transaction ID
+                          </div>
+                          <div className="font-mono text-sm text-gray-900 break-all">
+                            {transactionId}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="bg-white rounded-lg p-4 border">
+                          <div className="text-gray-600 mb-1">Account</div>
+                          <div className="font-medium">
+                            {selectedAccount?.accountNumber}
+                          </div>
+                        </div>
+                        <div className="bg-white rounded-lg p-4 border">
+                          <div className="text-gray-600 mb-1">Platform</div>
+                          <div className="font-medium">
+                            {selectedAccount?.platform}
+                          </div>
+                        </div>
+                        <div className="bg-white rounded-lg p-4 border">
+                          <div className="text-gray-600 mb-1">Network</div>
+                          <div className="font-medium">
+                            {getSelectedCryptoInfo()?.network}
+                          </div>
+                        </div>
+                        <div className="bg-white rounded-lg p-4 border">
+                          <div className="text-gray-600 mb-1">Status</div>
+                          <div className="font-medium text-amber-600 flex items-center gap-1">
+                            <Loader2 size={14} className="animate-spin" />
+                            Awaiting Payment
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        size="lg"
+                        onClick={handleViewHistory}
+                      >
+                        View Transaction History
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="w-full"
+                        onClick={resetSelection}
+                      >
+                        Make Another Deposit
+                      </Button>
+                    </div>
+
+                    <div className="mt-8 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl">
+                      <div className="flex items-start gap-4">
+                        <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+                          <Info size={20} className="text-white" />
+                        </div>
+                        <div className="text-left">
+                          <div className="font-semibold text-blue-900 mb-2">
+                            Important Instructions:
+                          </div>
+                          <ul className="text-sm text-blue-800 space-y-2">
+                            <li className="flex items-start gap-2">
+                              <span className="text-blue-600 font-bold">
+                                1.
+                              </span>
+                              <span>
+                                Send the exact amount to the payment address
+                                above
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <span className="text-blue-600 font-bold">
+                                2.
+                              </span>
+                              <span>
+                                Verify you're sending on{" "}
+                                <strong>
+                                  {getSelectedCryptoInfo()?.network}
+                                </strong>
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <span className="text-blue-600 font-bold">
+                                3.
+                              </span>
+                              <span>
+                                Auto-credit after 1 blockchain confirmation
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <span className="text-blue-600 font-bold">
+                                4.
+                              </span>
+                              <span>Processing: Usually 5-30 minutes</span>
+                            </li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </Card>
           </div>
@@ -424,14 +733,14 @@ const Deposits = () => {
                   <XCircle className="text-red-600" size={32} />
                 </div>
                 <h2 className="text-2xl font-bold mb-4 text-red-900">
-                  Failed to Create Deposit Link
+                  Failed to Create Payment Address
                 </h2>
 
                 <div className="space-y-4 mb-8">
                   <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                     <div className="text-sm text-red-800">
                       {depositResult?.error ||
-                        "An error occurred while creating your deposit link."}
+                        "An error occurred while creating your payment address."}
                     </div>
                   </div>
                 </div>
@@ -442,6 +751,7 @@ const Deposits = () => {
                     size="lg"
                     onClick={handleRetryDeposit}
                   >
+                    <RefreshCw size={18} className="mr-2" />
                     Try Again
                   </Button>
                   <Button
@@ -457,11 +767,10 @@ const Deposits = () => {
           </div>
         )}
 
-        {/* Main deposit flow */}
+        {/* Main deposit flow - COMPLETE FORM */}
         {!depositStatus && (
           <>
             {!showConfirmation ? (
-              // Step 1: Account & Amount Selection
               <div className="max-w-2xl mx-auto space-y-6">
                 {/* Info Banner */}
                 <Card className="p-6 bg-gradient-to-br from-blue-500 to-purple-600 text-white">
@@ -474,9 +783,9 @@ const Deposits = () => {
                         Cryptocurrency Deposits via BlockBee
                       </h3>
                       <ul className="text-sm space-y-1 opacity-90">
-                        <li>✓ 100+ cryptocurrencies supported</li>
+                        <li>✓ Direct wallet-to-wallet payment</li>
                         <li>✓ Automatic confirmation & instant credit</li>
-                        <li>✓ Secure payment gateway with QR codes</li>
+                        <li>✓ Secure blockchain transactions</li>
                         <li>✓ No manual approval required</li>
                       </ul>
                     </div>
@@ -556,6 +865,52 @@ const Deposits = () => {
                   )}
                 </Card>
 
+                {/* Cryptocurrency Selection */}
+                {selectedAccount && (
+                  <Card className="p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                        <span className="text-2xl">₿</span>
+                      </div>
+                      <h3 className="text-xl font-semibold">
+                        Choose Cryptocurrency
+                      </h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {cryptoOptions.map((crypto) => (
+                        <button
+                          key={crypto.value}
+                          onClick={() => setSelectedCrypto(crypto.value)}
+                          className={`p-4 border-2 rounded-lg text-left transition-all hover:border-blue-400 ${
+                            selectedCrypto === crypto.value
+                              ? "border-blue-600 bg-blue-50"
+                              : "border-gray-200 bg-white"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="text-3xl">{crypto.icon}</div>
+                            <div className="flex-1">
+                              <div className="font-semibold text-gray-900">
+                                {crypto.label}
+                              </div>
+                              <div className="text-xs text-gray-600">
+                                {crypto.network}
+                              </div>
+                            </div>
+                            {selectedCrypto === crypto.value && (
+                              <CheckCircle
+                                size={20}
+                                className="text-blue-600"
+                              />
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
                 {/* Amount Input */}
                 {selectedAccount && (
                   <Card className="p-6">
@@ -613,12 +968,12 @@ const Deposits = () => {
                         <div className="flex items-center gap-2 text-blue-800 text-sm mb-1">
                           <Info size={16} className="text-blue-600" />
                           <span className="font-medium">
-                            You can pay with any cryptocurrency
+                            You'll send {getSelectedCryptoInfo()?.label}
                           </span>
                         </div>
                         <div className="text-xs text-blue-700">
-                          The exact amount in crypto will be calculated on the
-                          payment page based on current market rates
+                          The exact crypto amount will be calculated based on
+                          current market rates
                         </div>
                       </div>
                     )}
@@ -642,7 +997,6 @@ const Deposits = () => {
                 )}
               </div>
             ) : (
-              // Step 2: Confirmation
               <div className="max-w-2xl mx-auto space-y-6">
                 <Button
                   variant="ghost"
@@ -664,7 +1018,7 @@ const Deposits = () => {
                       Confirm Your Deposit
                     </h2>
                     <p className="text-gray-600 mb-8">
-                      Review details before creating payment link
+                      Review details before generating payment address
                     </p>
 
                     <div className="space-y-4 mb-8">
@@ -702,13 +1056,13 @@ const Deposits = () => {
                         </div>
                         <div className="bg-white rounded-lg p-4 border col-span-2">
                           <div className="text-xs text-gray-600 mb-1">
-                            Payment Method
+                            Cryptocurrency
                           </div>
                           <div className="font-semibold text-gray-900">
-                            BlockBee Cryptocurrency Gateway
+                            {getSelectedCryptoInfo()?.label}
                           </div>
                           <div className="text-xs text-gray-600 mt-1">
-                            100+ cryptocurrencies • Instant confirmation
+                            {getSelectedCryptoInfo()?.network}
                           </div>
                         </div>
                       </div>
@@ -724,12 +1078,12 @@ const Deposits = () => {
                         {isProcessing ? (
                           <>
                             <Loader2 className="animate-spin mr-2" size={18} />
-                            Creating Payment Link...
+                            Generating Payment Address...
                           </>
                         ) : (
                           <>
                             <Zap size={18} className="mr-2" />
-                            Create Payment Link
+                            Generate Payment Address
                           </>
                         )}
                       </Button>
@@ -750,10 +1104,10 @@ const Deposits = () => {
                           className="text-amber-600 flex-shrink-0 mt-0.5"
                         />
                         <div className="text-sm text-amber-800">
-                          <strong>Note:</strong> After clicking "Create Payment
-                          Link", you'll receive a secure BlockBee checkout page
-                          where you can choose your preferred cryptocurrency and
-                          complete the payment.
+                          <strong>Note:</strong> After clicking "Generate
+                          Payment Address", you'll receive a unique crypto
+                          wallet address and QR code. Send your payment to that
+                          address to complete the deposit.
                         </div>
                       </div>
                     </div>

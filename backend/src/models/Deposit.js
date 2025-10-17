@@ -29,20 +29,33 @@ const depositSchema = new mongoose.Schema({
     currency: {
         type: String,
         required: true,
+        enum: ['USD', 'EUR', 'GBP', 'INR', 'BTC', 'ETH', 'USDT'],  // ✅ ADDED CRYPTO CURRENCIES
         default: 'USD'
     },
 
     // Payment Method
     paymentMethod: {
         type: String,
-        enum: ['bank_transfer', 'crypto', 'wallet', 'blockbee_checkout'],  // ADDED blockbee_checkout
+        enum: [
+            'bank_transfer',
+            'crypto',
+            'wallet',
+            'blockbee_checkout',
+            'blockbee-crypto'      // ✅ ADDED - Direct BlockBee crypto address
+        ],
         required: true
     },
     paymentDetails: {
         // For Crypto (Manual)
-        cryptocurrency: String,
+        cryptocurrency: {
+            type: String,
+            enum: ['BTC', 'ETH', 'USDT', 'BEP20 (USDT)', 'TRC20 (USDT)', 'ERC20 (USDT)', null]  // ✅ ADDED ENUM
+        },
         walletAddress: String,
-        network: String,
+        network: {
+            type: String,
+            enum: ['BTC', 'ETH', 'ERC20', 'BEP20', 'TRC20', 'BSC', 'TRON', null]  // ✅ ADDED ENUM
+        },
         txHash: String,
         confirmations: Number,
 
@@ -63,16 +76,53 @@ const depositSchema = new mongoose.Schema({
         paymentId: String,              // BlockBee payment ID
         paymentUrl: String,             // Checkout URL
         uuid: String,                   // Unique webhook ID per transaction
-        coin: String,                   // Crypto used (btc, eth, usdt_erc20, etc.)
+        coin: {
+            type: String,
+            enum: ['BTC', 'ETH', 'BEP20 (USDT)', 'TRC20 (USDT)', 'ERC20 (USDT)', null]  // ✅ ADDED ENUM
+        },
+        ticker: {
+            type: String,
+            enum: ['btc', 'eth', 'bep20/usdt', 'trc20/usdt', 'erc20/usdt', null]  // ✅ ADDED ENUM
+        },
+        address: String,                // ✅ ADDED - Generated payment address
+        qrCode: String,                 // ✅ ADDED - Base64 QR code
+        qrCodeUrl: String,              // ✅ ADDED - QR code image URL
+        callbackUrl: String,            // ✅ ADDED - Webhook callback URL
+        apiResponse: Object,            // ✅ ADDED - Full API response
         paidAmount: Number,             // Actual amount paid in crypto
+        valueReceived: Number,          // ✅ ADDED - Value received in crypto
+        valuePaid: Number,              // ✅ ADDED - Value forwarded/paid
+        txHash: String,                 // ✅ ADDED - Transaction hash
         blockBeeStatus: {               // BlockBee-specific status
             type: String,
-            enum: ['pending_payment', 'pending_confirmation', 'confirmed', 'done', 'expired'],
+            enum: [
+                'initiated',            // ✅ ADDED
+                'pending_payment',
+                'pending_confirmation',
+                'confirmed',
+                'completed',            // ✅ ADDED
+                'done',
+                'expired',
+                'failed'                // ✅ ADDED
+            ],
+            default: 'initiated'
         },
         confirmations: Number,          // Blockchain confirmations
+        isProcessed: {                  // ✅ ADDED - Prevent duplicate processing
+            type: Boolean,
+            default: false
+        },
         lastWebhookAt: Date,            // Last webhook received time
-        isWebhookProcessed: Boolean     // Prevent duplicate processing
+        lastCallbackAt: Date,           // ✅ ADDED - Last callback received time
+        isWebhookProcessed: Boolean,    // Prevent duplicate processing
+        createdAt: Date                 // ✅ ADDED - When BlockBee address was created
     },
+
+    // ✅ ADDED - PHP compatibility fields (from initiate_blockbee function)
+    blockbee_coin: String,              // Coin name for display
+    blockbee_address: String,           // Payment address
+    api_response: String,               // JSON string of API response
+    data: Object,                       // Full response object
 
     // Status
     status: {
@@ -102,6 +152,9 @@ const depositSchema = new mongoose.Schema({
 depositSchema.index({ userId: 1, status: 1, createdAt: -1 });
 depositSchema.index({ 'blockBee.paymentId': 1 });
 depositSchema.index({ 'blockBee.uuid': 1 });
+depositSchema.index({ 'blockBee.address': 1 });        // ✅ ADDED
+depositSchema.index({ 'blockBee.txHash': 1 });         // ✅ ADDED
+depositSchema.index({ 'blockBee.blockBeeStatus': 1 }); // ✅ ADDED
 
 const Deposit = mongoose.model('Deposit', depositSchema);
 export default Deposit;

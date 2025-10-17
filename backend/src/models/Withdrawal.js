@@ -29,6 +29,7 @@ const withdrawalSchema = new mongoose.Schema({
     currency: {
         type: String,
         required: true,
+        enum: ['USD', 'EUR', 'GBP', 'INR', 'BTC', 'ETH', 'USDT'],  // ✅ ADDED CRYPTO CURRENCIES
         default: 'USD'
     },
     fee: {
@@ -43,14 +44,25 @@ const withdrawalSchema = new mongoose.Schema({
     // Payment Method
     withdrawalMethod: {
         type: String,
-        enum: ['bank_transfer', 'crypto', 'wallet'],
+        enum: [
+            'bank_transfer',
+            'crypto',
+            'wallet',
+            'blockbee-crypto'      // ✅ ADDED - Direct BlockBee crypto payout
+        ],
         required: true
     },
     withdrawalDetails: {
         // For Crypto
-        cryptocurrency: String,
+        cryptocurrency: {
+            type: String,
+            enum: ['BTC', 'ETH', 'USDT', 'BEP20 (USDT)', 'TRC20 (USDT)', 'ERC20 (USDT)', null]  // ✅ ADDED ENUM
+        },
         walletAddress: String,
-        network: String,
+        network: {
+            type: String,
+            enum: ['BTC', 'ETH', 'ERC20', 'BEP20', 'TRC20', 'BSC', 'TRON', null]  // ✅ ADDED ENUM
+        },
         txHash: String,
 
         // For Bank
@@ -68,10 +80,25 @@ const withdrawalSchema = new mongoose.Schema({
     blockBee: {
         payoutId: String,              // BlockBee payout batch ID
         payoutRequestId: String,       // Individual payout request ID
-        coin: String,                  // Crypto ticker (btc, eth, usdt_erc20, etc.)
+        coin: {
+            type: String,
+            enum: ['BTC', 'ETH', 'BEP20 (USDT)', 'TRC20 (USDT)', 'ERC20 (USDT)', null]  // ✅ ADDED ENUM
+        },
+        ticker: {
+            type: String,
+            enum: ['btc', 'eth', 'bep20/usdt', 'trc20/usdt', 'erc20/usdt', null]  // ✅ ADDED ENUM
+        },
         blockBeeStatus: {              // BlockBee-specific status
             type: String,
-            enum: ['created', 'processing', 'done', 'error'],
+            enum: [
+                'created',
+                'pending',             // ✅ ADDED
+                'processing',
+                'done',
+                'completed',           // ✅ ADDED
+                'error',
+                'failed'               // ✅ ADDED
+            ],
         },
         txHash: String,                // Blockchain transaction hash
         lastStatusCheck: Date,         // Last time status was checked
@@ -104,6 +131,7 @@ const withdrawalSchema = new mongoose.Schema({
 withdrawalSchema.index({ userId: 1, status: 1, createdAt: -1 });
 withdrawalSchema.index({ 'blockBee.payoutId': 1 });
 withdrawalSchema.index({ 'blockBee.blockBeeStatus': 1 });
+withdrawalSchema.index({ 'blockBee.txHash': 1 });      // ✅ ADDED
 
 const Withdrawal = mongoose.model('Withdrawal', withdrawalSchema);
 export default Withdrawal;
