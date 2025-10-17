@@ -407,8 +407,10 @@ const Accounts = () => {
                         : "$3.5 per lot",
                     }}
                     onTrade={() => handleTrade(account._id)}
-                    onDeposit={() => handleDeposit(account._id)}
-                    onWithdraw={() => handleWithdraw(account._id)}
+                    onDeposit={() => navigate("/payments-and-wallet/deposit")}
+                    onWithdraw={() =>
+                      navigate("/payments-and-wallet/withdrawal")
+                    }
                     onCopyToClipboard={handleCopyToClipboard}
                   />
                 )}

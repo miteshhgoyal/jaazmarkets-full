@@ -503,4 +503,529 @@ router.get('/stats/users/overview', async (req, res) => {
     }
 });
 
+// ============================================
+// TRADES AND ORDERS ANALYTICS ROUTES
+// ============================================
+
+// GET ALL ORDERS
+router.get('/orders', async (req, res) => {
+    try {
+        const Order = (await import('../models/Order.js')).default;
+
+        const orders = await Order.find()
+            .populate('userId', 'email firstName lastName phoneNumber')
+            .populate('tradingAccountId', 'accountNumber platform accountType')
+            .sort({ placedAt: -1 })
+            .lean();
+
+        // Transform data to match frontend expectations
+        const transformedOrders = orders.map(order => ({
+            _id: order._id.toString(),
+            orderId: order.orderId,
+            symbol: order.symbol,
+            type: order.type,
+            volume: order.volume,
+            lots: order.lots,
+            orderPrice: order.orderPrice,
+            currentPrice: order.currentPrice,
+            takeProfit: order.takeProfit,
+            stopLoss: order.stopLoss,
+            status: order.status,
+            platform: order.platform,
+            comment: order.comment,
+            placedAt: order.placedAt,
+            expiresAt: order.expiresAt,
+            executedAt: order.executedAt,
+            userId: order.userId ? {
+                _id: order.userId._id,
+                email: order.userId.email,
+                firstName: order.userId.firstName,
+                lastName: order.userId.lastName,
+            } : null,
+            tradingAccountId: order.tradingAccountId ? {
+                _id: order.tradingAccountId._id,
+                accountNumber: order.tradingAccountId.accountNumber,
+                platform: order.tradingAccountId.platform,
+            } : null,
+        }));
+
+        res.json({
+            success: true,
+            data: transformedOrders,
+            count: transformedOrders.length
+        });
+    } catch (error) {
+        console.error('Get all orders error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch orders',
+            error: error.message
+        });
+    }
+});
+
+// GET SINGLE ORDER BY ID
+router.get('/orders/:orderId', async (req, res) => {
+    try {
+        const Order = (await import('../models/Order.js')).default;
+        const { orderId } = req.params;
+
+        const order = await Order.findById(orderId)
+            .populate('userId', 'email firstName lastName phoneNumber country')
+            .populate('tradingAccountId', 'accountNumber platform accountType balance')
+            .lean();
+
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: 'Order not found'
+            });
+        }
+
+        const transformedOrder = {
+            _id: order._id.toString(),
+            orderId: order.orderId,
+            symbol: order.symbol,
+            type: order.type,
+            volume: order.volume,
+            lots: order.lots,
+            orderPrice: order.orderPrice,
+            currentPrice: order.currentPrice,
+            takeProfit: order.takeProfit,
+            stopLoss: order.stopLoss,
+            status: order.status,
+            platform: order.platform,
+            comment: order.comment,
+            placedAt: order.placedAt,
+            expiresAt: order.expiresAt,
+            executedAt: order.executedAt,
+            userId: order.userId,
+            tradingAccountId: order.tradingAccountId,
+        };
+
+        res.json({
+            success: true,
+            data: transformedOrder
+        });
+    } catch (error) {
+        console.error('Get order by ID error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch order details',
+            error: error.message
+        });
+    }
+});
+
+// GET ALL TRADES
+router.get('/trades', async (req, res) => {
+    try {
+        const Trade = (await import('../models/Trade.js')).default;
+
+        const trades = await Trade.find()
+            .populate('userId', 'email firstName lastName phoneNumber')
+            .populate('tradingAccountId', 'accountNumber platform accountType')
+            .sort({ openTime: -1 })
+            .lean();
+
+        // Transform data to match frontend expectations
+        const transformedTrades = trades.map(trade => ({
+            _id: trade._id.toString(),
+            tradeId: trade.tradeId,
+            symbol: trade.symbol,
+            type: trade.type,
+            volume: trade.volume,
+            lots: trade.lots,
+            openPrice: trade.openPrice,
+            closePrice: trade.closePrice,
+            currentPrice: trade.currentPrice,
+            takeProfit: trade.takeProfit,
+            stopLoss: trade.stopLoss,
+            profitLoss: trade.profitLoss,
+            pips: trade.pips,
+            swap: trade.swap,
+            commission: trade.commission,
+            status: trade.status,
+            platform: trade.platform,
+            comment: trade.comment,
+            openTime: trade.openTime,
+            closeTime: trade.closeTime,
+            duration: trade.duration,
+            userId: trade.userId ? {
+                _id: trade.userId._id,
+                email: trade.userId.email,
+                firstName: trade.userId.firstName,
+                lastName: trade.userId.lastName,
+            } : null,
+            tradingAccountId: trade.tradingAccountId ? {
+                _id: trade.tradingAccountId._id,
+                accountNumber: trade.tradingAccountId.accountNumber,
+                platform: trade.tradingAccountId.platform,
+            } : null,
+        }));
+
+        res.json({
+            success: true,
+            data: transformedTrades,
+            count: transformedTrades.length
+        });
+    } catch (error) {
+        console.error('Get all trades error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch trades',
+            error: error.message
+        });
+    }
+});
+
+// GET SINGLE TRADE BY ID
+router.get('/trades/:tradeId', async (req, res) => {
+    try {
+        const Trade = (await import('../models/Trade.js')).default;
+        const { tradeId } = req.params;
+
+        const trade = await Trade.findById(tradeId)
+            .populate('userId', 'email firstName lastName phoneNumber country')
+            .populate('tradingAccountId', 'accountNumber platform accountType balance')
+            .lean();
+
+        if (!trade) {
+            return res.status(404).json({
+                success: false,
+                message: 'Trade not found'
+            });
+        }
+
+        const transformedTrade = {
+            _id: trade._id.toString(),
+            tradeId: trade.tradeId,
+            symbol: trade.symbol,
+            type: trade.type,
+            volume: trade.volume,
+            lots: trade.lots,
+            openPrice: trade.openPrice,
+            closePrice: trade.closePrice,
+            currentPrice: trade.currentPrice,
+            takeProfit: trade.takeProfit,
+            stopLoss: trade.stopLoss,
+            profitLoss: trade.profitLoss,
+            pips: trade.pips,
+            swap: trade.swap,
+            commission: trade.commission,
+            status: trade.status,
+            platform: trade.platform,
+            comment: trade.comment,
+            openTime: trade.openTime,
+            closeTime: trade.closeTime,
+            duration: trade.duration,
+            userId: trade.userId,
+            tradingAccountId: trade.tradingAccountId,
+        };
+
+        res.json({
+            success: true,
+            data: transformedTrade
+        });
+    } catch (error) {
+        console.error('Get trade by ID error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch trade details',
+            error: error.message
+        });
+    }
+});
+
+// GET TRADING ANALYTICS/STATISTICS
+router.get('/stats/trading/overview', async (req, res) => {
+    try {
+        const Order = (await import('../models/Order.js')).default;
+        const Trade = (await import('../models/Trade.js')).default;
+
+        // Orders Statistics
+        const totalOrders = await Order.countDocuments();
+        const executedOrders = await Order.countDocuments({ status: 'executed' });
+        const pendingOrders = await Order.countDocuments({ status: 'pending' });
+        const cancelledOrders = await Order.countDocuments({ status: 'cancelled' });
+        const expiredOrders = await Order.countDocuments({ status: 'expired' });
+
+        // Calculate total order volume
+        const orderVolumeResult = await Order.aggregate([
+            {
+                $group: {
+                    _id: null,
+                    totalVolume: { $sum: '$volume' }
+                }
+            }
+        ]);
+        const totalOrderVolume = orderVolumeResult.length > 0 ? orderVolumeResult[0].totalVolume : 0;
+
+        // Trades Statistics
+        const totalTrades = await Trade.countDocuments();
+        const openTrades = await Trade.countDocuments({ status: 'open' });
+        const closedTrades = await Trade.countDocuments({ status: 'closed' });
+
+        // Calculate trade volumes and P/L
+        const tradeStats = await Trade.aggregate([
+            {
+                $group: {
+                    _id: null,
+                    totalVolume: { $sum: '$volume' },
+                    totalProfitLoss: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$status', 'closed'] },
+                                '$profitLoss',
+                                0
+                            ]
+                        }
+                    },
+                    totalSpread: {
+                        $sum: {
+                            $cond: [
+                                { $and: [{ $ne: ['$closePrice', null] }, { $ne: ['$openPrice', null] }] },
+                                { $abs: { $subtract: ['$closePrice', '$openPrice'] } },
+                                0
+                            ]
+                        }
+                    },
+                    winningTrades: {
+                        $sum: {
+                            $cond: [
+                                { $and: [{ $eq: ['$status', 'closed'] }, { $gt: ['$profitLoss', 0] }] },
+                                1,
+                                0
+                            ]
+                        }
+                    },
+                    losingTrades: {
+                        $sum: {
+                            $cond: [
+                                { $and: [{ $eq: ['$status', 'closed'] }, { $lt: ['$profitLoss', 0] }] },
+                                1,
+                                0
+                            ]
+                        }
+                    }
+                }
+            }
+        ]);
+
+        const tradeData = tradeStats.length > 0 ? tradeStats[0] : {
+            totalVolume: 0,
+            totalProfitLoss: 0,
+            totalSpread: 0,
+            winningTrades: 0,
+            losingTrades: 0
+        };
+
+        const avgSpread = totalTrades > 0 ? tradeData.totalSpread / totalTrades : 0;
+        const winRate = closedTrades > 0 ? (tradeData.winningTrades / closedTrades) * 100 : 0;
+
+        res.json({
+            success: true,
+            data: {
+                orders: {
+                    totalOrders,
+                    executedOrders,
+                    pendingOrders,
+                    cancelledOrders,
+                    expiredOrders,
+                    totalOrderVolume
+                },
+                trades: {
+                    totalTrades,
+                    openTrades,
+                    closedTrades,
+                    totalTradeVolume: tradeData.totalVolume,
+                    totalProfitLoss: tradeData.totalProfitLoss,
+                    avgSpread,
+                    winningTrades: tradeData.winningTrades,
+                    losingTrades: tradeData.losingTrades,
+                    winRate: winRate.toFixed(2)
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Get trading statistics error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch trading statistics',
+            error: error.message
+        });
+    }
+});
+
+// UPDATE ORDER STATUS (ADMIN ACTION)
+router.patch('/orders/:orderId/status', async (req, res) => {
+    try {
+        const Order = (await import('../models/Order.js')).default;
+        const { orderId } = req.params;
+        const { status } = req.body;
+
+        const validStatuses = ['pending', 'executed', 'cancelled', 'expired'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid status value. Use: pending, executed, cancelled, or expired'
+            });
+        }
+
+        const order = await Order.findByIdAndUpdate(
+            orderId,
+            {
+                status,
+                ...(status === 'executed' ? { executedAt: new Date() } : {})
+            },
+            { new: true }
+        ).select('orderId symbol status executedAt');
+
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: 'Order not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: `Order status updated to ${status}`,
+            data: {
+                _id: order._id.toString(),
+                orderId: order.orderId,
+                status: order.status,
+                executedAt: order.executedAt
+            }
+        });
+    } catch (error) {
+        console.error('Update order status error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update order status',
+            error: error.message
+        });
+    }
+});
+
+// CLOSE TRADE (ADMIN ACTION)
+router.patch('/trades/:tradeId/close', async (req, res) => {
+    try {
+        const Trade = (await import('../models/Trade.js')).default;
+        const { tradeId } = req.params;
+        const { closePrice, profitLoss } = req.body;
+
+        if (!closePrice || profitLoss === undefined) {
+            return res.status(400).json({
+                success: false,
+                message: 'closePrice and profitLoss are required'
+            });
+        }
+
+        const trade = await Trade.findById(tradeId);
+        if (!trade) {
+            return res.status(404).json({
+                success: false,
+                message: 'Trade not found'
+            });
+        }
+
+        if (trade.status === 'closed') {
+            return res.status(400).json({
+                success: false,
+                message: 'Trade is already closed'
+            });
+        }
+
+        const closeTime = new Date();
+        const duration = Math.floor((closeTime - new Date(trade.openTime)) / 1000); // in seconds
+
+        trade.status = 'closed';
+        trade.closePrice = closePrice;
+        trade.profitLoss = profitLoss;
+        trade.closeTime = closeTime;
+        trade.duration = duration;
+
+        await trade.save();
+
+        res.json({
+            success: true,
+            message: 'Trade closed successfully',
+            data: {
+                _id: trade._id.toString(),
+                tradeId: trade.tradeId,
+                status: trade.status,
+                closePrice: trade.closePrice,
+                profitLoss: trade.profitLoss,
+                closeTime: trade.closeTime
+            }
+        });
+    } catch (error) {
+        console.error('Close trade error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to close trade',
+            error: error.message
+        });
+    }
+});
+
+// DELETE ORDER (ADMIN ACTION)
+router.delete('/orders/:orderId', async (req, res) => {
+    try {
+        const Order = (await import('../models/Order.js')).default;
+        const { orderId } = req.params;
+
+        const order = await Order.findByIdAndDelete(orderId);
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: 'Order not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            status: 200,
+            message: 'Order deleted successfully'
+        });
+    } catch (error) {
+        console.error('Delete order error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to delete order',
+            error: error.message
+        });
+    }
+});
+
+// DELETE TRADE (ADMIN ACTION)
+router.delete('/trades/:tradeId', async (req, res) => {
+    try {
+        const Trade = (await import('../models/Trade.js')).default;
+        const { tradeId } = req.params;
+
+        const trade = await Trade.findByIdAndDelete(tradeId);
+        if (!trade) {
+            return res.status(404).json({
+                success: false,
+                message: 'Trade not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            status: 200,
+            message: 'Trade deleted successfully'
+        });
+    } catch (error) {
+        console.error('Delete trade error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to delete trade',
+            error: error.message
+        });
+    }
+});
+
 export default router;

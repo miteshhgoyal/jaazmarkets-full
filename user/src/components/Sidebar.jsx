@@ -40,6 +40,7 @@ import {
   CalendarDays,
   Users,
   Users2,
+  GraduationCap,
 } from "lucide-react";
 
 const Sidebar = ({ isOpen, onToggle, isCollapsed, toggleCollapsed }) => {
@@ -94,6 +95,11 @@ const Sidebar = ({ isOpen, onToggle, isCollapsed, toggleCollapsed }) => {
       name: "Refer & Earn",
       href: "/refer-earn",
       icon: Users2,
+    },
+    {
+      name: "Education",
+      href: "/education",
+      icon: GraduationCap,
     },
     {
       name: "Settings",

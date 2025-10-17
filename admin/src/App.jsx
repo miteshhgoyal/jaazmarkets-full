@@ -28,6 +28,7 @@ import Withdrawals from "./pages/admin/Withdrawals";
 import Deposits from "./pages/admin/Deposits";
 import Settings from "./pages/admin/settings/Settings";
 import AccountTypes from "./pages/admin/AccountTypes";
+import TradesAndOrders from "./pages/admin/TradesAndOrders";
 
 const DefaultRoute = () => {
   const { isAuthenticated, loading } = useAuth();
@@ -163,6 +164,10 @@ function App() {
               <Route path="/admin/accounts" element={<Accounts />} />
               <Route path="/admin/withdrawals" element={<Withdrawals />} />
               <Route path="/admin/deposits" element={<Deposits />} />
+              <Route
+                path="/admin/trades-and-orders"
+                element={<TradesAndOrders />}
+              />
               <Route path="/admin/settings" element={<Settings />} />
             </Route>
 

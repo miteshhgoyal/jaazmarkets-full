@@ -233,7 +233,7 @@ const Summary = () => {
           description="Comprehensive trading summary with P&L, open positions, account equity, and performance analytics. Track your trading success."
           keywords="trading summary, profit loss, portfolio performance, trading analytics, account overview"
         />
-        <PageHeader title="Performance" />
+        <PageHeader title="Performance History" />
         <div className="flex justify-center items-center mt-20">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400"></div>
         </div>
@@ -249,7 +249,7 @@ const Summary = () => {
           description="Comprehensive trading summary with P&L, open positions, account equity, and performance analytics. Track your trading success."
           keywords="trading summary, profit loss, portfolio performance, trading analytics, account overview"
         />
-        <PageHeader title="Performance" />
+        <PageHeader title="Performance History" />
         <div className="flex flex-col justify-center items-center mt-20">
           <div className="text-red-600 mb-4">
             <svg
@@ -300,7 +300,7 @@ const Summary = () => {
         description="Comprehensive trading summary with P&L, open positions, account equity, and performance analytics. Track your trading success."
         keywords="trading summary, profit loss, portfolio performance, trading analytics, account overview"
       />
-      <PageHeader title="Summary" />
+      <PageHeader title="Performance History" />
 
       <div className="">
         <h3 className="text-gray-800 text-sm font-medium mt-6">Accounts</h3>

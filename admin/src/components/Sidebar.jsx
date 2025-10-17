@@ -80,6 +80,11 @@ const Sidebar = ({ isOpen, onToggle, isCollapsed, toggleCollapsed }) => {
       icon: Dock,
     },
     {
+      name: "Trades & Orders",
+      href: "/admin/trades-and-orders",
+      icon: Dock,
+    },
+    {
       name: "Settings",
       icon: Settings2,
       href: "/admin/settings",

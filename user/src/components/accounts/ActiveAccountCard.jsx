@@ -8,7 +8,6 @@ import AccountStats from "./AccountStats";
 
 const ActiveAccountCard = ({
   account,
-  onTrade,
   onDeposit,
   onWithdraw,
   onCopyToClipboard,
@@ -42,15 +41,6 @@ const ActiveAccountCard = ({
 
           {/* Mobile: Stack buttons vertically, Desktop: Horizontal */}
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <Button
-              variant="primary"
-              onClick={() => onTrade(account.id)}
-              className="flex items-center justify-center gap-2 shadow-sm text-sm"
-              size="sm"
-            >
-              <TrendingUp size={14} />
-              Trade
-            </Button>
             <div className="flex gap-2">
               <Button
                 variant="outline"
