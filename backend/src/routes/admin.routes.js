@@ -10,62 +10,121 @@ const router = express.Router();
 router.use(authenticateToken);
 router.use(authorize(['admin', 'superadmin']));
 
-// GET ALL USERS
+// ============================================
+// USER MANAGEMENT ROUTES WITH TRADING STATS
+// ============================================
+
+// GET ALL USERS WITH TRADING STATISTICS
 router.get('/users', async (req, res) => {
     try {
+        const Trade = (await import('../models/Trade.js')).default;
+
         const users = await User.find({ email: { $ne: 'admin@jaaz.com' } })
             .select('-password -resetPasswordOTP -resetPasswordOTPExpiry')
             .sort({ createdAt: -1 })
             .lean();
 
-        // Transform data to match frontend expectations
-        const transformedUsers = users.map(user => ({
-            id: user._id.toString(),
-            // Authentication            
-            email: user.email,
-            // Personal Info
-            firstname: user.firstName,
-            lastname: user.lastName,
-            mobile: user.phoneNumber || '',
-            dateofbirth: user.dateOfBirth,
-            // Role
-            role: user.role,
-            // Address
-            addressline1: user.address || '',
-            addressline2: '', // Not in model
-            city: user.city || '',
-            state: user.state || '',
-            zipcode: user.postalCode || '',
-            country: user.country || '',
-            // Status fields
-            status: user.accountStatus === 'active' ? 'active' :
-                user.accountStatus === 'suspended' ? 'suspended' :
-                    user.accountStatus === 'closed' ? 'closed' : 'pending',
-            kyc: user.kycStatus,
-            // Verification
-            emailverified: user.isVerified,
-            phoneverified: !!user.phoneNumber && user.isVerified,
-            mfaenabled: user.twoFactorEnabled,
-            // Wallet
-            walletbalance: user.walletBalance,
-            currency: user.currency,
-            totaldeposits: user.totalDeposits,
-            totalwithdrawals: user.totalWithdrawals,
-            // Platform Preferences
-            preferredMT5Terminal: user.preferredMT5Terminal,
-            preferredMT4Terminal: user.preferredMT4Terminal,
-            // Referral
-            referralCode: user.referralCode,
-            referredBy: user.referredBy,
-            // Metadata
-            createdat: user.createdAt,
-            updatedat: user.updatedAt,
-            lastlogin: user.lastLogin
-        }));
+        // Get trading stats for all users
+        const userIds = users.map(u => u._id);
+
+        const tradingStats = await Trade.aggregate([
+            { $match: { userId: { $in: userIds }, status: 'closed' } },
+            {
+                $group: {
+                    _id: '$userId',
+                    totalTrades: { $sum: 1 },
+                    totalProfitLoss: { $sum: '$profitLoss' },
+                    winningTrades: {
+                        $sum: { $cond: [{ $gt: ['$profitLoss', 0] }, 1, 0] }
+                    },
+                    losingTrades: {
+                        $sum: { $cond: [{ $lt: ['$profitLoss', 0] }, 1, 0] }
+                    }
+                }
+            }
+        ]);
+
+        // Create a map for quick lookup
+        const statsMap = {};
+        tradingStats.forEach(stat => {
+            statsMap[stat._id.toString()] = stat;
+        });
+
+        // Transform data with trading stats
+        const transformedUsers = users.map(user => {
+            const stats = statsMap[user._id.toString()] || {
+                totalTrades: 0,
+                totalProfitLoss: 0,
+                winningTrades: 0,
+                losingTrades: 0
+            };
+
+            return {
+                id: user._id.toString(),
+                userId: user.userId,  // Platform User ID
+                // Authentication            
+                email: user.email,
+                // Personal Info
+                firstname: user.firstName,
+                lastname: user.lastName,
+                mobile: user.phoneNumber || '',
+                dateofbirth: user.dateOfBirth,
+                // Role
+                role: user.role,
+                // Address
+                addressline1: user.address || '',
+                addressline2: '',
+                city: user.city || '',
+                state: user.state || '',
+                zipcode: user.postalCode || '',
+                country: user.country || '',
+                // Status fields
+                status: user.accountStatus === 'active' ? 'active' :
+                    user.accountStatus === 'suspended' ? 'suspended' :
+                        user.accountStatus === 'closed' ? 'closed' : 'pending',
+                kyc: user.kycStatus,
+                // Verification
+                emailverified: user.isVerified,
+                phoneverified: !!user.phoneNumber && user.isVerified,
+                mfaenabled: user.twoFactorEnabled,
+                // Wallet
+                walletbalance: user.walletBalance,
+                currency: user.currency,
+                totaldeposits: user.totalDeposits,
+                totalwithdrawals: user.totalWithdrawals,
+                // Platform Preferences
+                preferredMT5Terminal: user.preferredMT5Terminal,
+                preferredMT4Terminal: user.preferredMT4Terminal,
+                // Referral
+                referralCode: user.referralCode,
+                referredBy: user.referredBy,
+                // Trading Stats
+                totalTrades: stats.totalTrades,
+                totalProfitLoss: stats.totalProfitLoss,
+                winningTrades: stats.winningTrades,
+                losingTrades: stats.losingTrades,
+                isProfitable: stats.totalProfitLoss > 0,
+                // Metadata
+                createdat: user.createdAt,
+                updatedat: user.updatedAt,
+                lastlogin: user.lastLogin
+            };
+        });
+
+        // Calculate overall statistics
+        const overallStats = {
+            totalUsers: transformedUsers.length,
+            profitableUsers: transformedUsers.filter(u => u.isProfitable && u.totalTrades > 0).length,
+            losingUsers: transformedUsers.filter(u => !u.isProfitable && u.totalTrades > 0).length,
+            usersWithNoTrades: transformedUsers.filter(u => u.totalTrades === 0).length,
+            totalProfitLoss: transformedUsers.reduce((sum, u) => sum + (u.totalProfitLoss || 0), 0),
+            totalTrades: transformedUsers.reduce((sum, u) => sum + (u.totalTrades || 0), 0),
+        };
 
         res.json({
             success: true,
             data: transformedUsers,
+            stats: overallStats,
             total: transformedUsers.length
         });
     } catch (error) {
@@ -100,6 +159,7 @@ router.get('/users/:userId', async (req, res) => {
         // Transform data
         const transformedUser = {
             id: user._id.toString(),
+            userId: user.userId,  // Platform User ID
             // Authentication
             email: user.email,
             // Personal Info
@@ -239,6 +299,7 @@ router.put('/users/:userId', async (req, res) => {
             message: 'User updated successfully',
             data: {
                 id: user._id.toString(),
+                userId: user.userId,
                 firstname: user.firstName,
                 lastname: user.lastName,
                 email: user.email,

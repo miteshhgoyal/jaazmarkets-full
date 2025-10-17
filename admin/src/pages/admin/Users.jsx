@@ -35,6 +35,8 @@ import {
   TrendingDown,
   BarChart3,
   Package,
+  DollarSign,
+  Users as UsersIcon,
 } from "lucide-react";
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
@@ -62,8 +64,16 @@ const ROLE_FILTERS = [
   { label: "Super Admin", value: "superadmin" },
 ];
 
+const TRADING_FILTERS = [
+  { label: "All Users", value: "all" },
+  { label: "Profitable", value: "profitable" },
+  { label: "Losing", value: "losing" },
+  { label: "No Trades", value: "no_trades" },
+];
+
 const Users = () => {
   const [users, setUsers] = useState([]);
+  const [overallStats, setOverallStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -71,6 +81,7 @@ const Users = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [kycFilter, setKycFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [tradingFilter, setTradingFilter] = useState("all");
   const [sortField, setSortField] = useState(null);
   const [sortDirection, setSortDirection] = useState("asc");
   const [currentPage, setCurrentPage] = useState(1);
@@ -88,6 +99,7 @@ const Users = () => {
       const response = await api.get("/admin/users");
       if (response.data.data && Array.isArray(response.data.data)) {
         setUsers(response.data.data);
+        setOverallStats(response.data.stats);
       } else {
         setUsers([]);
       }
@@ -213,7 +225,7 @@ const Users = () => {
     }
   };
 
-  // Filter and search users
+  // Filter and search users with trading performance
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
       const searchLower = searchQuery.toLowerCase();
@@ -223,6 +235,7 @@ const Users = () => {
         user.lastname?.toLowerCase().includes(searchLower) ||
         user.email?.toLowerCase().includes(searchLower) ||
         user.mobile?.toLowerCase().includes(searchLower) ||
+        user.userId?.toLowerCase().includes(searchLower) ||
         user.id?.toLowerCase().includes(searchLower);
 
       const matchesStatus =
@@ -230,9 +243,25 @@ const Users = () => {
       const matchesKyc = kycFilter === "all" || user.kyc === kycFilter;
       const matchesRole = roleFilter === "all" || user.role === roleFilter;
 
-      return matchesSearch && matchesStatus && matchesKyc && matchesRole;
+      const matchesTrading =
+        tradingFilter === "all" ||
+        (tradingFilter === "profitable" &&
+          user.isProfitable &&
+          user.totalTrades > 0) ||
+        (tradingFilter === "losing" &&
+          !user.isProfitable &&
+          user.totalTrades > 0) ||
+        (tradingFilter === "no_trades" && user.totalTrades === 0);
+
+      return (
+        matchesSearch &&
+        matchesStatus &&
+        matchesKyc &&
+        matchesRole &&
+        matchesTrading
+      );
     });
-  }, [users, searchQuery, statusFilter, kycFilter, roleFilter]);
+  }, [users, searchQuery, statusFilter, kycFilter, roleFilter, tradingFilter]);
 
   // Sort users
   const sortedUsers = useMemo(() => {
@@ -242,8 +271,8 @@ const Users = () => {
       let aValue = a[sortField];
       let bValue = b[sortField];
 
-      if (aValue === null) aValue = "";
-      if (bValue === null) bValue = "";
+      if (aValue === null || aValue === undefined) aValue = "";
+      if (bValue === null || bValue === undefined) bValue = "";
 
       if (typeof aValue === "number" && typeof bValue === "number") {
         return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
@@ -267,7 +296,14 @@ const Users = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, statusFilter, kycFilter, roleFilter, itemsPerPage]);
+  }, [
+    searchQuery,
+    statusFilter,
+    kycFilter,
+    roleFilter,
+    tradingFilter,
+    itemsPerPage,
+  ]);
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -284,7 +320,7 @@ const Users = () => {
   };
 
   const csvHeaders = [
-    { label: "User ID", key: "id" },
+    { label: "User ID", key: "userId" },
     { label: "First Name", key: "firstname" },
     { label: "Last Name", key: "lastname" },
     { label: "Email", key: "email" },
@@ -294,6 +330,10 @@ const Users = () => {
     { label: "KYC", key: "kyc" },
     { label: "Wallet Balance", key: "walletbalance" },
     { label: "Currency", key: "currency" },
+    { label: "Total Trades", key: "totalTrades" },
+    { label: "Total P/L", key: "totalProfitLoss" },
+    { label: "Winning Trades", key: "winningTrades" },
+    { label: "Losing Trades", key: "losingTrades" },
   ];
 
   if (loading) {
@@ -349,8 +389,119 @@ const Users = () => {
       />
       <PageHeader
         title="Manage All Users"
-        subtitle="Manage all user accounts and monitor activity"
+        subtitle="Manage all user accounts and monitor trading activity"
       />
+
+      {/* Overall Trading Statistics Cards */}
+      {overallStats && (
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-medium text-blue-700 uppercase">
+                Total Users
+              </p>
+              <UsersIcon className="w-5 h-5 text-blue-600" />
+            </div>
+            <p className="text-2xl font-bold text-blue-900">
+              {overallStats.totalUsers}
+            </p>
+            <p className="text-xs text-blue-600 mt-1">
+              {overallStats.totalTrades} total trades
+            </p>
+          </div>
+
+          <div className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-medium text-green-700 uppercase">
+                Profitable Users
+              </p>
+              <TrendingUp className="w-5 h-5 text-green-600" />
+            </div>
+            <p className="text-2xl font-bold text-green-900">
+              {overallStats.profitableUsers}
+            </p>
+            <p className="text-xs text-green-600 mt-1">
+              {overallStats.totalUsers > overallStats.usersWithNoTrades
+                ? (
+                    (overallStats.profitableUsers /
+                      (overallStats.totalUsers -
+                        overallStats.usersWithNoTrades)) *
+                    100
+                  ).toFixed(1)
+                : 0}
+              % of active traders
+            </p>
+          </div>
+
+          <div className="bg-gradient-to-br from-red-50 to-red-100 border border-red-200 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-medium text-red-700 uppercase">
+                Losing Users
+              </p>
+              <TrendingDown className="w-5 h-5 text-red-600" />
+            </div>
+            <p className="text-2xl font-bold text-red-900">
+              {overallStats.losingUsers}
+            </p>
+            <p className="text-xs text-red-600 mt-1">
+              {overallStats.totalUsers > overallStats.usersWithNoTrades
+                ? (
+                    (overallStats.losingUsers /
+                      (overallStats.totalUsers -
+                        overallStats.usersWithNoTrades)) *
+                    100
+                  ).toFixed(1)
+                : 0}
+              % of active traders
+            </p>
+          </div>
+
+          <div
+            className={`bg-gradient-to-br ${
+              overallStats.totalProfitLoss >= 0
+                ? "from-purple-50 to-purple-100 border-purple-200"
+                : "from-orange-50 to-orange-100 border-orange-200"
+            } border rounded-xl p-4`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <p
+                className={`text-xs font-medium uppercase ${
+                  overallStats.totalProfitLoss >= 0
+                    ? "text-purple-700"
+                    : "text-orange-700"
+                }`}
+              >
+                Total Platform P/L
+              </p>
+              <DollarSign
+                className={`w-5 h-5 ${
+                  overallStats.totalProfitLoss >= 0
+                    ? "text-purple-600"
+                    : "text-orange-600"
+                }`}
+              />
+            </div>
+            <p
+              className={`text-2xl font-bold ${
+                overallStats.totalProfitLoss >= 0
+                  ? "text-purple-900"
+                  : "text-orange-900"
+              }`}
+            >
+              ${overallStats.totalProfitLoss.toFixed(2)}
+            </p>
+            <p
+              className={`text-xs mt-1 ${
+                overallStats.totalProfitLoss >= 0
+                  ? "text-purple-600"
+                  : "text-orange-600"
+              }`}
+            >
+              Platform-wide performance
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Filters and Search */}
       <div className="mt-6 space-y-4">
@@ -358,7 +509,7 @@ const Users = () => {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by name, email, mobile, or ID..."
+            placeholder="Search by name, email, mobile, or User ID..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white"
@@ -402,6 +553,18 @@ const Users = () => {
                 </option>
               ))}
             </select>
+
+            <select
+              className="w-full md:w-auto px-3 py-2 text-sm rounded-xl border border-gray-200 bg-white outline-none focus:ring-2 focus:ring-blue-500"
+              value={tradingFilter}
+              onChange={(e) => setTradingFilter(e.target.value)}
+            >
+              {TRADING_FILTERS.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="flex gap-2">
@@ -418,7 +581,9 @@ const Users = () => {
             <CSVLink
               data={sortedUsers}
               headers={csvHeaders}
-              filename={`users-${new Date().toISOString().split("T")[0]}.csv`}
+              filename={`users-trading-stats-${
+                new Date().toISOString().split("T")[0]
+              }.csv`}
               className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
             >
               <Download className="w-4 h-4" />
@@ -436,7 +601,7 @@ const Users = () => {
         </div>
       </div>
 
-      {/* Users Table */}
+      {/* Users Table with Trading Stats */}
       {sortedUsers.length === 0 ? (
         <div className="mt-6 bg-white border border-gray-200 rounded-xl p-12">
           <div className="text-center">
@@ -453,12 +618,12 @@ const Users = () => {
                 <tr>
                   <th
                     className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleSort("id")}
+                    onClick={() => handleSort("userId")}
                   >
                     <div className="flex items-center gap-1">
-                      ID
+                      User ID
                       <SortIcon
-                        field="id"
+                        field="userId"
                         sortField={sortField}
                         sortDirection={sortDirection}
                       />
@@ -496,8 +661,31 @@ const Users = () => {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    KYC
+                  <th
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort("totalProfitLoss")}
+                  >
+                    <div className="flex items-center gap-1">
+                      P/L
+                      <SortIcon
+                        field="totalProfitLoss"
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                      />
+                    </div>
+                  </th>
+                  <th
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort("totalTrades")}
+                  >
+                    <div className="flex items-center gap-1">
+                      Trades
+                      <SortIcon
+                        field="totalTrades"
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                      />
+                    </div>
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Verifications
@@ -510,8 +698,8 @@ const Users = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {paginatedUsers.map((user) => (
                   <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-600">
-                      {user.id?.substring(0, 8)}...
+                    <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-blue-600 font-semibold">
+                      {user.userId}
                     </td>
 
                     <td className="px-4 py-3 whitespace-nowrap">
@@ -527,12 +715,15 @@ const Users = () => {
                         </div>
                       </div>
                     </td>
+
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
                       {user.email}
                     </td>
+
                     <td className="px-4 py-3 whitespace-nowrap">
                       <RoleBadge role={user.role} />
                     </td>
+
                     <td className="px-4 py-3 whitespace-nowrap">
                       <button
                         onClick={() =>
@@ -544,15 +735,48 @@ const Users = () => {
                         <StatusBadge status={user.status} />
                       </button>
                     </td>
+
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <button
-                        onClick={() => handleQuickToggleKYC(user.id, user.kyc)}
-                        className="focus:outline-none"
-                        title="Click to cycle: pending → submitted → approved → rejected"
-                      >
-                        <KYCBadge status={user.kyc} />
-                      </button>
+                      {user.totalTrades > 0 ? (
+                        <div className="flex items-center gap-1">
+                          {user.isProfitable ? (
+                            <TrendingUp className="w-3 h-3 text-green-600" />
+                          ) : (
+                            <TrendingDown className="w-3 h-3 text-red-600" />
+                          )}
+                          <span
+                            className={`text-sm font-semibold ${
+                              user.isProfitable
+                                ? "text-green-600"
+                                : "text-red-600"
+                            }`}
+                          >
+                            ${(user.totalProfitLoss || 0).toFixed(2)}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-400">No trades</span>
+                      )}
                     </td>
+
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="text-xs text-gray-600">
+                        {user.totalTrades > 0 ? (
+                          <>
+                            <span className="text-green-600 font-semibold">
+                              {user.winningTrades || 0}
+                            </span>
+                            {" / "}
+                            <span className="text-red-600 font-semibold">
+                              {user.losingTrades || 0}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-gray-400">0</span>
+                        )}
+                      </div>
+                    </td>
+
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex gap-2">
                         <button
@@ -614,6 +838,7 @@ const Users = () => {
                         </button>
                       </div>
                     </td>
+
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <button
