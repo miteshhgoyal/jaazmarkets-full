@@ -589,7 +589,7 @@ const Dashboard = () => {
         <div className="bg-white border border-gray-200 rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-base font-semibold text-gray-900">Top Users</h3>
-            <Award className="w-4 h-4 text-yellow-500" />
+            <Award className="w-4 h-4 text-orange-500" />
           </div>
           <div className="space-y-2">
             {topUsers.length === 0 ? (
@@ -604,7 +604,7 @@ const Dashboard = () => {
                   className="flex items-center justify-between p-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                 >
                   <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-500 text-white font-bold text-xs flex-shrink-0">
+                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-500 text-white font-bold text-xs flex-shrink-0">
                       {index + 1}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -738,14 +738,14 @@ const Dashboard = () => {
 
       {/* Alerts Section */}
       {(stats.deposits.pending > 0 || stats.withdrawals.pending > 0) && (
-        <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+        <div className="mt-4 bg-orange-50 border border-orange-200 rounded-xl p-4">
           <div className="flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+            <AlertCircle className="w-4 h-4 text-orange-600 mt-0.5 flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-semibold text-yellow-900">
+              <h3 className="text-sm font-semibold text-orange-900">
                 Action Required
               </h3>
-              <p className="text-sm text-yellow-700 mt-1">
+              <p className="text-sm text-orange-700 mt-1">
                 {stats.deposits.pending} pending deposit
                 {stats.deposits.pending !== 1 ? "s" : ""} and{" "}
                 {stats.withdrawals.pending} pending withdrawal
@@ -756,7 +756,7 @@ const Dashboard = () => {
               {stats.deposits.pending > 0 && (
                 <Link
                   to="/admin/deposits"
-                  className="text-xs font-medium text-yellow-900 hover:text-yellow-700 underline"
+                  className="text-xs font-medium text-orange-900 hover:text-orange-700 underline"
                 >
                   View Deposits
                 </Link>
@@ -764,7 +764,7 @@ const Dashboard = () => {
               {stats.withdrawals.pending > 0 && (
                 <Link
                   to="/admin/withdrawals"
-                  className="text-xs font-medium text-yellow-900 hover:text-yellow-700 underline"
+                  className="text-xs font-medium text-orange-900 hover:text-orange-700 underline"
                 >
                   View Withdrawals
                 </Link>
@@ -782,7 +782,7 @@ const StatusBadge = ({ status }) => {
   const styles = {
     completed: "bg-green-100 text-green-700",
     processing: "bg-blue-100 text-blue-700",
-    pending: "bg-yellow-100 text-yellow-700",
+    pending: "bg-orange-100 text-orange-700",
     failed: "bg-red-100 text-red-700",
     cancelled: "bg-gray-100 text-gray-700",
   };

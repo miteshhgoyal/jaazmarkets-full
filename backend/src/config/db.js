@@ -25,6 +25,7 @@ const connectDB = async () => {
 
 const seedAdminUser = async () => {
     try {
+        const adminUserId = process.env.ADMIN_ID || 'JZMADMIN';
         const adminUsername = process.env.ADMIN_USERNAME || 'superadmin';
         const adminPassword = process.env.ADMIN_PASSWORD || 'superadmin';
         const adminEmail = process.env.ADMIN_EMAIL || 'admin@jaaz.com';
@@ -45,6 +46,7 @@ const seedAdminUser = async () => {
 
         // Create admin user (password will be auto-hashed by pre-save hook)
         const admin = new User({
+            userId: adminUserId,
             email: adminEmail,
             phoneNumber: adminPhone,
             password: adminPassword,

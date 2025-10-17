@@ -188,7 +188,7 @@ const NewAccount = () => {
   if (loadingSettings) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-400"></div>
       </div>
     );
   }
@@ -200,7 +200,7 @@ const NewAccount = () => {
           <p className="text-red-600">Failed to load settings</p>
           <button
             onClick={fetchSettings}
-            className="mt-4 px-4 py-2 bg-yellow-400 rounded-lg"
+            className="mt-4 px-4 py-2 bg-orange-400 rounded-lg"
           >
             Retry
           </button>
@@ -270,7 +270,7 @@ const NewAccount = () => {
                     disabled={!selectedAccount}
                     className={`w-full py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg transition-all ${
                       selectedAccount
-                        ? "bg-yellow-400 hover:bg-yellow-500 text-gray-900"
+                        ? "bg-orange-400 hover:bg-orange-500 text-gray-900"
                         : "bg-gray-200 text-gray-400 cursor-not-allowed"
                     }`}
                   >
@@ -312,7 +312,7 @@ const NewAccount = () => {
                         onClick={() => setAccountType("Demo")}
                         className={`py-3 font-semibold transition-colors rounded-lg ${
                           accountType === "Demo"
-                            ? "bg-yellow-400 text-gray-900"
+                            ? "bg-orange-400 text-gray-900"
                             : "bg-white text-gray-600 hover:bg-gray-50"
                         }`}
                       >
@@ -322,7 +322,7 @@ const NewAccount = () => {
                         onClick={() => setAccountType("Real")}
                         className={`py-3 font-semibold transition-colors rounded-lg ${
                           accountType === "Real"
-                            ? "bg-yellow-400 text-gray-900"
+                            ? "bg-orange-400 text-gray-900"
                             : "bg-white text-gray-600 hover:bg-gray-50"
                         }`}
                       >
@@ -351,7 +351,7 @@ const NewAccount = () => {
                         name="currency"
                         value={formData.currency}
                         onChange={handleInputChange}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent bg-white"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent bg-white"
                         required
                       >
                         {settings.currencies.map((currency) => (
@@ -377,7 +377,7 @@ const NewAccount = () => {
                           onChange={handleInputChange}
                           min="100"
                           max="100000"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
                           required
                         />
                       </div>
@@ -393,7 +393,7 @@ const NewAccount = () => {
                         name="nickname"
                         value={formData.nickname}
                         onChange={handleInputChange}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
                         maxLength={36}
                         required
                       />
@@ -411,7 +411,7 @@ const NewAccount = () => {
                         name="leverage"
                         value={formData.leverage}
                         onChange={handleInputChange}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent bg-white"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent bg-white"
                         required
                       >
                         {settings.leverageOptions.map((leverage) => (
@@ -431,7 +431,7 @@ const NewAccount = () => {
                         name="platform"
                         value={formData.platform}
                         onChange={handleInputChange}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent bg-white"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent bg-white"
                         required
                       >
                         {settings.platforms.map((platform) => (
@@ -453,7 +453,7 @@ const NewAccount = () => {
                           name="tradingPassword"
                           value={formData.tradingPassword}
                           onChange={handleInputChange}
-                          className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
+                          className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
                         />
                         <button
                           type="button"
@@ -499,7 +499,7 @@ const NewAccount = () => {
                       <button
                         type="submit"
                         disabled={loading}
-                        className="w-full py-3 sm:py-4 bg-yellow-400 hover:bg-yellow-500 disabled:bg-gray-300 disabled:cursor-not-allowed text-gray-900 font-semibold rounded-lg transition-colors text-base sm:text-lg"
+                        className="w-full py-3 sm:py-4 bg-orange-400 hover:bg-orange-500 disabled:bg-gray-300 disabled:cursor-not-allowed text-gray-900 font-semibold rounded-lg transition-colors text-base sm:text-lg"
                       >
                         {loading ? "Creating account..." : "Create account"}
                       </button>
@@ -568,11 +568,11 @@ const NewAccount = () => {
                 </p>
               </div>
 
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-                <p className="text-sm text-yellow-800 font-semibold mb-1">
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
+                <p className="text-sm text-orange-800 font-semibold mb-1">
                   ⚠Important: Save your credentials
                 </p>
-                <p className="text-sm text-yellow-700">
+                <p className="text-sm text-orange-700">
                   Your password will only be shown once. Please save it
                   securely.
                 </p>
@@ -617,7 +617,7 @@ const NewAccount = () => {
               <div className="flex gap-4">
                 <button
                   onClick={() => navigate("/trading/accounts")}
-                  className="flex-1 py-3 bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold rounded-lg transition-colors"
+                  className="flex-1 py-3 bg-orange-400 hover:bg-orange-500 text-gray-900 font-semibold rounded-lg transition-colors"
                 >
                   View My Accounts
                 </button>
@@ -655,7 +655,7 @@ const AccountCard = ({ account, isSelected, onSelect }) => {
       onClick={() => onSelect(account)}
       className={`bg-white rounded-lg border-2 p-4 sm:p-6 cursor-pointer transition-all hover:shadow-lg ${
         isSelected
-          ? "border-yellow-400 shadow-md"
+          ? "border-orange-400 shadow-md"
           : "border-gray-200 hover:border-gray-300"
       }`}
     >
@@ -664,7 +664,7 @@ const AccountCard = ({ account, isSelected, onSelect }) => {
           <div
             className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
               isSelected
-                ? "border-yellow-400 bg-yellow-400"
+                ? "border-orange-400 bg-orange-400"
                 : "border-gray-300 bg-white"
             }`}
           >
@@ -733,14 +733,14 @@ const PasswordCheck = ({ check, label }) => (
 const CredentialRow = ({ label, value, onCopy, highlight }) => (
   <div
     className={`flex items-center justify-between p-4 rounded-lg ${
-      highlight ? "bg-yellow-50 border border-yellow-200" : "bg-gray-50"
+      highlight ? "bg-orange-50 border border-orange-200" : "bg-gray-50"
     }`}
   >
     <div>
       <p className="text-sm text-gray-600">{label}</p>
       <p
         className={`font-mono font-semibold ${
-          highlight ? "text-yellow-700" : "text-gray-900"
+          highlight ? "text-orange-700" : "text-gray-900"
         }`}
       >
         {value}

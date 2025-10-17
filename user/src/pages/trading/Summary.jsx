@@ -235,7 +235,7 @@ const Summary = () => {
         />
         <PageHeader title="Performance History" />
         <div className="flex justify-center items-center mt-20">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-400"></div>
         </div>
       </>
     );
@@ -269,7 +269,7 @@ const Summary = () => {
           </div>
           <button
             onClick={fetchAccounts}
-            className="px-6 py-2 bg-yellow-400 hover:bg-yellow-500 rounded-lg font-semibold transition-colors"
+            className="px-6 py-2 bg-orange-400 hover:bg-orange-500 rounded-lg font-semibold transition-colors"
           >
             Try Again
           </button>
@@ -307,7 +307,7 @@ const Summary = () => {
 
         <div className="flex flex-col md:flex-row md:items-center gap-2 mt-2">
           <select
-            className="w-full md:w-auto px-3 py-2 rounded-xl border border-gray-200 bg-white outline-none focus:ring-2 focus:ring-yellow-400"
+            className="w-full md:w-auto px-3 py-2 rounded-xl border border-gray-200 bg-white outline-none focus:ring-2 focus:ring-orange-400"
             value={selectedAccount}
             onChange={(e) => setSelectedAccount(e.target.value)}
           >
@@ -319,7 +319,7 @@ const Summary = () => {
             ))}
           </select>
           <select
-            className="w-full md:w-auto px-3 py-2 rounded-xl border border-gray-200 bg-white outline-none focus:ring-2 focus:ring-yellow-400"
+            className="w-full md:w-auto px-3 py-2 rounded-xl border border-gray-200 bg-white outline-none focus:ring-2 focus:ring-orange-400"
             value={selectedDays || "all"}
             onChange={(e) =>
               setSelectedDays(
@@ -358,7 +358,7 @@ const Summary = () => {
             </p>
             <button
               onClick={() => (window.location.href = "/trading/new-account")}
-              className="px-6 py-3 bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold rounded-lg transition-colors"
+              className="px-6 py-3 bg-orange-400 hover:bg-orange-500 text-gray-900 font-semibold rounded-lg transition-colors"
             >
               Create Account
             </button>

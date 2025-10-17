@@ -317,7 +317,7 @@ const TransactionHistory = () => {
       case "completed":
         return <CheckCircle className="text-green-600" size={16} />;
       case "pending":
-        return <Clock className="text-yellow-600" size={16} />;
+        return <Clock className="text-orange-600" size={16} />;
       case "failed":
         return <XCircle className="text-red-600" size={16} />;
       default:
@@ -343,7 +343,7 @@ const TransactionHistory = () => {
       case "completed":
         return "bg-green-100 text-green-800";
       case "pending":
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-orange-100 text-orange-800";
       case "failed":
         return "bg-red-100 text-red-800";
       default:
@@ -398,7 +398,7 @@ const TransactionHistory = () => {
           subtitle="Loading transaction data..."
         />
         <div className="flex justify-center items-center py-16">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-400"></div>
         </div>
       </div>
     );
@@ -485,12 +485,12 @@ const TransactionHistory = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 mb-1">Pending</p>
-                <p className="text-xl sm:text-2xl font-bold text-yellow-600">
+                <p className="text-xl sm:text-2xl font-bold text-orange-600">
                   {summaryStats.pendingTransactions}
                 </p>
               </div>
-              <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
-                <Clock className="text-yellow-600" size={20} />
+              <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                <Clock className="text-orange-600" size={20} />
               </div>
             </div>
           </Card>
@@ -533,7 +533,7 @@ const TransactionHistory = () => {
                 placeholder="Search transactions..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent bg-white w-64"
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent bg-white w-64"
               />
             </div>
 
@@ -541,7 +541,7 @@ const TransactionHistory = () => {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent bg-white"
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent bg-white"
             >
               <option value="newest">Newest First</option>
               <option value="oldest">Oldest First</option>
@@ -560,7 +560,7 @@ const TransactionHistory = () => {
                     e.target.value === "all" ? "" : e.target.value
                   )
                 }
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent bg-white"
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent bg-white"
               >
                 <option value="all">All Types</option>
                 {typeOptions.map((type) => (
@@ -581,7 +581,7 @@ const TransactionHistory = () => {
                     e.target.value === "all" ? "" : e.target.value
                   )
                 }
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent bg-white"
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent bg-white"
               >
                 <option value="all">All Status</option>
                 {statusOptions.map((status) => (
@@ -602,7 +602,7 @@ const TransactionHistory = () => {
                     e.target.value === "all" ? "" : e.target.value
                   )
                 }
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent bg-white"
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent bg-white"
               >
                 <option value="all">All Currencies</option>
                 {currencyOptions.map((currency) => (
@@ -633,7 +633,7 @@ const TransactionHistory = () => {
           <div className="text-sm text-gray-600">
             Showing {filteredCount} of {totalCount} transactions
             {hasActiveFilters && (
-              <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">
+              <span className="ml-2 px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">
                 Filtered
               </span>
             )}

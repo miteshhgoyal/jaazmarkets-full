@@ -245,7 +245,7 @@ const Accounts = () => {
                 placeholder="Search accounts..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent bg-white w-full"
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent bg-white w-full"
               />
             </div>
 
@@ -253,7 +253,7 @@ const Accounts = () => {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent bg-white"
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent bg-white"
             >
               <option value="newest">Newest First</option>
               <option value="oldest">Oldest First</option>
@@ -268,7 +268,7 @@ const Accounts = () => {
               <select
                 value={platformFilter}
                 onChange={(e) => setPlatformFilter(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent bg-white"
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent bg-white"
               >
                 <option value="all">All Platforms</option>
                 {platformOptions.map((platform) => (
@@ -284,7 +284,7 @@ const Accounts = () => {
               <select
                 value={classFilter}
                 onChange={(e) => setClassFilter(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent bg-white"
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent bg-white"
               >
                 <option value="all">All Classes</option>
                 {classOptions.map((accountClass) => (
@@ -299,7 +299,7 @@ const Accounts = () => {
             <select
               value={balanceRangeFilter}
               onChange={(e) => setBalanceRangeFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent bg-white"
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent bg-white"
             >
               <option value="all">All Balances</option>
               <option value="0-1000">$0 - $1,000</option>
@@ -338,7 +338,7 @@ const Accounts = () => {
             }{" "}
             accounts
             {hasActiveFilters && (
-              <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">
+              <span className="ml-2 px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">
                 Filtered
               </span>
             )}
@@ -348,7 +348,7 @@ const Accounts = () => {
         {/* Loading State */}
         {loading && (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-400"></div>
           </div>
         )}
 
@@ -446,7 +446,7 @@ const Accounts = () => {
                     <Button
                       onClick={() => navigate("/trading/new-account")}
                       size="lg"
-                      className="bg-yellow-400 hover:bg-yellow-500"
+                      className="bg-orange-400 hover:bg-orange-500"
                     >
                       <Plus className="w-5 h-5 mr-2" />
                       Create Your First Account

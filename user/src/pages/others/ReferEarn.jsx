@@ -109,7 +109,7 @@ const ReferEarn = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-400"></div>
       </div>
     );
   }
@@ -162,12 +162,12 @@ const ReferEarn = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 mb-1">Total Commission</p>
-                <p className="text-3xl font-bold text-yellow-600">
+                <p className="text-3xl font-bold text-orange-600">
                   ${totalCommissionEarned.toFixed(2)}
                 </p>
               </div>
-              <div className="bg-yellow-100 p-3 rounded-full">
-                <TrendingUp className="text-yellow-600" size={24} />
+              <div className="bg-orange-100 p-3 rounded-full">
+                <TrendingUp className="text-orange-600" size={24} />
               </div>
             </div>
           </Card>
@@ -213,7 +213,7 @@ const ReferEarn = () => {
                 </Button>
                 <Button
                   onClick={handleShare}
-                  className="bg-yellow-400 hover:bg-yellow-500"
+                  className="bg-orange-400 hover:bg-orange-500"
                 >
                   <Share2 size={20} />
                 </Button>

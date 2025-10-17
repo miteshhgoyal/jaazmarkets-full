@@ -7,7 +7,7 @@ const AccountBadges = ({ account }) => {
       case "active":
         return "bg-green-100 text-green-800 border-green-200";
       case "suspended":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200";
+        return "bg-orange-100 text-orange-800 border-orange-200";
       case "closed":
         return "bg-gray-100 text-gray-800 border-gray-200";
       default:
@@ -38,7 +38,7 @@ const AccountBadges = ({ account }) => {
       </span>
 
       {/* Account Class */}
-      <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200">
+      <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-xs font-semibold rounded-full bg-orange-100 text-orange-800 border border-orange-200">
         {account.accountClass}
       </span>
 

@@ -68,7 +68,7 @@ const Deposits = () => {
       label: "USDT (BEP20)",
       network: "Binance Smart Chain",
       icon: "💰",
-      color: "from-yellow-400 to-yellow-600",
+      color: "from-orange-400 to-orange-600",
     },
     {
       value: "trc20/usdt",

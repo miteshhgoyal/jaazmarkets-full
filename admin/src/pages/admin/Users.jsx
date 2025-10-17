@@ -974,7 +974,7 @@ const StatusBadge = ({ status }) => {
   const styles = {
     active: "bg-green-100 text-green-700 hover:bg-green-200",
     suspended: "bg-red-100 text-red-700 hover:bg-red-200",
-    pending: "bg-yellow-100 text-yellow-700 hover:bg-yellow-200",
+    pending: "bg-orange-100 text-orange-700 hover:bg-orange-200",
     closed: "bg-gray-100 text-gray-700 hover:bg-gray-200",
   };
 
@@ -992,7 +992,7 @@ const StatusBadge = ({ status }) => {
 const KYCBadge = ({ status }) => {
   const styles = {
     approved: "bg-green-100 text-green-700 hover:bg-green-200",
-    pending: "bg-yellow-100 text-yellow-700 hover:bg-yellow-200",
+    pending: "bg-orange-100 text-orange-700 hover:bg-orange-200",
     submitted: "bg-blue-100 text-blue-700 hover:bg-blue-200",
     rejected: "bg-red-100 text-red-700 hover:bg-red-200",
   };
@@ -1416,7 +1416,7 @@ const ViewUserModal = ({ user, onClose }) => {
                           </div>
                           <div className="flex justify-between text-sm">
                             <span className="text-gray-600">Pending:</span>
-                            <span className="font-semibold text-yellow-600">
+                            <span className="font-semibold text-orange-600">
                               {tradingStats.orders.pendingOrders}
                             </span>
                           </div>
@@ -1581,7 +1581,7 @@ const ViewUserModal = ({ user, onClose }) => {
                                       order.status === "executed"
                                         ? "bg-green-100 text-green-700"
                                         : order.status === "pending"
-                                        ? "bg-yellow-100 text-yellow-700"
+                                        ? "bg-orange-100 text-orange-700"
                                         : "bg-gray-100 text-gray-700"
                                     }`}
                                   >
