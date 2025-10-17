@@ -108,7 +108,6 @@ const Sidebar = ({ isOpen, onToggle, isCollapsed, toggleCollapsed }) => {
       subItems: [
         { name: "Profile", href: "/settings/profile" },
         { name: "Security", href: "/settings/security" },
-        { name: "Trading Terminals", href: "/settings/trading-terminals" },
       ],
     },
   ];

@@ -239,10 +239,10 @@ function App() {
               {/* Settings Routes */}
               <Route path="/settings/profile" element={<Profile />} />
               <Route path="/settings/security" element={<Security />} />
-              <Route
+              {/* <Route
                 path="/settings/trading-terminals"
                 element={<TradingTerminals />}
-              />
+              /> */}
             </Route>
 
             {/* Default redirects */}
