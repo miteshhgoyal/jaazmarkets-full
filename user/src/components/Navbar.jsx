@@ -1,6 +1,6 @@
 // user/src/components/layout/Navbar.jsx
 import React, { useState, useRef, useEffect } from "react";
-import { DollarSign, User, LogOut, Menu, RefreshCw } from "lucide-react";
+import { DollarSign, User, LogOut, Menu, RefreshCw, Hash } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../services/api";
 
@@ -21,6 +21,9 @@ const Navbar = ({ toggleSidebar, toggleSidebarCollapse, sidebarCollapsed }) => {
     email: localStorage.getItem("user")
       ? JSON.parse(localStorage.getItem("user")).email || "user@jaazmarkets.com"
       : "user@jaazmarkets.com",
+    userId: localStorage.getItem("user")
+      ? JSON.parse(localStorage.getItem("user")).userId || "JZM00000000"
+      : "JZM00000000",
   };
 
   // Fetch total balance from all Real accounts
@@ -123,9 +126,17 @@ const Navbar = ({ toggleSidebar, toggleSidebarCollapse, sidebarCollapsed }) => {
         </div>
 
         {/* Right Section */}
-        <div className="flex items-center gap-2 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* User ID - Hidden on small screens */}
+          <div className="hidden md:flex items-center gap-2 text-slate-700 bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 px-3 py-2 rounded-lg">
+            <Hash size={14} className="text-blue-600" />
+            <span className="font-mono text-xs font-semibold text-blue-700">
+              {userInfo.userId}
+            </span>
+          </div>
+
           {/* Balance - Hidden on small screens */}
-          <div className="hidden sm:flex items-center gap-2 text-slate-700 bg-slate-50 px-3 py-2 rounded-lg">
+          <div className="hidden sm:flex items-center gap-2 text-slate-700 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
             <DollarSign size={16} />
             {balanceLoading ? (
               <span className="text-sm text-slate-400 flex items-center gap-1">
@@ -164,19 +175,27 @@ const Navbar = ({ toggleSidebar, toggleSidebarCollapse, sidebarCollapsed }) => {
             </button>
 
             {isUserMenuOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-slate-200 py-2 z-50">
+              <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-slate-200 py-2 z-50">
                 {/* User Info */}
                 <div className="px-4 py-3 border-b border-slate-100">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-slate-300 rounded-full flex items-center justify-center">
-                      <User size={20} className="text-slate-600" />
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
+                      <span className="text-white font-bold text-sm">
+                        {userInfo.name.charAt(0).toUpperCase()}
+                      </span>
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <div className="font-medium text-slate-900">
                         {userInfo.name}
                       </div>
-                      <div className="text-sm text-slate-500">
+                      <div className="text-xs text-slate-500">
                         {userInfo.email}
+                      </div>
+                      <div className="flex items-center gap-1 mt-1">
+                        <Hash size={12} className="text-blue-600" />
+                        <span className="text-xs font-mono font-semibold text-blue-700">
+                          {userInfo.userId}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -192,10 +211,19 @@ const Navbar = ({ toggleSidebar, toggleSidebarCollapse, sidebarCollapsed }) => {
                             Loading...
                           </span>
                         ) : (
-                          <span className="font-medium text-sm">
-                            {formatBalance(totalBalance, balanceCurrency)}{" "}
-                            {balanceCurrency}
-                          </span>
+                          <>
+                            <span className="font-medium text-sm">
+                              {formatBalance(totalBalance, balanceCurrency)}{" "}
+                              {balanceCurrency}
+                            </span>
+                            <button
+                              onClick={fetchTotalBalance}
+                              className="p-0.5 hover:bg-slate-200 rounded transition-colors"
+                              title="Refresh balance"
+                            >
+                              <RefreshCw size={12} className="text-slate-500" />
+                            </button>
+                          </>
                         )}
                       </div>
                       <div
@@ -203,6 +231,19 @@ const Navbar = ({ toggleSidebar, toggleSidebarCollapse, sidebarCollapsed }) => {
                           totalBalance > 0 ? "bg-green-500" : "bg-red-500"
                         }`}
                       ></div>
+                    </div>
+                  </div>
+
+                  {/* User ID for mobile (shown when menu is open) */}
+                  <div className="md:hidden mt-2 pt-2 border-t border-slate-100">
+                    <div className="flex items-center gap-2 bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 px-2 py-1.5 rounded-md">
+                      <Hash size={12} className="text-blue-600" />
+                      <span className="text-xs font-mono font-semibold text-blue-700">
+                        {userInfo.userId}
+                      </span>
+                      <span className="ml-auto text-xs text-slate-500">
+                        User ID
+                      </span>
                     </div>
                   </div>
                 </div>

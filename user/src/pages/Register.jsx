@@ -63,7 +63,6 @@ const Register = () => {
       required: true,
       hasToggle: true,
     },
-    // ADD REFERRAL FIELD
     {
       name: "referralCode",
       label: "Referral Code (Optional)",

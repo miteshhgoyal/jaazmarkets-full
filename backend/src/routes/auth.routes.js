@@ -123,7 +123,7 @@ router.post("/signup", async (req, res) => {
         // ===== REFERRAL HANDLING =====
         let referrerId = null;
         if (referralCode) {
-            const referrer = await User.findOne({ email: referralCode });
+            const referrer = await User.findOne({ userId: referralCode });
             if (referrer) {
                 referrerId = referrer._id;
                 // Increment referrer's total referrals
@@ -136,11 +136,11 @@ router.post("/signup", async (req, res) => {
         // ===== AUTO-GENERATE TRADING CREDENTIALS =====
         const tradingPassword = generateTradingPassword();
         const accountNumber = generateAccountNumber();
-        const userReferralCode = email; // Use email as referral code
+        const userReferralCode = referralCode; // Use email as referral code
 
         // Create new user with all fields
         const user = new User({
-            userId,                         // Platform User ID (JZM34892384)
+            userId,
             email: email.toLowerCase(),
             password,
             tradingPassword,
@@ -198,10 +198,10 @@ router.post("/signup", async (req, res) => {
 // SIGNIN - Login with Email OR User ID
 router.post('/signin', async (req, res) => {
     try {
-        const { emailOrUserId, password } = req.body;
+        const { email, password } = req.body;
 
         // Validation
-        if (!emailOrUserId || !password) {
+        if (!email || !password) {
             return res.status(400).json({
                 success: false,
                 message: 'Email/User ID and password are required',
@@ -211,8 +211,8 @@ router.post('/signin', async (req, res) => {
         // Find user by email OR userId
         const user = await User.findOne({
             $or: [
-                { email: emailOrUserId.toLowerCase() },
-                { userId: emailOrUserId.toUpperCase() }
+                { email: email.toLowerCase() },
+                { userId: email.toUpperCase() }
             ]
         }).select('+password');
 
