@@ -17,6 +17,31 @@ const router = express.Router();
 // HELPER FUNCTIONS
 // ============================================
 
+/**
+ * Generate unique User ID
+ * Format: JZM + 8 random digits
+ * Example: JZM34892384
+ */
+const generateUserId = async () => {
+    const prefix = 'JZM';
+    let userId;
+    let isUnique = false;
+
+    while (!isUnique) {
+        // Generate 8 random digits
+        const randomDigits = Math.floor(10000000 + Math.random() * 90000000).toString();
+        userId = `${prefix}${randomDigits}`;
+
+        // Check if userId already exists in database
+        const existingUser = await User.findOne({ userId });
+        if (!existingUser) {
+            isUnique = true;
+        }
+    }
+
+    return userId;
+};
+
 const generateTokens = (user) => {
     const accessToken = jwt.sign(
         {
@@ -44,11 +69,13 @@ const generateTokens = (user) => {
 const sanitizeUser = (user) => {
     return {
         id: user._id,
+        userId: user.userId,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
         phoneNumber: user.phoneNumber,
+        accountNumber: user.accountNumber,
         accountStatus: user.accountStatus,
         isVerified: user.isVerified,
         kycStatus: user.kycStatus,
@@ -56,6 +83,7 @@ const sanitizeUser = (user) => {
         currency: user.currency,
         twoFactorEnabled: user.twoFactorEnabled,
         tradingAccounts: user.tradingAccounts,
+        referralCode: user.referralCode,
     };
 };
 
@@ -88,6 +116,10 @@ router.post("/signup", async (req, res) => {
             });
         }
 
+        // ===== GENERATE UNIQUE USER ID =====
+        const userId = await generateUserId();
+        console.log(`Generated User ID: ${userId}`);
+
         // ===== REFERRAL HANDLING =====
         let referrerId = null;
         if (referralCode) {
@@ -104,9 +136,11 @@ router.post("/signup", async (req, res) => {
         // ===== AUTO-GENERATE TRADING CREDENTIALS =====
         const tradingPassword = generateTradingPassword();
         const accountNumber = generateAccountNumber();
+        const userReferralCode = email; // Use email as referral code
 
         // Create new user with all fields
         const user = new User({
+            userId,                         // Platform User ID (JZM34892384)
             email: email.toLowerCase(),
             password,
             tradingPassword,
@@ -117,6 +151,7 @@ router.post("/signup", async (req, res) => {
             role: "user",
             accountStatus: "pending",
             isVerified: false,
+            referralCode: userReferralCode,
             referredBy: referrerId,
         });
 
@@ -128,12 +163,13 @@ router.post("/signup", async (req, res) => {
                 email: user.email,
                 firstName: user.firstName,
                 lastName: user.lastName,
-                portalPassword: password,              // Send plain text for email
-                tradingPassword: tradingPassword,      // Send plain text for email (before hash)
+                portalPassword: password,          // Send plain text for email
+                tradingPassword: tradingPassword,  // Send plain text for email (before hash)
                 accountNumber: accountNumber,
                 currency: user.currency,
+                referralCode: userReferralCode,
             });
-            console.log(`Registration email sent to ${user.email}`);
+            console.log(`Registration email sent to ${user.email} with User ID: ${userId}`);
         } catch (emailError) {
             console.error('Registration email failed:', emailError);
             // Don't fail registration if email fails
@@ -141,11 +177,13 @@ router.post("/signup", async (req, res) => {
 
         res.status(201).json({
             success: true,
-            message: "Registration successful! Check your email for complete login details.",
+            message: "Registration successful! Check your email for complete login details including your User ID.",
             data: {
+                userId: userId,
                 email: user.email,
                 accountNumber: accountNumber,
-                message: "Trading credentials sent to your email"
+                referralCode: userReferralCode,
+                message: "All credentials sent to your email"
             }
         });
     } catch (error) {
@@ -157,22 +195,25 @@ router.post("/signup", async (req, res) => {
     }
 });
 
-// SIGNIN - Login
+// SIGNIN - Login with Email OR User ID
 router.post('/signin', async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { emailOrUserId, password } = req.body;
 
         // Validation
-        if (!email || !password) {
+        if (!emailOrUserId || !password) {
             return res.status(400).json({
                 success: false,
-                message: 'Email and password are required',
+                message: 'Email/User ID and password are required',
             });
         }
 
-        // Find user by email and include password field
+        // Find user by email OR userId
         const user = await User.findOne({
-            email: email.toLowerCase()
+            $or: [
+                { email: emailOrUserId.toLowerCase() },
+                { userId: emailOrUserId.toUpperCase() }
+            ]
         }).select('+password');
 
         if (!user) {

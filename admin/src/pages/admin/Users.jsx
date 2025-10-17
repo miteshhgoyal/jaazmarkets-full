@@ -30,6 +30,11 @@ import {
   XCircle,
   Building,
   CreditCard,
+  Activity,
+  TrendingUp,
+  TrendingDown,
+  BarChart3,
+  Package,
 } from "lucide-react";
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
@@ -459,7 +464,6 @@ const Users = () => {
                       />
                     </div>
                   </th>
-
                   <th
                     className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                     onClick={() => handleSort("firstname")}
@@ -867,8 +871,29 @@ const renderPageNumbers = (currentPage, totalPages, handlePageChange) => {
   return pages;
 };
 
-// VIEW USER MODAL
+// VIEW USER MODAL WITH TRADING STATS
 const ViewUserModal = ({ user, onClose }) => {
+  const [tradingStats, setTradingStats] = useState(null);
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [activeTradeTab, setActiveTradeTab] = useState("overview");
+
+  useEffect(() => {
+    const fetchTradingStats = async () => {
+      try {
+        const response = await api.get(`/admin/users/${user.id}/trading-stats`);
+        if (response.data.success) {
+          setTradingStats(response.data.data);
+        }
+      } catch (err) {
+        console.error("Error fetching trading stats:", err);
+      } finally {
+        setLoadingStats(false);
+      }
+    };
+
+    fetchTradingStats();
+  }, [user.id]);
+
   const formatDate = (dateString) => {
     if (!dateString) return "Not provided";
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -878,12 +903,28 @@ const ViewUserModal = ({ user, onClose }) => {
     });
   };
 
+  const formatDateTime = (dateString) => {
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
-          <h2 className="text-xl font-semibold text-gray-900">User Details</h2>
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">
+              User Details
+            </h2>
+            <p className="text-sm text-gray-500">{user.email}</p>
+          </div>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -899,7 +940,7 @@ const ViewUserModal = ({ user, onClose }) => {
               <UserIcon className="w-4 h-4" />
               Personal Information
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <InfoField label="User ID" value={user.id} mono />
               <InfoField label="First Name" value={user.firstname} />
               <InfoField label="Last Name" value={user.lastname} />
@@ -918,9 +959,431 @@ const ViewUserModal = ({ user, onClose }) => {
                 value={formatDate(user.dateofbirth)}
                 icon={<Calendar className="w-4 h-4" />}
               />
-              <InfoField label="Role" value={user.role} />
             </div>
           </div>
+
+          {/* Trading Statistics Section */}
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide flex items-center gap-2">
+              <Activity className="w-4 h-4" />
+              Trading Performance
+            </h3>
+
+            {loadingStats ? (
+              <div className="flex justify-center items-center py-12">
+                <RefreshCw className="w-6 h-6 animate-spin text-blue-600" />
+              </div>
+            ) : tradingStats ? (
+              <>
+                {/* Trading Stats Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-medium text-blue-700 uppercase">
+                        Total Trades
+                      </p>
+                      <BarChart3 className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <p className="text-2xl font-bold text-blue-900">
+                      {tradingStats.trades.totalTrades}
+                    </p>
+                    <p className="text-xs text-blue-600 mt-1">
+                      {tradingStats.trades.openTrades} open,{" "}
+                      {tradingStats.trades.closedTrades} closed
+                    </p>
+                  </div>
+
+                  <div
+                    className={`bg-gradient-to-br ${
+                      parseFloat(tradingStats.trades.totalProfitLoss) >= 0
+                        ? "from-green-50 to-green-100 border-green-200"
+                        : "from-red-50 to-red-100 border-red-200"
+                    } border rounded-xl p-4`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <p
+                        className={`text-xs font-medium uppercase ${
+                          parseFloat(tradingStats.trades.totalProfitLoss) >= 0
+                            ? "text-green-700"
+                            : "text-red-700"
+                        }`}
+                      >
+                        Total P/L
+                      </p>
+                      {parseFloat(tradingStats.trades.totalProfitLoss) >= 0 ? (
+                        <TrendingUp className="w-4 h-4 text-green-600" />
+                      ) : (
+                        <TrendingDown className="w-4 h-4 text-red-600" />
+                      )}
+                    </div>
+                    <p
+                      className={`text-2xl font-bold ${
+                        parseFloat(tradingStats.trades.totalProfitLoss) >= 0
+                          ? "text-green-900"
+                          : "text-red-900"
+                      }`}
+                    >
+                      ${tradingStats.trades.totalProfitLoss}
+                    </p>
+                    <p
+                      className={`text-xs mt-1 ${
+                        parseFloat(tradingStats.trades.totalProfitLoss) >= 0
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      Avg: ${tradingStats.trades.avgProfitPerTrade}/trade
+                    </p>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-medium text-purple-700 uppercase">
+                        Win Rate
+                      </p>
+                      <Activity className="w-4 h-4 text-purple-600" />
+                    </div>
+                    <p className="text-2xl font-bold text-purple-900">
+                      {tradingStats.trades.winRate}%
+                    </p>
+                    <p className="text-xs text-purple-600 mt-1">
+                      {tradingStats.trades.winningTrades}W /{" "}
+                      {tradingStats.trades.losingTrades}L
+                    </p>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-medium text-orange-700 uppercase">
+                        Volume
+                      </p>
+                      <Package className="w-4 h-4 text-orange-600" />
+                    </div>
+                    <p className="text-2xl font-bold text-orange-900">
+                      {tradingStats.trades.totalVolume}
+                    </p>
+                    <p className="text-xs text-orange-600 mt-1">Lots traded</p>
+                  </div>
+                </div>
+
+                {/* Additional Stats Row */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="bg-white border border-gray-200 rounded-lg p-3">
+                    <p className="text-xs text-gray-500 uppercase">
+                      Total Commission
+                    </p>
+                    <p className="text-lg font-semibold text-gray-900 mt-1">
+                      ${tradingStats.trades.totalCommission}
+                    </p>
+                  </div>
+                  <div className="bg-white border border-gray-200 rounded-lg p-3">
+                    <p className="text-xs text-gray-500 uppercase">
+                      Total Swap
+                    </p>
+                    <p className="text-lg font-semibold text-gray-900 mt-1">
+                      ${tradingStats.trades.totalSwap}
+                    </p>
+                  </div>
+                  <div className="bg-white border border-gray-200 rounded-lg p-3">
+                    <p className="text-xs text-gray-500 uppercase">
+                      Break Even
+                    </p>
+                    <p className="text-lg font-semibold text-gray-900 mt-1">
+                      {tradingStats.trades.breakEvenTrades} trades
+                    </p>
+                  </div>
+                </div>
+
+                {/* Tabs for Trades and Orders */}
+                <div className="border-b border-gray-200">
+                  <nav className="flex gap-4">
+                    <button
+                      onClick={() => setActiveTradeTab("overview")}
+                      className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
+                        activeTradeTab === "overview"
+                          ? "border-blue-600 text-blue-600"
+                          : "border-transparent text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      Overview
+                    </button>
+                    <button
+                      onClick={() => setActiveTradeTab("trades")}
+                      className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
+                        activeTradeTab === "trades"
+                          ? "border-blue-600 text-blue-600"
+                          : "border-transparent text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      Trades ({tradingStats.trades.totalTrades})
+                    </button>
+                    <button
+                      onClick={() => setActiveTradeTab("orders")}
+                      className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
+                        activeTradeTab === "orders"
+                          ? "border-blue-600 text-blue-600"
+                          : "border-transparent text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      Orders ({tradingStats.orders.totalOrders})
+                    </button>
+                  </nav>
+                </div>
+
+                {/* Tab Content */}
+                <div className="mt-4">
+                  {activeTradeTab === "overview" && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                          <Activity className="w-4 h-4" />
+                          Trade Breakdown
+                        </h4>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">
+                              Winning Trades:
+                            </span>
+                            <span className="font-semibold text-green-600">
+                              {tradingStats.trades.winningTrades}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">
+                              Losing Trades:
+                            </span>
+                            <span className="font-semibold text-red-600">
+                              {tradingStats.trades.losingTrades}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Break Even:</span>
+                            <span className="font-semibold text-gray-600">
+                              {tradingStats.trades.breakEvenTrades}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Open Trades:</span>
+                            <span className="font-semibold text-blue-600">
+                              {tradingStats.trades.openTrades}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                          <Package className="w-4 h-4" />
+                          Order Statistics
+                        </h4>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Total Orders:</span>
+                            <span className="font-semibold text-gray-900">
+                              {tradingStats.orders.totalOrders}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Executed:</span>
+                            <span className="font-semibold text-green-600">
+                              {tradingStats.orders.executedOrders}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Pending:</span>
+                            <span className="font-semibold text-yellow-600">
+                              {tradingStats.orders.pendingOrders}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Cancelled:</span>
+                            <span className="font-semibold text-red-600">
+                              {tradingStats.orders.cancelledOrders}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTradeTab === "trades" && (
+                    <div className="max-h-96 overflow-y-auto">
+                      {tradingStats.trades.list.length === 0 ? (
+                        <p className="text-center text-gray-500 py-8">
+                          No trades found
+                        </p>
+                      ) : (
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-50 sticky top-0">
+                            <tr>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                Trade ID
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                Symbol
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                Type
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                Volume
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                P/L
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                Status
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                Open Time
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {tradingStats.trades.list.map((trade) => (
+                              <tr key={trade._id} className="hover:bg-gray-50">
+                                <td className="px-3 py-2 font-mono text-xs">
+                                  {trade.tradeId}
+                                </td>
+                                <td className="px-3 py-2 font-semibold">
+                                  {trade.symbol}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <span
+                                    className={`text-xs px-2 py-1 rounded-full ${
+                                      trade.type?.toLowerCase().includes("buy")
+                                        ? "bg-green-100 text-green-700"
+                                        : "bg-red-100 text-red-700"
+                                    }`}
+                                  >
+                                    {trade.type}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2">{trade.volume}</td>
+                                <td className="px-3 py-2">
+                                  <span
+                                    className={`font-semibold ${
+                                      (trade.profitLoss || 0) >= 0
+                                        ? "text-green-600"
+                                        : "text-red-600"
+                                    }`}
+                                  >
+                                    ${(trade.profitLoss || 0).toFixed(2)}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2">
+                                  <span
+                                    className={`text-xs px-2 py-1 rounded-full ${
+                                      trade.status === "open"
+                                        ? "bg-blue-100 text-blue-700"
+                                        : "bg-gray-100 text-gray-700"
+                                    }`}
+                                  >
+                                    {trade.status}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-xs text-gray-600">
+                                  {formatDateTime(trade.openTime)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  )}
+
+                  {activeTradeTab === "orders" && (
+                    <div className="max-h-96 overflow-y-auto">
+                      {tradingStats.orders.list.length === 0 ? (
+                        <p className="text-center text-gray-500 py-8">
+                          No orders found
+                        </p>
+                      ) : (
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-50 sticky top-0">
+                            <tr>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                Order ID
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                Symbol
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                Type
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                Volume
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                Price
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                Status
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                Placed At
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {tradingStats.orders.list.map((order) => (
+                              <tr key={order._id} className="hover:bg-gray-50">
+                                <td className="px-3 py-2 font-mono text-xs">
+                                  {order.orderId}
+                                </td>
+                                <td className="px-3 py-2 font-semibold">
+                                  {order.symbol}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <span
+                                    className={`text-xs px-2 py-1 rounded-full ${
+                                      order.type?.toLowerCase().includes("buy")
+                                        ? "bg-green-100 text-green-700"
+                                        : "bg-red-100 text-red-700"
+                                    }`}
+                                  >
+                                    {order.type}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2">{order.volume}</td>
+                                <td className="px-3 py-2 font-medium">
+                                  ${order.orderPrice?.toFixed(2)}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <span
+                                    className={`text-xs px-2 py-1 rounded-full ${
+                                      order.status === "executed"
+                                        ? "bg-green-100 text-green-700"
+                                        : order.status === "pending"
+                                        ? "bg-yellow-100 text-yellow-700"
+                                        : "bg-gray-100 text-gray-700"
+                                    }`}
+                                  >
+                                    {order.status}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-xs text-gray-600">
+                                  {formatDateTime(order.placedAt)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <p className="text-center text-gray-500 py-8">
+                No trading data available
+              </p>
+            )}
+          </div>
+
+          {/* Keep all existing sections from original ViewUserModal below */}
+          {/* Verification Status, Address, Account Status, Wallet, Platform Preferences, Referral, Trading Accounts, Timestamps */}
 
           {/* Verification Status */}
           <div className="border-t border-gray-200 pt-6">

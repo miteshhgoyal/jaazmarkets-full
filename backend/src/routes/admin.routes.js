@@ -1028,4 +1028,129 @@ router.delete('/trades/:tradeId', async (req, res) => {
     }
 });
 
+// GET USER TRADING STATISTICS
+router.get('/users/:userId/trading-stats', async (req, res) => {
+    try {
+        const Trade = (await import('../models/Trade.js')).default;
+        const Order = (await import('../models/Order.js')).default;
+        const { userId } = req.params;
+
+        // Check if user exists
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Get all user's trades
+        const trades = await Trade.find({ userId })
+            .populate('tradingAccountId', 'accountNumber platform')
+            .sort({ openTime: -1 })
+            .lean();
+
+        // Get all user's orders
+        const orders = await Order.find({ userId })
+            .populate('tradingAccountId', 'accountNumber platform')
+            .sort({ placedAt: -1 })
+            .lean();
+
+        // Calculate trade statistics
+        const totalTrades = trades.length;
+        const openTrades = trades.filter(t => t.status === 'open').length;
+        const closedTrades = trades.filter(t => t.status === 'closed').length;
+
+        const closedTradesList = trades.filter(t => t.status === 'closed');
+        const totalProfitLoss = closedTradesList.reduce((sum, t) => sum + (t.profitLoss || 0), 0);
+        const winningTrades = closedTradesList.filter(t => (t.profitLoss || 0) > 0).length;
+        const losingTrades = closedTradesList.filter(t => (t.profitLoss || 0) < 0).length;
+        const breakEvenTrades = closedTradesList.filter(t => (t.profitLoss || 0) === 0).length;
+
+        const totalVolume = trades.reduce((sum, t) => sum + (t.volume || 0), 0);
+        const totalCommission = trades.reduce((sum, t) => sum + (t.commission || 0), 0);
+        const totalSwap = trades.reduce((sum, t) => sum + (t.swap || 0), 0);
+
+        const winRate = closedTrades > 0 ? ((winningTrades / closedTrades) * 100).toFixed(2) : 0;
+        const avgProfitPerTrade = closedTrades > 0 ? (totalProfitLoss / closedTrades).toFixed(2) : 0;
+
+        // Calculate order statistics
+        const totalOrders = orders.length;
+        const executedOrders = orders.filter(o => o.status === 'executed').length;
+        const pendingOrders = orders.filter(o => o.status === 'pending').length;
+        const cancelledOrders = orders.filter(o => o.status === 'cancelled').length;
+
+        // Transform trades for frontend
+        const transformedTrades = trades.map(trade => ({
+            _id: trade._id.toString(),
+            tradeId: trade.tradeId,
+            symbol: trade.symbol,
+            type: trade.type,
+            volume: trade.volume,
+            openPrice: trade.openPrice,
+            closePrice: trade.closePrice,
+            profitLoss: trade.profitLoss,
+            pips: trade.pips,
+            commission: trade.commission,
+            swap: trade.swap,
+            status: trade.status,
+            openTime: trade.openTime,
+            closeTime: trade.closeTime,
+            duration: trade.duration,
+            platform: trade.platform || trade.tradingAccountId?.platform,
+            accountNumber: trade.tradingAccountId?.accountNumber,
+        }));
+
+        // Transform orders for frontend
+        const transformedOrders = orders.map(order => ({
+            _id: order._id.toString(),
+            orderId: order.orderId,
+            symbol: order.symbol,
+            type: order.type,
+            volume: order.volume,
+            orderPrice: order.orderPrice,
+            status: order.status,
+            placedAt: order.placedAt,
+            executedAt: order.executedAt,
+            platform: order.platform || order.tradingAccountId?.platform,
+            accountNumber: order.tradingAccountId?.accountNumber,
+        }));
+
+        res.json({
+            success: true,
+            data: {
+                trades: {
+                    totalTrades,
+                    openTrades,
+                    closedTrades,
+                    winningTrades,
+                    losingTrades,
+                    breakEvenTrades,
+                    totalVolume: totalVolume.toFixed(2),
+                    totalProfitLoss: totalProfitLoss.toFixed(2),
+                    totalCommission: totalCommission.toFixed(2),
+                    totalSwap: totalSwap.toFixed(2),
+                    winRate,
+                    avgProfitPerTrade,
+                    list: transformedTrades
+                },
+                orders: {
+                    totalOrders,
+                    executedOrders,
+                    pendingOrders,
+                    cancelledOrders,
+                    list: transformedOrders
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Get user trading statistics error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch trading statistics',
+            error: error.message
+        });
+    }
+});
+
 export default router;

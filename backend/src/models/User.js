@@ -3,6 +3,14 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 const userSchema = new mongoose.Schema({
+    // User ID - Platform specific unique identifier
+    userId: {
+        type: String,
+        unique: true,
+        required: true,
+        index: true
+    },
+
     // Authentication
     email: {
         type: String,
@@ -20,7 +28,7 @@ const userSchema = new mongoose.Schema({
     tradingPassword: {
         type: String,
         required: false,
-        select: false 
+        select: false
     },
 
     // Role
