@@ -1616,6 +1616,7 @@ router.delete('/admin/withdrawals/:withdrawalId', authenticateToken, authorize([
 // ============================================
 // CREATE BLOCKBEE DEPOSIT LINK (User)
 // ============================================
+// CREATE BLOCKBEE DEPOSIT LINK (User)
 router.post('/blockbee/deposit/create', authenticateToken, async (req, res) => {
     try {
         const { tradingAccountId, suggestedAmount, description } = req.body;
@@ -1661,32 +1662,36 @@ router.post('/blockbee/deposit/create', authenticateToken, async (req, res) => {
         if (suggestedAmount && (suggestedAmount < minAmount || suggestedAmount > maxAmount)) {
             return res.status(400).json({
                 success: false,
-                message: `Deposit amount must be between $${minAmount} and $${maxAmount}`
+                message: `Deposit amount must be between ${minAmount} and ${maxAmount}`
             });
         }
 
-        // Build correct BlockBee API request with proper parameter names
-        const params = new URLSearchParams({
-            apikey: blockBeeSettings.apiKeyV2,
-            notify_url: `${process.env.BASE_URL}/api/transactions/blockbee/webhook/deposit`,  // Fixed: proper URL format
-            currency: 'usd',
-            item_description: description || 'Account Deposit',  // Fixed: use underscore
-            post: '1',
-            params: JSON.stringify({  // Pass custom data via params field
-                user_id: userId,
-                trading_account_id: tradingAccountId || ''
-            })
+        // ✅ FIX: Build notify_url with custom parameters
+        const notifyParams = new URLSearchParams({
+            user_id: userId,
+            trading_account_id: tradingAccountId || ''
         });
 
+        const notifyUrl = `${process.env.BASE_URL}/api/transactions/blockbee/webhook/deposit?${notifyParams.toString()}`;
+
+        // Build BlockBee API request
+        const params = new URLSearchParams({
+            apikey: blockBeeSettings.apiKeyV2,
+            notify_url: notifyUrl,
+            currency: 'usd',
+            item_description: description || 'Account Deposit',
+            post: '1'
+        });
+
+        // Add suggested amount if provided
         if (suggestedAmount) {
-            params.append('suggested_value', suggestedAmount);  // Fixed: use underscore
+            params.append('suggested_value', suggestedAmount);
         }
 
-        // Call BlockBee API
-        const response = await fetch(
-            `https://api.blockbee.io/deposit/request/?${params}`
-        );
+        console.log('BlockBee API Request URL:', `https://api.blockbee.io/deposit/request/?${params}`);
 
+        // Call BlockBee API
+        const response = await fetch(`https://api.blockbee.io/deposit/request/?${params}`);
         const result = await response.json();
 
         // Log full response for debugging
@@ -1703,7 +1708,7 @@ router.post('/blockbee/deposit/create', authenticateToken, async (req, res) => {
                 transactionId,
                 amount: suggestedAmount || 0,
                 currency: 'USD',
-                paymentMethod: 'blockbee_checkout',
+                paymentMethod: 'blockbee-checkout',
                 blockBee: {
                     paymentId: result.payment_id,
                     paymentUrl: result.payment_url,
@@ -1711,6 +1716,7 @@ router.post('/blockbee/deposit/create', authenticateToken, async (req, res) => {
                 },
                 status: 'pending'
             });
+
             await deposit.save();
 
             res.json({
@@ -1726,7 +1732,7 @@ router.post('/blockbee/deposit/create', authenticateToken, async (req, res) => {
         } else {
             // Log the error details from BlockBee
             console.error('BlockBee API Error:', result);
-            throw new Error(result.message || 'Failed to create deposit link');
+            throw new Error(result.error || 'Failed to create deposit link');
         }
     } catch (error) {
         console.error('BlockBee deposit link creation error:', error);
@@ -1740,35 +1746,29 @@ router.post('/blockbee/deposit/create', authenticateToken, async (req, res) => {
 // ============================================
 // BLOCKBEE DEPOSIT WEBHOOK HANDLER
 // ============================================
+// BLOCKBEE DEPOSIT WEBHOOK HANDLER
 router.post('/blockbee/webhook/deposit', express.json(), async (req, res) => {
     try {
         // Extract webhook data
         const { uuid, is_paid, status, paid_amount, paid_coin, txid, confirmations } = req.body;
 
-        // Extract custom params from BlockBee
-        let customParams = {};
-        if (req.body.params) {
-            try {
-                customParams = JSON.parse(req.body.params);
-            } catch (e) {
-                console.error('Failed to parse params:', e);
-            }
-        }
+        // ✅ FIX: Extract custom params from query string (not from body)
+        const userId = req.query.user_id;
+        const tradingAccountId = req.query.trading_account_id;
 
-        const userId = customParams.user_id;
-        const tradingAccountId = customParams.trading_account_id;
+        console.log('Webhook received:', { uuid, userId, tradingAccountId, is_paid, status });
 
         // Check for duplicate webhooks using UUID
         const existingWebhook = await WebhookLog.findOne({ uuid });
         if (existingWebhook) {
-            console.log('⚠Duplicate webhook:', uuid);
+            console.log('Duplicate webhook:', uuid);
             return res.status(200).send('*ok*');
         }
 
-        // FIXED: Use correct variable names
+        // Create webhook log
         const webhookLog = await WebhookLog.create({
             uuid,
-            userId: userId,  // Fixed
+            userId,
             type: 'deposit',
             payload: req.body,
             processedAt: new Date()
@@ -1779,7 +1779,7 @@ router.post('/blockbee/webhook/deposit', express.json(), async (req, res) => {
         const deposit = await Deposit.findOne({ 'blockBee.paymentId': paymentId });
 
         if (!deposit) {
-            console.error(`Deposit not found for payment_id: ${paymentId}`);
+            console.error('Deposit not found for payment_id:', paymentId);
             webhookLog.error = 'Deposit record not found';
             await webhookLog.save();
             return res.status(200).send('*ok*');
@@ -1803,7 +1803,7 @@ router.post('/blockbee/webhook/deposit', express.json(), async (req, res) => {
         if (is_paid === 1 && status === 'done') {
             // Check if already processed
             if (deposit.blockBee.isWebhookProcessed) {
-                console.log('⚠Already processed:', uuid);
+                console.log('Already processed:', uuid);
                 return res.status(200).send('*ok*');
             }
 
@@ -1812,7 +1812,7 @@ router.post('/blockbee/webhook/deposit', express.json(), async (req, res) => {
             deposit.status = 'completed';
             deposit.completedAt = new Date();
 
-            // FIXED: Use correct variable names
+            // Credit trading account
             if (tradingAccountId && tradingAccountId !== '') {
                 const account = await TradingAccount.findById(tradingAccountId);
                 if (account) {
@@ -1820,16 +1820,14 @@ router.post('/blockbee/webhook/deposit', express.json(), async (req, res) => {
                     account.equity = account.balance;
                     account.freeMargin = account.balance;
                     await account.save();
-
                     deposit.tradingAccountId = tradingAccountId;
                 }
             }
 
-            // FIXED: Use correct variable name
-            await User.findByIdAndUpdate(
-                userId,
-                { $inc: { totalDeposits: paid_amount } }
-            );
+            // Update user total deposits
+            await User.findByIdAndUpdate(userId, {
+                $inc: { totalDeposits: paid_amount }
+            });
 
             console.log(`Deposit auto-approved: ${paid_amount} ${paid_coin} for user ${userId}`);
         } else {
