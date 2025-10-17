@@ -8,7 +8,7 @@ import MetaHead from "../components/MetaHead";
 const Register = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams(); // Add this
+  const [searchParams] = useSearchParams();
 
   const pageConfig = {
     title: "Create Account",
@@ -74,15 +74,16 @@ const Register = () => {
   ];
 
   const initialFormData = fieldConfigs.reduce(
-    (acc, f) => ({ ...acc, [name]: "" }),
+    (acc, f) => ({ ...acc, [f.name]: "" }),
     {}
   );
+
   const [formData, setFormData] = useState(initialFormData);
   const [passwordVisibility, setPasswordVisibility] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // ADD THIS: Auto-fill referral code from URL
+  // Auto-fill referral code from URL
   useEffect(() => {
     const refCode = searchParams.get("ref");
     if (refCode) {
@@ -118,27 +119,76 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
+
     setIsLoading(true);
+    setErrors({});
+
     try {
-      const res = await api.post("/auth/signup", {
+      const signupRes = await api.post("/auth/signup", {
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
         mobile: formData.mobile,
         password: formData.password,
-        referralCode: formData.referralCode, // Add this
+        referralCode: formData.referralCode,
       });
 
-      if (res.data.success) {
-        navigate("/login", {
-          state: {
-            message: "Account created successfully! Please login to continue.",
-          },
+      console.log("Signup response:", signupRes.data);
+
+      if (signupRes.data.success) {
+        try {
+          const loginRes = await api.post("/auth/signin", {
+            email: formData.email,
+            password: formData.password,
+          });
+
+          console.log("Login response:", loginRes.data);
+
+          if (loginRes.data.success && loginRes.data.data) {
+            const { accessToken, refreshToken, user } = loginRes.data.data;
+
+            // Step 3: Save auth data and redirect
+            login({
+              accessToken,
+              refreshToken,
+              user,
+            });
+
+            // Redirect to trading accounts page
+            navigate("/trading/accounts", { replace: true });
+          } else {
+            // Login failed, redirect to login page
+            navigate("/login", {
+              state: {
+                message:
+                  "Account created successfully! Please login to continue.",
+              },
+            });
+          }
+        } catch (loginError) {
+          console.error("Auto-login failed:", loginError);
+          // If auto-login fails, redirect to login page
+          navigate("/login", {
+            state: {
+              message:
+                "Account created successfully! Please login to continue.",
+            },
+          });
+        }
+      } else {
+        // Signup returned success: false
+        setErrors({
+          submit: signupRes.data.message || "Registration failed",
         });
       }
     } catch (err) {
+      console.error("Registration error:", err);
+      console.error("Error response:", err.response?.data);
+
       setErrors({
-        submit: err.response?.data?.message || "Registration failed",
+        submit:
+          err.response?.data?.message ||
+          "Registration failed. Please try again.",
       });
     } finally {
       setIsLoading(false);
