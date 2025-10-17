@@ -179,81 +179,6 @@ const registrationEmailHTML = (userData) => `
                         </td>
                     </tr>
                     
-                    <!-- Account Details - Compact Table -->
-                    <tr>
-                        <td style="padding: 0 20px 20px;">
-                            <h3 style="margin: 0 0 10px; color: #1a1a1a; font-size: 16px; font-weight: 600;">📊 Account Information</h3>
-                            <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden;">
-                                <tr style="background-color: #f9fafb;">
-                                    <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; color: #666; font-size: 13px; width: 50%;">
-                                        <strong>Account Type:</strong>
-                                    </td>
-                                    <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; color: #1a1a1a; font-size: 13px; font-weight: 600;">
-                                        Standard
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; color: #666; font-size: 13px;">
-                                        <strong>Base Currency:</strong>
-                                    </td>
-                                    <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; color: #1a1a1a; font-size: 13px; font-weight: 600;">
-                                        ${userData.currency || 'USD'}
-                                    </td>
-                                </tr>
-                                <tr style="background-color: #f9fafb;">
-                                    <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; color: #666; font-size: 13px;">
-                                        <strong>Leverage:</strong>
-                                    </td>
-                                    <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; color: #1a1a1a; font-size: 13px; font-weight: 600;">
-                                        1:100
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; color: #666; font-size: 13px;">
-                                        <strong>Platform:</strong>
-                                    </td>
-                                    <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; color: #1a1a1a; font-size: 13px; font-weight: 600;">
-                                        MT5 (Web, Desktop, Mobile)
-                                    </td>
-                                </tr>
-                                <tr style="background-color: #f9fafb;">
-                                    <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; color: #666; font-size: 13px;">
-                                        <strong>Account Status:</strong>
-                                    </td>
-                                    <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; color: #f59e0b; font-size: 13px; font-weight: 700;">
-                                        Pending Verification
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 10px; color: #666; font-size: 13px;">
-                                        <strong>KYC Status:</strong>
-                                    </td>
-                                    <td style="padding: 10px; color: #ef4444; font-size: 13px; font-weight: 700;">
-                                        Pending
-                                    </td>
-                                </tr>
-                            </table>
-                        </td>
-                    </tr>
-                    
-                    <!-- Quick Next Steps -->
-                    <tr>
-                        <td style="padding: 0 20px 20px;">
-                            <h3 style="margin: 0 0 10px; color: #1a1a1a; font-size: 16px; font-weight: 600;">🚀 Next Steps</h3>
-                            <div style="background-color: #f9fafb; border-left: 3px solid #f97316; padding: 12px; border-radius: 4px;">
-                                <p style="margin: 0 0 8px; color: #333; font-size: 14px; line-height: 1.6;">
-                                    <strong>1.</strong> Complete KYC verification (upload ID documents)
-                                </p>
-                                <p style="margin: 0 0 8px; color: #333; font-size: 14px; line-height: 1.6;">
-                                    <strong>2.</strong> Fund your account (minimum $100 USD)
-                                </p>
-                                <p style="margin: 0; color: #333; font-size: 14px; line-height: 1.6;">
-                                    <strong>3.</strong> Download MT5 platform and start trading
-                                </p>
-                            </div>
-                        </td>
-                    </tr>
-                    
                     <!-- Login Button -->
                     <tr>
                         <td style="padding: 0 20px 20px;" align="center">
@@ -333,30 +258,11 @@ Trading Password: ${userData.tradingPassword}
 
 Account Number: ${userData.accountNumber || 'Pending'}
 
-
-ACCOUNT INFORMATION:
---------------------
-Account Type: Standard
-Base Currency: ${userData.currency || 'USD'}
-Leverage: 1:100
-Platform: MT5 (Web, Desktop, Mobile)
-Account Status: Pending Verification
-KYC Status: Pending
-
-
-NEXT STEPS:
------------
-1. Complete KYC verification (upload ID documents)
-2. Fund your account (minimum $100 USD)
-3. Download MT5 platform and start trading
-
-
 SECURITY:
 ---------
 🔒 Never share your passwords
 🔒 Enable 2FA in settings
 🔒 Jaaz Markets will never ask for your password via email/phone
-
 
 NEED HELP?
 ----------
