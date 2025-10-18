@@ -41,6 +41,7 @@ import {
   Users,
   Users2,
   GraduationCap,
+  ExternalLink, // Added for external link icon
 } from "lucide-react";
 
 const Sidebar = ({ isOpen, onToggle, isCollapsed, toggleCollapsed }) => {
@@ -51,7 +52,7 @@ const Sidebar = ({ isOpen, onToggle, isCollapsed, toggleCollapsed }) => {
     {
       name: "Trading",
       href: "/trading",
-      icon: TrendingUp, // Changed from BarChart3 to TrendingUp for trading
+      icon: TrendingUp,
       subItems: [
         { name: "My Accounts", href: "/trading/accounts" },
         { name: "Summary", href: "/trading/summary" },
@@ -59,12 +60,17 @@ const Sidebar = ({ isOpen, onToggle, isCollapsed, toggleCollapsed }) => {
           name: "History of orders",
           href: "/trading/history-of-orders",
         },
+        {
+          name: "Trading Terminal",
+          href: "https://trade.mql5.com/trade", // External URL
+          isExternal: true, // Flag for external link
+        },
       ],
     },
     {
       name: "Payments & wallet",
       href: "/payments-and-wallet",
-      icon: WalletCards, // Changed from BarChart3 to WalletCards for payments & wallet
+      icon: WalletCards,
       subItems: [
         { name: "Deposit", href: "/payments-and-wallet/deposit" },
         { name: "Withdrawal", href: "/payments-and-wallet/withdrawal" },
@@ -81,14 +87,10 @@ const Sidebar = ({ isOpen, onToggle, isCollapsed, toggleCollapsed }) => {
     {
       name: "Analytics",
       href: "/analytics",
-      icon: LineChart, // Changed from BarChart3 to LineChart for analytics
+      icon: LineChart,
       subItems: [
         { name: "Analyst Views", href: "/analytics/analyst-views" },
         { name: "Market News", href: "/analytics/market-news" },
-        // {
-        //   name: "Economic Calendar",
-        //   href: "/analytics/economic-calendar",
-        // },
       ],
     },
     {
@@ -104,7 +106,7 @@ const Sidebar = ({ isOpen, onToggle, isCollapsed, toggleCollapsed }) => {
     {
       name: "Settings",
       href: "/settings",
-      icon: Settings, // Keeping Settings as it's appropriate
+      icon: Settings,
       subItems: [
         { name: "Profile", href: "/settings/profile" },
         { name: "Security", href: "/settings/security" },
@@ -275,7 +277,10 @@ const Sidebar = ({ isOpen, onToggle, isCollapsed, toggleCollapsed }) => {
                       {hasSubItems && (
                         <div className="text-xs text-slate-300 mt-2 space-y-1">
                           {item.subItems.map((subItem, idx) => (
-                            <div key={idx}>{subItem.name}</div>
+                            <div key={idx} className="flex items-center gap-2">
+                              <span>{subItem.name}</span>
+                              {subItem.isExternal && <ExternalLink size={12} />}
+                            </div>
                           ))}
                         </div>
                       )}
@@ -286,28 +291,52 @@ const Sidebar = ({ isOpen, onToggle, isCollapsed, toggleCollapsed }) => {
                 {/* Submenu */}
                 {hasSubItems && !isCollapsed && isExpanded && (
                   <div className="ml-8 mt-1 space-y-1 border-l-2 border-slate-100 pl-4">
-                    {item.subItems.map((subItem, index) => (
-                      <Link
-                        key={index}
-                        to={subItem.href}
-                        onClick={() => window.innerWidth < 1024 && onToggle()}
-                        className={`
-                          block p-3 rounded-lg text-sm transition-colors
-                          ${
-                            isActiveLink(subItem.href)
-                              ? "bg-primary-light text-primary font-medium"
-                              : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                          }
-                        `}
-                      >
-                        <div>{subItem.name}</div>
-                        {subItem.description && (
-                          <div className="text-xs text-slate-500 mt-1">
-                            {subItem.description}
-                          </div>
-                        )}
-                      </Link>
-                    ))}
+                    {item.subItems.map((subItem, index) => {
+                      // Render external links differently
+                      if (subItem.isExternal) {
+                        return (
+                          <a
+                            key={index}
+                            href={subItem.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-between p-3 rounded-lg text-sm transition-colors text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span>{subItem.name}</span>
+                              <ExternalLink
+                                size={14}
+                                className="flex-shrink-0"
+                              />
+                            </div>
+                          </a>
+                        );
+                      }
+
+                      // Render internal links normally
+                      return (
+                        <Link
+                          key={index}
+                          to={subItem.href}
+                          onClick={() => window.innerWidth < 1024 && onToggle()}
+                          className={`
+                            block p-3 rounded-lg text-sm transition-colors
+                            ${
+                              isActiveLink(subItem.href)
+                                ? "bg-primary-light text-primary font-medium"
+                                : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                            }
+                          `}
+                        >
+                          <div>{subItem.name}</div>
+                          {subItem.description && (
+                            <div className="text-xs text-slate-500 mt-1">
+                              {subItem.description}
+                            </div>
+                          )}
+                        </Link>
+                      );
+                    })}
                   </div>
                 )}
               </div>

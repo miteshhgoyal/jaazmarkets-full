@@ -200,7 +200,7 @@ const NewAccount = () => {
           <p className="text-red-600">Failed to load settings</p>
           <button
             onClick={fetchSettings}
-            className="mt-4 px-4 py-2 bg-orange-400 rounded-lg"
+            className="mt-4 px-4 py-2 bg-orange-500 rounded-lg"
           >
             Retry
           </button>
@@ -270,7 +270,7 @@ const NewAccount = () => {
                     disabled={!selectedAccount}
                     className={`w-full py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg transition-all ${
                       selectedAccount
-                        ? "bg-orange-400 hover:bg-orange-500 text-gray-900"
+                        ? "bg-orange-500 hover:bg-orange-500 text-gray-900"
                         : "bg-gray-200 text-gray-400 cursor-not-allowed"
                     }`}
                   >
@@ -312,7 +312,7 @@ const NewAccount = () => {
                         onClick={() => setAccountType("Demo")}
                         className={`py-3 font-semibold transition-colors rounded-lg ${
                           accountType === "Demo"
-                            ? "bg-orange-400 text-gray-900"
+                            ? "bg-orange-500 text-gray-900"
                             : "bg-white text-gray-600 hover:bg-gray-50"
                         }`}
                       >
@@ -322,7 +322,7 @@ const NewAccount = () => {
                         onClick={() => setAccountType("Real")}
                         className={`py-3 font-semibold transition-colors rounded-lg ${
                           accountType === "Real"
-                            ? "bg-orange-400 text-gray-900"
+                            ? "bg-orange-500 text-gray-900"
                             : "bg-white text-gray-600 hover:bg-gray-50"
                         }`}
                       >
@@ -499,7 +499,7 @@ const NewAccount = () => {
                       <button
                         type="submit"
                         disabled={loading}
-                        className="w-full py-3 sm:py-4 bg-orange-400 hover:bg-orange-500 disabled:bg-gray-300 disabled:cursor-not-allowed text-gray-900 font-semibold rounded-lg transition-colors text-base sm:text-lg"
+                        className="w-full py-3 sm:py-4 bg-orange-500 hover:bg-orange-500 disabled:bg-gray-300 disabled:cursor-not-allowed text-gray-900 font-semibold rounded-lg transition-colors text-base sm:text-lg"
                       >
                         {loading ? "Creating account..." : "Create account"}
                       </button>
@@ -617,7 +617,7 @@ const NewAccount = () => {
               <div className="flex gap-4">
                 <button
                   onClick={() => navigate("/trading/accounts")}
-                  className="flex-1 py-3 bg-orange-400 hover:bg-orange-500 text-gray-900 font-semibold rounded-lg transition-colors"
+                  className="flex-1 py-3 bg-orange-500 hover:bg-orange-500 text-gray-900 font-semibold rounded-lg transition-colors"
                 >
                   View My Accounts
                 </button>
@@ -664,7 +664,7 @@ const AccountCard = ({ account, isSelected, onSelect }) => {
           <div
             className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
               isSelected
-                ? "border-orange-400 bg-orange-400"
+                ? "border-orange-400 bg-orange-500"
                 : "border-gray-300 bg-white"
             }`}
           >

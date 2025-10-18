@@ -269,7 +269,7 @@ const Summary = () => {
           </div>
           <button
             onClick={fetchAccounts}
-            className="px-6 py-2 bg-orange-400 hover:bg-orange-500 rounded-lg font-semibold transition-colors"
+            className="px-6 py-2 bg-orange-500 hover:bg-orange-500 rounded-lg font-semibold transition-colors"
           >
             Try Again
           </button>
@@ -358,7 +358,7 @@ const Summary = () => {
             </p>
             <button
               onClick={() => (window.location.href = "/trading/new-account")}
-              className="px-6 py-3 bg-orange-400 hover:bg-orange-500 text-gray-900 font-semibold rounded-lg transition-colors"
+              className="px-6 py-3 bg-orange-500 hover:bg-orange-500 text-gray-900 font-semibold rounded-lg transition-colors"
             >
               Create Account
             </button>
