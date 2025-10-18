@@ -146,3 +146,5 @@ vite.config.ts.timestamp-*
 files-content.txt
 raw
 raw.txt
+android
+.expo

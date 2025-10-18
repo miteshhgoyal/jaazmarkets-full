@@ -339,7 +339,7 @@ const ReferEarn = () => {
             <p className="text-sm text-blue-800">
               <strong>How it works:</strong> Share your link with friends. When
               they register and trade, you earn {commissionRate.toFixed(3)}%
-              commission on their trade volume. Minimum withdrawal: $10. Admin
+              commission on their trade volume. Minimum withdrawal: $1. Admin
               processes withdrawals within 24 hours.
             </p>
           </div>
@@ -580,11 +580,11 @@ const ReferEarn = () => {
                   value={payoutAmount}
                   onChange={(e) => setPayoutAmount(e.target.value)}
                   className="w-full px-4 py-3 border-2 rounded-lg focus:border-orange-500 focus:outline-none"
-                  placeholder="Min: $10"
+                  placeholder="Min: $1"
                   required
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Minimum withdrawal: $10
+                  Minimum withdrawal: $1
                 </p>
               </div>
 

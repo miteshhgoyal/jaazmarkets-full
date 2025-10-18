@@ -57,7 +57,7 @@ router.get('/settings', async (req, res) => {
                         category: 'Standard accounts',
                         description: 'Perfect for beginners',
                         image: 'https://img.icons8.com/3d-fluency/94/trophy.png',
-                        minDeposit: '$10',
+                        minDeposit: '$1',
                         minSpread: '1.5 pips',
                         maxLeverage: '1:1000',
                         commission: 'No commission',
