@@ -50,8 +50,8 @@ export const generateOTP = () => {
     return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Generate Trading Password (10 chars with special chars)
-export const generateTradingPassword = () => {
+// Generate Trader Password (10 chars with special chars)
+export const generateTraderPassword = () => {
     const length = 10;
     const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     const lowercase = 'abcdefghijklmnopqrstuvwxyz';
@@ -147,12 +147,12 @@ const registrationEmailHTML = (userData) => `
                                             </tr>
                                         </table>
                                         
-                                        <!-- Trading Password - HIGHLIGHTED -->
+                                        <!-- Trader Password - HIGHLIGHTED -->
                                         <table width="100%" cellpadding="8" cellspacing="0" style="margin-bottom: 8px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 2px solid #f59e0b; border-radius: 4px;">
                                             <tr>
-                                                <td style="width: 35%; color: #92400e; font-size: 14px; font-weight: 700; vertical-align: top; padding-top: 10px;">Trading Password:</td>
+                                                <td style="width: 35%; color: #92400e; font-size: 14px; font-weight: 700; vertical-align: top; padding-top: 10px;">Trader Password:</td>
                                                 <td style="color: #92400e; font-size: 16px; font-weight: 700; font-family: 'Courier New', monospace; letter-spacing: 2px;">
-                                                    ${userData.tradingPassword}
+                                                    ${userData.traderPassword}
                                                 </td>
                                             </tr>
                                             <tr>
@@ -253,7 +253,7 @@ Login Email: ${userData.email}
 Portal Password: ${userData.portalPassword || '(Your signup password)'}
                  For web dashboard login
 
-Trading Password: ${userData.tradingPassword}
+Trader Password: ${userData.traderPassword}
                  ⚠For MT4/MT5 platform login
 
 Account Number: ${userData.accountNumber || 'Pending'}
@@ -536,6 +536,6 @@ export default {
     sendRegistrationEmail,
     sendPasswordResetEmail,
     generateOTP,
-    generateTradingPassword,
+    generateTraderPassword,
     generateAccountNumber,
 };

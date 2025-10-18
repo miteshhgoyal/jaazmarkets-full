@@ -25,7 +25,7 @@ const NewAccount = () => {
     nickname: "",
     leverage: "1:100",
     platform: "MT5",
-    tradingPassword: "",
+    traderPassword: "",
   });
 
   // Fetch settings from backend
@@ -88,8 +88,8 @@ const NewAccount = () => {
     e.preventDefault();
 
     // Validate password if provided
-    if (formData.tradingPassword) {
-      const checks = validatePassword(formData.tradingPassword);
+    if (formData.traderPassword) {
+      const checks = validatePassword(formData.traderPassword);
       const allValid = Object.values(checks).every((v) => v);
       if (!allValid) {
         toast.error("Please meet all password requirements");
@@ -183,7 +183,7 @@ const NewAccount = () => {
     document.body.removeChild(textArea);
   };
 
-  const passwordChecks = validatePassword(formData.tradingPassword);
+  const passwordChecks = validatePassword(formData.traderPassword);
 
   if (loadingSettings) {
     return (
@@ -442,16 +442,16 @@ const NewAccount = () => {
                       </select>
                     </div>
 
-                    {/* Trading Password (Optional) */}
+                    {/* Trader Password (Optional) */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Trading password (Optional)
+                        Trader password (Optional)
                       </label>
                       <div className="relative">
                         <input
                           type={showPassword ? "text" : "password"}
-                          name="tradingPassword"
-                          value={formData.tradingPassword}
+                          name="traderPassword"
+                          value={formData.traderPassword}
                           onChange={handleInputChange}
                           className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
                         />
@@ -469,7 +469,7 @@ const NewAccount = () => {
                       </div>
 
                       {/* Password Requirements */}
-                      {formData.tradingPassword && (
+                      {formData.traderPassword && (
                         <div className="mt-3 space-y-2 text-sm">
                           <PasswordCheck
                             check={passwordChecks.length}
@@ -632,7 +632,7 @@ const NewAccount = () => {
                       nickname: "",
                       leverage: "1:100",
                       platform: "MT5",
-                      tradingPassword: "",
+                      traderPassword: "",
                     });
                   }}
                   className="flex-1 py-3 bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-900 font-semibold rounded-lg transition-colors"

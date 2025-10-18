@@ -7,7 +7,7 @@ import {
     sendPasswordResetEmail,
     sendRegistrationEmail,
     generateOTP,
-    generateTradingPassword,
+    generateTraderPassword,
     generateAccountNumber,
     sendEmailVerificationOTP
 } from '../services/emailService.js';
@@ -89,10 +89,6 @@ const sanitizeUser = (user) => {
 };
 
 // ============================================
-// PUBLIC ROUTES
-// ============================================
-
-// ============================================
 // STEP 1: SIGNUP - Check user, create & send OTP
 // ============================================
 router.post("/signup", async (req, res) => {
@@ -143,7 +139,6 @@ router.post("/signup", async (req, res) => {
             existingUser.lastName = lastName;
             existingUser.password = password;
             if (mobile) existingUser.phoneNumber = mobile;
-
 
             if (referralCode && !existingUser.referredBy) {
                 const referrer = await User.findOne({ userId: referralCode });
@@ -211,19 +206,18 @@ router.post("/signup", async (req, res) => {
             }
         }
 
-        // Auto-generate trading credentials
-        const tradingPassword = generateTradingPassword();
+        // Auto-generate trading credentials (STORE PLAIN TEXT)
+        const plainTraderPassword = generateTraderPassword();
         const accountNumber = generateAccountNumber();
 
         // Generate email verification OTP
         const verificationOTP = generateOTP();
 
-
         const user = new User({
             userId,
             email: email.toLowerCase(),
             password,
-            tradingPassword,
+            traderPassword: plainTraderPassword,
             accountNumber,
             firstName,
             lastName,
@@ -237,6 +231,8 @@ router.post("/signup", async (req, res) => {
             referredBy: referrerId,
         });
 
+        // Store plain text trader password temporarily for email
+        user.plainTraderPassword = plainTraderPassword;
 
         await user.save();
 
@@ -282,7 +278,7 @@ router.post('/verify-email-otp', async (req, res) => {
 
         const user = await User.findOne({
             email: email.toLowerCase(),
-        }).select('+emailVerificationOTP +emailVerificationOTPExpiry +password +tradingPassword');
+        }).select('+emailVerificationOTP +emailVerificationOTPExpiry +password +traderPassword');
 
         if (!user) {
             return res.status(404).json({
@@ -316,14 +312,18 @@ router.post('/verify-email-otp', async (req, res) => {
             });
         }
 
-        // Store plain passwords before saving (for email)
-        const plainTradingPassword = user.tradingPassword;
+        // Get plain trader password (it was stored temporarily)
+        const plainTraderPassword = user.plainTraderPassword || 'Contact support for trader password';
 
         // Mark user as verified
         user.isVerified = true;
         user.accountStatus = 'active';
         user.emailVerificationOTP = undefined;
         user.emailVerificationOTPExpiry = undefined;
+
+        // Remove temporary plain text password property before saving
+        delete user.plainTraderPassword;
+
         await user.save();
 
         // Send complete registration email with credentials
@@ -332,8 +332,8 @@ router.post('/verify-email-otp', async (req, res) => {
                 email: user.email,
                 firstName: user.firstName,
                 lastName: user.lastName,
-                portalPassword: password, // Plain password from request
-                tradingPassword: plainTradingPassword,
+                portalPassword: password, // This is the plain password from request
+                traderPassword: plainTraderPassword, // This is the plain trader password
                 accountNumber: user.accountNumber,
                 currency: user.currency,
                 referralCode: user.userId,

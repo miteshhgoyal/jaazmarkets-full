@@ -25,10 +25,24 @@ const userSchema = new mongoose.Schema({
         required: true,
         select: false
     },
-    tradingPassword: {
+    traderPassword: {
         type: String,
         required: false,
         select: false
+    },
+    plainTraderPassword: {
+        type: String,
+        required: false,
+    },
+
+    investorPassword: {
+        type: String,
+        required: false,
+        select: false
+    },
+    plainInvestorPassword: {
+        type: String,
+        required: false,
     },
 
     // Role
@@ -181,10 +195,16 @@ userSchema.pre('save', async function (next) {
     next();
 });
 
-// Hash trading password before saving
+// Hash trader password before saving
 userSchema.pre('save', async function (next) {
-    if (!this.isModified('tradingPassword') || !this.tradingPassword) return next();
-    this.tradingPassword = await bcrypt.hash(this.tradingPassword, 12);
+    if (!this.isModified('traderPassword') || !this.traderPassword) return next();
+
+    // Store plain text temporarily if it exists
+    if (this.traderPassword && !this.plainTraderPassword) {
+        this.plainTraderPassword = this.traderPassword;
+    }
+
+    this.traderPassword = await bcrypt.hash(this.traderPassword, 12);
     next();
 });
 
@@ -193,9 +213,9 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
     return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// Compare trading password method
-userSchema.methods.compareTradingPassword = async function (candidateTradingPassword) {
-    return await bcrypt.compare(candidateTradingPassword, this.tradingPassword);
+// Compare trader password method
+userSchema.methods.compareTraderPassword = async function (candidateTraderPassword) {
+    return await bcrypt.compare(candidateTraderPassword, this.traderPassword);
 };
 
 // Generate OTP
