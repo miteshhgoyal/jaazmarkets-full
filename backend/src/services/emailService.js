@@ -276,6 +276,114 @@ Login: ${process.env.FRONTEND_URL || 'https://jaazmarkets.com'}/signin
 © ${new Date().getFullYear()} Jaaz Markets. All rights reserved.
 `;
 
+// Email Verification OTP HTML
+const emailVerificationHTML = (otp, name) => `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Your Email</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background-color: #f5f5f5;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 20px 10px;">
+        <tr>
+            <td align="center">
+                <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 500px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                    
+                    <tr>
+                        <td style="padding: 20px; text-align: center; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700;">Jaaz Markets</h1>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td style="padding: 20px;">
+                            <h2 style="margin: 0 0 10px; color: #1a1a1a; font-size: 20px; font-weight: 600;">Verify Your Email</h2>
+                            <p style="margin: 0 0 20px; color: #666; font-size: 14px;">
+                                Hi <strong>${name}</strong>, please verify your email address to complete registration:
+                            </p>
+                            
+                            <table width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td align="center" style="background-color: #f9fafb; border: 2px solid #f97316; border-radius: 6px; padding: 20px;">
+                                        <div style="font-size: 12px; color: #666; margin-bottom: 8px; font-weight: 600;">VERIFICATION CODE</div>
+                                        <div style="font-size: 32px; font-weight: 700; color: #f97316; letter-spacing: 6px; font-family: 'Courier New', monospace;">${otp}</div>
+                                        <div style="font-size: 12px; color: #999; margin-top: 8px;">Expires in 10 minutes</div>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <p style="margin: 20px 0 0; color: #666; font-size: 13px;">
+                                If you didn't request this, ignore this email.
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td style="padding: 15px; background-color: #f9fafb; text-align: center;">
+                            <p style="margin: 0; color: #999; font-size: 12px;">
+                                © ${new Date().getFullYear()} Jaaz Markets
+                            </p>
+                        </td>
+                    </tr>
+                    
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+`;
+
+const emailVerificationText = (otp, name) => `
+Hi ${name},
+
+Your email verification code: ${otp}
+
+This code expires in 10 minutes.
+
+If you didn't request this, ignore this email.
+
+---
+© ${new Date().getFullYear()} Jaaz Markets
+`;
+
+// Export this function
+export const sendEmailVerificationOTP = async (email, otp, name) => {
+    try {
+        if (!transporter || !isVerified) {
+            const initialized = await initializeTransporter();
+            if (!initialized) {
+                throw new Error('Email service is not available');
+            }
+        }
+
+        const mailOptions = {
+            from: {
+                name: 'Jaaz Markets',
+                address: process.env.EMAIL_USER
+            },
+            to: email,
+            subject: 'Verify Your Email - Jaaz Markets',
+            html: emailVerificationHTML(otp, name),
+            text: emailVerificationText(otp, name),
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log('Email verification sent:', info.messageId);
+
+        return {
+            success: true,
+            messageId: info.messageId,
+        };
+
+    } catch (error) {
+        console.error('Error sending verification email:', error);
+        throw new Error(`Failed to send email: ${error.message}`);
+    }
+};
+
 // ============================================
 // PASSWORD RESET EMAIL - SIMPLE VERSION
 // ============================================

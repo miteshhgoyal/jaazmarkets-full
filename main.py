@@ -49,8 +49,10 @@ def find_and_extract_files(target_files, root_dir='.', output_file='files-conten
 if __name__ == "__main__":
     # Define the files you want to search for
     files_to_find = [
-      'Trade.js',
-      'Order.js',
+     'Withdrawal.jsx',
+     'transaction.routes.js',
+     'ReferEarn.jsx',
+     'refer.routes.js',
         
     ]
     

@@ -8,7 +8,8 @@ import {
     sendRegistrationEmail,
     generateOTP,
     generateTradingPassword,
-    generateAccountNumber
+    generateAccountNumber,
+    sendEmailVerificationOTP
 } from '../services/emailService.js';
 
 const router = express.Router();
@@ -91,7 +92,9 @@ const sanitizeUser = (user) => {
 // PUBLIC ROUTES
 // ============================================
 
-// SIGNUP - Register new user
+// ============================================
+// STEP 1: SIGNUP - Check user, create & send OTP
+// ============================================
 router.post("/signup", async (req, res) => {
     try {
         const { email, password, firstName, lastName, mobile, referralCode } = req.body;
@@ -104,41 +107,118 @@ router.post("/signup", async (req, res) => {
             });
         }
 
-        // Check if user already exists
+        // ===== CHECK IF USER EXISTS =====
         const existingUser = await User.findOne({
-            $or: [{ email: email.toLowerCase() }, ...(mobile ? [{ phoneNumber: mobile }] : [])],
-        });
+            email: email.toLowerCase()
+        }).select('+emailVerificationOTP +emailVerificationOTPExpiry');
 
-        if (existingUser) {
+        // If user exists and is already verified - reject signup
+        if (existingUser && existingUser.isVerified) {
             return res.status(400).json({
                 success: false,
-                message: "User with this email or phone already exists",
+                message: "An account with this email already exists. Please login instead.",
+                userExists: true,
+                isVerified: true
             });
         }
 
-        // ===== GENERATE UNIQUE USER ID =====
+        // If user exists but NOT verified - resend OTP and update data
+        if (existingUser && !existingUser.isVerified) {
+            // Check if phone number is being changed and conflicts with another user
+            if (mobile && mobile !== existingUser.phoneNumber) {
+                const phoneConflict = await User.findOne({
+                    phoneNumber: mobile,
+                    _id: { $ne: existingUser._id }
+                });
+                if (phoneConflict) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "This phone number is already registered with another account",
+                    });
+                }
+            }
+
+            // Update user details (allow them to change info before verification)
+            existingUser.firstName = firstName;
+            existingUser.lastName = lastName;
+            existingUser.password = password;
+            if (mobile) existingUser.phoneNumber = mobile;
+
+
+            if (referralCode && !existingUser.referredBy) {
+                const referrer = await User.findOne({ userId: referralCode });
+                if (referrer) {
+                    existingUser.referredBy = referrer._id;
+
+                    await User.findByIdAndUpdate(referrer._id, {
+                        $inc: { totalReferrals: 1 }
+                    });
+                }
+            }
+
+            // Generate NEW OTP
+            const verificationOTP = generateOTP();
+            existingUser.emailVerificationOTP = verificationOTP;
+            existingUser.emailVerificationOTPExpiry = Date.now() + 10 * 60 * 1000;
+
+            await existingUser.save();
+
+            // Send verification email
+            try {
+                await sendEmailVerificationOTP(existingUser.email, verificationOTP, existingUser.firstName);
+                console.log(`Verification OTP resent to ${existingUser.email}`);
+            } catch (emailError) {
+                console.error('Verification email failed:', emailError);
+            }
+
+            return res.status(200).json({
+                success: true,
+                message: "Verification code sent! Please check your email.",
+                data: {
+                    email: existingUser.email,
+                    requiresVerification: true,
+                    isResend: true
+                }
+            });
+        }
+
+        // ===== NEW USER - CREATE ACCOUNT =====
+
+        // Check phone number uniqueness for new users
+        if (mobile) {
+            const phoneExists = await User.findOne({ phoneNumber: mobile });
+            if (phoneExists) {
+                return res.status(400).json({
+                    success: false,
+                    message: "This phone number is already registered",
+                });
+            }
+        }
+
+        // Generate unique user ID
         const userId = await generateUserId();
         console.log(`Generated User ID: ${userId}`);
 
-        // ===== REFERRAL HANDLING =====
+        // Referral handling
         let referrerId = null;
         if (referralCode) {
             const referrer = await User.findOne({ userId: referralCode });
             if (referrer) {
                 referrerId = referrer._id;
-                // Increment referrer's total referrals
                 await User.findByIdAndUpdate(referrer._id, {
                     $inc: { totalReferrals: 1 },
                 });
             }
         }
 
-        // ===== AUTO-GENERATE TRADING CREDENTIALS =====
+        // Auto-generate trading credentials
         const tradingPassword = generateTradingPassword();
         const accountNumber = generateAccountNumber();
-        const userReferralCode = referralCode; // Use email as referral code
 
-        // Create new user with all fields
+        // Generate email verification OTP
+        const verificationOTP = generateOTP();
+
+
         const user = new User({
             userId,
             email: email.toLowerCase(),
@@ -151,46 +231,197 @@ router.post("/signup", async (req, res) => {
             role: "user",
             accountStatus: "pending",
             isVerified: false,
-            referralCode: userReferralCode,
+            emailVerificationOTP: verificationOTP,
+            emailVerificationOTPExpiry: Date.now() + 10 * 60 * 1000,
+            referralCode: userId,
             referredBy: referrerId,
         });
 
+
         await user.save();
 
-        // ===== SEND REGISTRATION EMAIL WITH ALL CREDENTIALS =====
+        // Send verification email
         try {
-            await sendRegistrationEmail({
-                email: user.email,
-                firstName: user.firstName,
-                lastName: user.lastName,
-                portalPassword: password,          // Send plain text for email
-                tradingPassword: tradingPassword,  // Send plain text for email (before hash)
-                accountNumber: accountNumber,
-                currency: user.currency,
-                referralCode: userReferralCode,
-            });
-            console.log(`Registration email sent to ${user.email} with User ID: ${userId}`);
+            await sendEmailVerificationOTP(user.email, verificationOTP, user.firstName);
+            console.log(`Verification OTP sent to ${user.email}`);
         } catch (emailError) {
-            console.error('Registration email failed:', emailError);
-            // Don't fail registration if email fails
+            console.error('Verification email failed:', emailError);
         }
 
         res.status(201).json({
             success: true,
-            message: "Registration successful! Check your email for complete login details including your User ID.",
+            message: "Verification code sent! Please check your email.",
             data: {
-                userId: userId,
                 email: user.email,
-                accountNumber: accountNumber,
-                referralCode: userReferralCode,
-                message: "All credentials sent to your email"
+                requiresVerification: true
             }
         });
+
     } catch (error) {
         console.error("Signup error:", error);
         res.status(500).json({
             success: false,
             message: error.message || "Registration failed",
+        });
+    }
+});
+
+// ============================================
+// STEP 2: VERIFY EMAIL OTP
+// ============================================
+router.post('/verify-email-otp', async (req, res) => {
+    try {
+        const { email, otp, password } = req.body;
+
+        if (!email || !otp) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email and OTP are required',
+            });
+        }
+
+        const user = await User.findOne({
+            email: email.toLowerCase(),
+        }).select('+emailVerificationOTP +emailVerificationOTPExpiry +password +tradingPassword');
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found',
+            });
+        }
+
+        // Check if already verified
+        if (user.isVerified) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email already verified. Please login.',
+            });
+        }
+
+        // Verify OTP
+        if (user.emailVerificationOTP !== otp) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid verification code',
+            });
+        }
+
+        // Check OTP expiry
+        if (!user.emailVerificationOTPExpiry || user.emailVerificationOTPExpiry < Date.now()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Verification code has expired. Please request a new one.',
+                expired: true
+            });
+        }
+
+        // Store plain passwords before saving (for email)
+        const plainTradingPassword = user.tradingPassword;
+
+        // Mark user as verified
+        user.isVerified = true;
+        user.accountStatus = 'active';
+        user.emailVerificationOTP = undefined;
+        user.emailVerificationOTPExpiry = undefined;
+        await user.save();
+
+        // Send complete registration email with credentials
+        try {
+            await sendRegistrationEmail({
+                email: user.email,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                portalPassword: password, // Plain password from request
+                tradingPassword: plainTradingPassword,
+                accountNumber: user.accountNumber,
+                currency: user.currency,
+                referralCode: user.userId,
+            });
+            console.log(`Registration email sent to ${user.email}`);
+        } catch (emailError) {
+            console.error('Registration email failed:', emailError);
+        }
+
+        // Generate tokens for auto-login
+        const { accessToken, refreshToken } = generateTokens(user);
+
+        res.json({
+            success: true,
+            message: 'Email verified successfully! Welcome to Jaaz Markets.',
+            data: {
+                accessToken,
+                refreshToken,
+                user: sanitizeUser(user),
+            },
+        });
+
+    } catch (error) {
+        console.error('Verify email OTP error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Verification failed',
+        });
+    }
+});
+
+// ============================================
+// RESEND VERIFICATION OTP
+// ============================================
+router.post('/resend-verification-otp', async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email is required',
+            });
+        }
+
+        const user = await User.findOne({
+            email: email.toLowerCase()
+        }).select('+emailVerificationOTP +emailVerificationOTPExpiry');
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found',
+            });
+        }
+
+        if (user.isVerified) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email already verified. Please login.',
+            });
+        }
+
+        // Generate new OTP
+        const verificationOTP = generateOTP();
+        user.emailVerificationOTP = verificationOTP;
+        user.emailVerificationOTPExpiry = Date.now() + 10 * 60 * 1000;
+        await user.save();
+
+        // Send new OTP
+        try {
+            await sendEmailVerificationOTP(user.email, verificationOTP, user.firstName);
+            console.log(`Verification OTP resent to ${user.email}`);
+        } catch (emailError) {
+            console.error('Email resend failed:', emailError);
+            throw new Error('Failed to send verification email');
+        }
+
+        res.json({
+            success: true,
+            message: 'Verification code resent successfully',
+        });
+
+    } catch (error) {
+        console.error('Resend OTP error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to resend code',
         });
     }
 });

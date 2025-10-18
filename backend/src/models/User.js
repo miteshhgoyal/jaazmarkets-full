@@ -159,7 +159,16 @@ const userSchema = new mongoose.Schema({
     totalReferrals: {
         type: Number,
         default: 0
-    }
+    },
+
+    emailVerificationOTP: {
+        type: String,
+        select: false
+    },
+    emailVerificationOTPExpiry: {
+        type: Date,
+        select: false
+    },
 
 }, {
     timestamps: true
