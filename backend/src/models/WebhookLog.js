@@ -5,13 +5,12 @@ const webhookLogSchema = new mongoose.Schema({
     uuid: {
         type: String,
         required: true,
-        unique: true,
         index: true
     },
     userId: String,
     type: {
         type: String,
-        enum: ['deposit', 'withdrawal', 'other'],
+        enum: ['deposit', 'withdrawal', 'blockbee-callback', 'other'],
         default: 'other'
     },
     payload: mongoose.Schema.Types.Mixed,
@@ -24,6 +23,8 @@ const webhookLogSchema = new mongoose.Schema({
 }, {
     timestamps: true
 });
+
+webhookLogSchema.index({ uuid: 1, createdAt: 1 });
 
 const WebhookLog = mongoose.model('WebhookLog', webhookLogSchema);
 export default WebhookLog;

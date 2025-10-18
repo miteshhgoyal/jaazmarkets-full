@@ -84,39 +84,71 @@ const Deposits = () => {
     fetchAccounts();
   }, []);
 
-  // Start payment verification polling when deposit is created
-  useEffect(() => {
-    let pollInterval;
-    let progressInterval;
+  // ✅ UPDATED: Check payment status from backend
+  const checkPaymentStatus = async () => {
+    try {
+      const response = await api.get(`/transactions/deposits/${depositId}`);
 
-    if (depositStatus === "success" && depositId && !paymentReceived) {
-      setIsVerifying(true);
+      if (response.data.success) {
+        const deposit = response.data.data;
 
-      // Initial check after 5 seconds
-      const initialTimeout = setTimeout(() => {
-        checkPaymentStatus();
-      }, 5000);
+        // Update confirmations
+        if (deposit.blockBee?.confirmations !== undefined) {
+          setConfirmations(deposit.blockBee.confirmations);
+        }
 
-      // Poll every 10 seconds
-      pollInterval = setInterval(() => {
-        checkPaymentStatus();
-      }, 10000);
+        // ✅ Check if completed
+        if (deposit.status === "completed") {
+          setPaymentReceived(true);
+          setIsVerifying(false);
+          setVerificationProgress(100);
+          toast.success("Payment received and confirmed! ✅");
+          return true; // Stop polling
+        }
+        // Show confirmation progress
+        else if (deposit.blockBee?.confirmations > 0) {
+          const progress = Math.min(
+            (deposit.blockBee.confirmations / 1) * 100,
+            90
+          );
+          setVerificationProgress(progress);
+          toast.info(
+            `Payment detected! ${deposit.blockBee.confirmations} confirmation(s)...`
+          );
+        }
+      }
 
-      // Simulate progress bar animation
-      progressInterval = setInterval(() => {
-        setVerificationProgress((prev) => {
-          if (prev >= 95) return 95;
-          return prev + 1;
-        });
-      }, 1000);
-
-      return () => {
-        clearTimeout(initialTimeout);
-        if (pollInterval) clearInterval(pollInterval);
-        if (progressInterval) clearInterval(progressInterval);
-      };
+      return false;
+    } catch (error) {
+      console.error("Payment status check error:", error);
+      return false;
     }
-  }, [depositStatus, depositId, paymentReceived]);
+  };
+
+  // ✅ UPDATED: Start payment verification polling when deposit is created
+  useEffect(() => {
+    if (!depositId || paymentReceived || depositStatus !== "success") return;
+
+    setIsVerifying(true);
+
+    // Initial check after 5 seconds
+    const initialTimeout = setTimeout(() => {
+      checkPaymentStatus();
+    }, 5000);
+
+    // Poll every 10 seconds
+    const pollInterval = setInterval(async () => {
+      const isComplete = await checkPaymentStatus();
+      if (isComplete) {
+        clearInterval(pollInterval);
+      }
+    }, 10000);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(pollInterval);
+    };
+  }, [depositId, paymentReceived, depositStatus]);
 
   const fetchAccounts = async () => {
     setLoading(true);
@@ -139,34 +171,6 @@ const Deposits = () => {
       toast.error("Failed to load trading accounts");
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Check payment status from backend
-  const checkPaymentStatus = async () => {
-    try {
-      const response = await api.get(`/transactions/deposits/${depositId}`);
-
-      if (response.data.success) {
-        const deposit = response.data.data;
-
-        if (deposit.blockBee?.confirmations) {
-          setConfirmations(deposit.blockBee.confirmations);
-        }
-
-        if (deposit.status === "completed") {
-          setPaymentReceived(true);
-          setIsVerifying(false);
-          setVerificationProgress(100);
-          toast.success("Payment received and confirmed! 🎉");
-        } else if (
-          deposit.blockBee?.blockBeeStatus === "pending_confirmation"
-        ) {
-          toast.info("Payment detected! Waiting for confirmations...");
-        }
-      }
-    } catch (error) {
-      console.error("Payment status check error:", error);
     }
   };
 

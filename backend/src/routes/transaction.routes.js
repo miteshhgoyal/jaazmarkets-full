@@ -1967,200 +1967,6 @@ router.post('/deposits/blockbee/create', authenticateToken, async (req, res) => 
     }
 });
 
-// ============================================
-// BLOCKBEE CALLBACK HANDLER FOR DIRECT PAYMENTS
-// ============================================
-router.post('/blockbee/callback/:uuid', express.json(), async (req, res) => {
-    try {
-        const { uuid } = req.params;
-        const webhookData = req.body;
-
-        console.log('BlockBee Callback received:', {
-            uuid,
-            data: webhookData
-        });
-
-        // Find deposit by UUID
-        const deposit = await Deposit.findOne({
-            'blockBee.uuid': uuid
-        });
-
-        if (!deposit) {
-            console.error('Deposit not found for UUID:', uuid);
-            return res.status(200).send('*ok*'); // Still return ok to BlockBee
-        }
-
-        // Check for duplicate webhook
-        const existingWebhook = await WebhookLog.findOne({ uuid: webhookData.uuid });
-        if (existingWebhook) {
-            console.log('Duplicate webhook, UUID:', webhookData.uuid);
-            return res.status(200).send('*ok*');
-        }
-
-        // Create webhook log
-        await WebhookLog.create({
-            uuid: webhookData.uuid,
-            userId: deposit.userId,
-            type: 'blockbee_callback',
-            payload: webhookData,
-            processedAt: new Date()
-        });
-
-        // Update deposit with callback data
-        deposit.blockBee = {
-            ...deposit.blockBee,
-            txHash: webhookData.txid_in,
-            confirmations: webhookData.confirmations,
-            valueReceived: webhookData.value_coin,
-            valuePaid: webhookData.value_forwarded_coin,
-            blockBeeStatus: webhookData.confirmations >= 1 ? 'confirmed' : 'pending_confirmation',
-            lastCallbackAt: new Date()
-        };
-
-        // If payment is confirmed
-        if (webhookData.confirmations >= 1 && !deposit.blockBee.isProcessed) {
-            deposit.amount = parseFloat(webhookData.value_forwarded_coin);
-            deposit.status = 'completed';
-            deposit.completedAt = new Date();
-            deposit.blockBee.isProcessed = true;
-
-            // Credit trading account if exists
-            if (deposit.tradingAccountId) {
-                const account = await TradingAccount.findById(deposit.tradingAccountId);
-                if (account) {
-                    account.balance += parseFloat(webhookData.value_forwarded_coin);
-                    account.equity = account.balance;
-                    account.freeMargin = account.balance;
-                    await account.save();
-                }
-            }
-
-            // Update user total deposits
-            await User.findByIdAndUpdate(
-                deposit.userId,
-                { $inc: { totalDeposits: parseFloat(webhookData.value_forwarded_coin) } }
-            );
-
-            console.log('Deposit auto-approved:', {
-                transactionId: deposit.transactionId,
-                amount: webhookData.value_forwarded_coin,
-                userId: deposit.userId
-            });
-        }
-
-        await deposit.save();
-
-        // BlockBee expects "*ok*" as response
-        res.status(200).send('*ok*');
-
-    } catch (error) {
-        console.error('BlockBee callback error:', error);
-        res.status(200).send('*ok*'); // Still return ok to avoid retries
-    }
-});
-
-// ============================================
-// BLOCKBEE DEPOSIT WEBHOOK HANDLER
-// ============================================
-// BLOCKBEE DEPOSIT WEBHOOK HANDLER
-router.post('/blockbee/webhook/deposit', express.json(), async (req, res) => {
-    try {
-        // Extract webhook data
-        const { uuid, is_paid, status, paid_amount, paid_coin, txid, confirmations } = req.body;
-
-        // ✅ FIX: Extract custom params from query string (not from body)
-        const userId = req.query.user_id;
-        const tradingAccountId = req.query.trading_account_id;
-
-        console.log('Webhook received:', { uuid, userId, tradingAccountId, is_paid, status });
-
-        // Check for duplicate webhooks using UUID
-        const existingWebhook = await WebhookLog.findOne({ uuid });
-        if (existingWebhook) {
-            console.log('Duplicate webhook:', uuid);
-            return res.status(200).send('*ok*');
-        }
-
-        // Create webhook log
-        const webhookLog = await WebhookLog.create({
-            uuid,
-            userId,
-            type: 'deposit',
-            payload: req.body,
-            processedAt: new Date()
-        });
-
-        // Find existing deposit record by paymentId from BlockBee
-        const paymentId = req.body.payment_id;
-        const deposit = await Deposit.findOne({ 'blockBee.paymentId': paymentId });
-
-        if (!deposit) {
-            console.error('Deposit not found for payment_id:', paymentId);
-            webhookLog.error = 'Deposit record not found';
-            await webhookLog.save();
-            return res.status(200).send('*ok*');
-        }
-
-        // Update deposit with webhook data
-        deposit.blockBee.uuid = uuid;
-        deposit.blockBee.coin = paid_coin;
-        deposit.blockBee.paidAmount = paid_amount;
-        deposit.blockBee.confirmations = confirmations;
-        deposit.blockBee.blockBeeStatus = status;
-        deposit.blockBee.lastWebhookAt = new Date();
-        deposit.paymentDetails = {
-            ...deposit.paymentDetails,
-            cryptocurrency: paid_coin,
-            txHash: txid,
-            confirmations
-        };
-
-        // Process payment if complete
-        if (is_paid === 1 && status === 'done') {
-            // Check if already processed
-            if (deposit.blockBee.isWebhookProcessed) {
-                console.log('Already processed:', uuid);
-                return res.status(200).send('*ok*');
-            }
-
-            deposit.blockBee.isWebhookProcessed = true;
-            deposit.amount = paid_amount;
-            deposit.status = 'completed';
-            deposit.completedAt = new Date();
-
-            // Credit trading account
-            if (tradingAccountId && tradingAccountId !== '') {
-                const account = await TradingAccount.findById(tradingAccountId);
-                if (account) {
-                    account.balance += parseFloat(paid_amount);
-                    account.equity = account.balance;
-                    account.freeMargin = account.balance;
-                    await account.save();
-                    deposit.tradingAccountId = tradingAccountId;
-                }
-            }
-
-            // Update user total deposits
-            await User.findByIdAndUpdate(userId, {
-                $inc: { totalDeposits: paid_amount }
-            });
-
-            console.log(`Deposit auto-approved: ${paid_amount} ${paid_coin} for user ${userId}`);
-        } else {
-            deposit.status = 'processing';
-            console.log(`Deposit pending admin approval: ${paid_amount} ${paid_coin} for user ${userId}`);
-        }
-
-        webhookLog.processed = true;
-        await webhookLog.save();
-        await deposit.save();
-
-        res.status(200).send('*ok*');
-    } catch (error) {
-        console.error('BlockBee webhook processing error:', error);
-        res.status(200).send('*ok*');
-    }
-});
 
 // ============================================
 // GET BLOCKBEE DEPOSIT HISTORY (User)
@@ -2881,5 +2687,307 @@ router.get('/admin/blockbee/withdrawal/status/:withdrawalId',
         }
     }
 );
+
+// ============================================
+// BLOCKBEE CALLBACK HANDLER FOR DIRECT PAYMENTS
+// ============================================
+router.post('/blockbee/callback/:uuid', express.json(), async (req, res) => {
+    try {
+        const { uuid } = req.params;
+        const webhookData = req.body;
+
+        console.log('📥 BlockBee Callback:', uuid, webhookData);
+
+        const deposit = await Deposit.findOne({ 'blockBee.uuid': uuid });
+        if (!deposit) {
+            console.error('❌ Deposit not found:', uuid);
+            return res.status(200).send('ok');
+        }
+
+        // ✅ FIX: Log webhook but don't crash on duplicates
+        try {
+            await WebhookLog.create({
+                uuid: `${uuid}-${webhookData.txid_in || Date.now()}`,
+                userId: deposit.userId.toString(),
+                type: 'blockbee-callback',
+                payload: webhookData,
+                processed: true,
+                processedAt: new Date()
+            });
+        } catch (logError) {
+            console.log('⚠️ Webhook log duplicate (non-critical)');
+        }
+
+        // ✅ FIX: Always update with latest blockchain data
+        deposit.blockBee.txHash = webhookData.txid_in;
+        deposit.blockBee.confirmations = webhookData.confirmations;
+        deposit.blockBee.valueReceived = webhookData.value_coin;
+        deposit.blockBee.valuePaid = webhookData.value_forwarded_coin;
+        deposit.blockBee.lastCallbackAt = new Date();
+
+        // ✅ FIX: Process only once when confirmed
+        const shouldProcess =
+            webhookData.confirmations >= 1 &&
+            deposit.status !== 'completed';
+
+        if (shouldProcess) {
+            deposit.amount = parseFloat(webhookData.value_forwarded_coin);
+            deposit.status = 'completed';
+            deposit.completedAt = new Date();
+            deposit.blockBee.isProcessed = true;
+            deposit.blockBee.blockBeeStatus = 'completed';
+
+            // Credit account
+            if (deposit.tradingAccountId) {
+                const account = await TradingAccount.findById(deposit.tradingAccountId);
+                if (account) {
+                    account.balance += parseFloat(webhookData.value_forwarded_coin);
+                    account.equity = account.balance;
+                    account.freeMargin = account.balance;
+                    await account.save();
+                }
+            }
+
+            // Update user totals
+            await User.findByIdAndUpdate(deposit.userId, {
+                $inc: { totalDeposits: parseFloat(webhookData.value_forwarded_coin) }
+            });
+
+            console.log('✅ Deposit auto-completed:', {
+                transactionId: deposit.transactionId,
+                amount: webhookData.value_forwarded_coin,
+                confirmations: webhookData.confirmations
+            });
+        } else {
+            console.log('⏳ Waiting for confirmations:', {
+                confirmations: webhookData.confirmations,
+                status: deposit.status
+            });
+        }
+
+        await deposit.save();
+        res.status(200).send('ok');
+
+    } catch (error) {
+        console.error('❌ Callback error:', error);
+        res.status(200).send('ok');
+    }
+});
+
+// ============================================
+// BLOCKBEE DEPOSIT WEBHOOK HANDLER (Checkout)
+// ============================================
+router.post('/blockbee/webhook/deposit', express.json(), async (req, res) => {
+    try {
+        const webhookData = req.body;
+        const { uuid, is_paid, status, paid_amount, paid_coin, txid_in, confirmations, payment_id } = webhookData;
+
+        // ✅ FIX: Extract params from query string
+        const userId = req.query.user_id || req.query.userid;
+        const tradingAccountId = req.query.trading_account_id || req.query.tradingaccountid;
+
+        console.log('📥 Webhook received:', {
+            uuid, userId, tradingAccountId,
+            is_paid, status, confirmations, paid_amount
+        });
+
+        // ✅ FIX: Log webhook but allow duplicates
+        try {
+            await WebhookLog.create({
+                uuid: `${uuid}-${Date.now()}`,
+                userId,
+                type: 'deposit',
+                payload: webhookData,
+                processed: false,
+                processedAt: new Date()
+            });
+        } catch (logError) {
+            console.log('⚠️ Webhook log exists (non-critical)');
+        }
+
+        // Find or create deposit record
+        let deposit = await Deposit.findOne({
+            $or: [
+                { 'blockBee.uuid': uuid },
+                { 'blockBee.paymentId': payment_id }
+            ]
+        });
+
+        if (!deposit) {
+            const transactionId = `DEP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+            deposit = new Deposit({
+                userId,
+                tradingAccountId: tradingAccountId || null,
+                transactionId,
+                amount: 0,
+                currency: 'USDT',
+                paymentMethod: 'blockbee_checkout',
+                blockBee: {
+                    uuid,
+                    paymentId: payment_id,
+                    blockBeeStatus: 'pending_payment'
+                },
+                status: 'pending'
+            });
+        }
+
+        // ✅ FIX: Always update latest webhook data
+        deposit.blockBee.coin = paid_coin;
+        deposit.blockBee.paidAmount = paid_amount;
+        deposit.blockBee.confirmations = confirmations;
+        deposit.blockBee.blockBeeStatus = status;
+        deposit.blockBee.txHash = txid_in;
+        deposit.blockBee.lastWebhookAt = new Date();
+
+        // ✅ FIX: Only process once when conditions are met
+        const shouldProcess =
+            is_paid === 1 &&
+            confirmations >= 1 &&
+            deposit.status !== 'completed';
+
+        if (shouldProcess) {
+            console.log('✅ Processing payment:', {
+                transactionId: deposit.transactionId,
+                amount: paid_amount,
+                confirmations
+            });
+
+            deposit.amount = parseFloat(paid_amount);
+            deposit.status = 'completed';
+            deposit.completedAt = new Date();
+            deposit.blockBee.isWebhookProcessed = true;
+            deposit.blockBee.blockBeeStatus = 'completed';
+
+            // Credit trading account
+            if (tradingAccountId) {
+                const account = await TradingAccount.findById(tradingAccountId);
+                if (account) {
+                    account.balance += parseFloat(paid_amount);
+                    account.equity = account.balance;
+                    account.freeMargin = account.balance;
+                    await account.save();
+                    console.log('💰 Account credited:', account.accountNumber);
+                }
+            }
+
+            // Update user total deposits
+            await User.findByIdAndUpdate(userId, {
+                $inc: { totalDeposits: parseFloat(paid_amount) }
+            });
+
+            console.log('✅ Deposit completed:', deposit.transactionId);
+        } else {
+            console.log('⏳ Waiting for confirmations:', {
+                is_paid,
+                confirmations,
+                currentStatus: deposit.status
+            });
+        }
+
+        await deposit.save();
+        res.status(200).send('ok');
+
+    } catch (error) {
+        console.error('❌ Webhook error:', error);
+        res.status(200).send('ok');
+    }
+});
+
+// ============================================
+// AUTO-CHECK SINGLE WITHDRAWAL STATUS
+// ============================================
+router.get('/withdrawals/:withdrawalId/check-status', authenticateToken, async (req, res) => {
+    try {
+        const { withdrawalId } = req.params;
+
+        const withdrawal = await Withdrawal.findOne({
+            _id: withdrawalId,
+            userId: req.user.userId
+        });
+
+        if (!withdrawal) {
+            return res.status(404).json({ success: false, message: 'Withdrawal not found' });
+        }
+
+        // Only check if it has a payoutId and is in processing
+        if (!withdrawal.blockBee?.payoutId || withdrawal.status === 'completed' || withdrawal.status === 'failed') {
+            return res.json({
+                success: true,
+                data: {
+                    status: withdrawal.status,
+                    blockBeeStatus: withdrawal.blockBee?.blockBeeStatus,
+                    txHash: withdrawal.withdrawalDetails?.txHash
+                }
+            });
+        }
+
+        // Fetch status from BlockBee
+        const blockBeeSettings = await getBlockBeeSettings();
+        const ticker = withdrawal.blockBee.ticker || 'bep20_usdt';
+        const payoutId = withdrawal.blockBee.payoutId;
+
+        const apiUrl = `https://api.blockbee.io/${ticker}/payout/info/?apikey=${blockBeeSettings.apiKeyV2}&payoutid=${payoutId}`;
+        const response = await httpsGet(apiUrl);
+
+        if (response.status === 'success' && response.data) {
+            const payoutData = response.data;
+
+            // Update withdrawal
+            withdrawal.blockBee.blockBeeStatus = payoutData.status;
+            withdrawal.blockBee.lastStatusCheck = new Date();
+
+            if (payoutData.txid || payoutData.txhash) {
+                withdrawal.withdrawalDetails.txHash = payoutData.txid || payoutData.txhash;
+                withdrawal.blockBee.txHash = payoutData.txid || payoutData.txhash;
+            }
+
+            // ✅ FIX: Auto-complete when done
+            if (payoutData.status === 'done' || payoutData.status === 'completed') {
+                withdrawal.status = 'completed';
+                withdrawal.completedAt = new Date();
+
+                // Update user total withdrawals
+                await User.findByIdAndUpdate(withdrawal.userId, {
+                    $inc: { totalWithdrawals: withdrawal.amount }
+                });
+
+                console.log('✅ Withdrawal auto-completed:', withdrawal.transactionId);
+            }
+            // ✅ FIX: Auto-fail and refund if error
+            else if (payoutData.status === 'error' || payoutData.status === 'failed') {
+                withdrawal.status = 'failed';
+                withdrawal.blockBee.errorMessage = payoutData.error || 'Payout failed';
+                withdrawal.rejectionReason = payoutData.error;
+
+                // Refund to account
+                await TradingAccount.findByIdAndUpdate(withdrawal.tradingAccountId, {
+                    $inc: {
+                        balance: withdrawal.amount,
+                        equity: withdrawal.amount,
+                        freeMargin: withdrawal.amount
+                    }
+                });
+
+                console.log('❌ Withdrawal failed and refunded:', withdrawal.transactionId);
+            }
+
+            await withdrawal.save();
+
+            return res.json({
+                success: true,
+                data: {
+                    status: withdrawal.status,
+                    blockBeeStatus: withdrawal.blockBee.blockBeeStatus,
+                    txHash: withdrawal.withdrawalDetails?.txHash
+                }
+            });
+        }
+
+        res.json({ success: false, message: 'Failed to fetch status from BlockBee' });
+    } catch (error) {
+        console.error('Withdrawal status check error:', error);
+        res.status(500).json({ success: false, message: 'Failed to check withdrawal status' });
+    }
+});
 
 export default router;

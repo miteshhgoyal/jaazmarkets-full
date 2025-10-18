@@ -13,6 +13,7 @@ import {
   Building2,
   Bitcoin,
   Zap,
+  Clock,
 } from "lucide-react";
 import { Card } from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
@@ -61,6 +62,13 @@ const Withdrawal = () => {
   const [withdrawalStatus, setWithdrawalStatus] = useState(null);
   const [withdrawalResult, setWithdrawalResult] = useState(null);
 
+  // ✅ ADD: Withdrawal status polling state
+  const [pollingWithdrawalId, setPollingWithdrawalId] = useState(null);
+  const [polledStatus, setPolledStatus] = useState(null);
+  const [polledTxHash, setPolledTxHash] = useState(null);
+  const [polledBlockBeeStatus, setPolledBlockBeeStatus] = useState(null);
+  const [isPolling, setIsPolling] = useState(false);
+
   // UI state
   const [copiedAddress, setCopiedAddress] = useState(false);
 
@@ -68,6 +76,54 @@ const Withdrawal = () => {
   useEffect(() => {
     fetchWithdrawalData();
   }, []);
+
+  // ✅ ADD: Auto-poll withdrawal status every 15 seconds
+  useEffect(() => {
+    // Only poll if we have a withdrawal ID and it's not completed/failed
+    if (
+      !pollingWithdrawalId ||
+      polledStatus === "completed" ||
+      polledStatus === "failed"
+    ) {
+      setIsPolling(false);
+      return;
+    }
+
+    setIsPolling(true);
+
+    const checkWithdrawalStatus = async () => {
+      try {
+        const response = await api.get(
+          `/transactions/withdrawals/${pollingWithdrawalId}/check-status`
+        );
+
+        if (response.data.success) {
+          setPolledStatus(response.data.data.status);
+          setPolledBlockBeeStatus(response.data.data.blockBeeStatus);
+          setPolledTxHash(response.data.data.txHash);
+
+          // Stop polling if completed or failed
+          if (response.data.data.status === "completed") {
+            setIsPolling(false);
+            toast.success("Withdrawal completed! ✅");
+          } else if (response.data.data.status === "failed") {
+            setIsPolling(false);
+            toast.error("Withdrawal failed and refunded ❌");
+          }
+        }
+      } catch (error) {
+        console.error("Status check error:", error);
+      }
+    };
+
+    // Check immediately
+    checkWithdrawalStatus();
+
+    // Poll every 15 seconds
+    const interval = setInterval(checkWithdrawalStatus, 15000);
+
+    return () => clearInterval(interval);
+  }, [pollingWithdrawalId, polledStatus]);
 
   const fetchWithdrawalData = async () => {
     setLoading(true);
@@ -213,6 +269,11 @@ const Withdrawal = () => {
     setShowWithdrawalDetails(false);
     setWithdrawalStatus(null);
     setWithdrawalResult(null);
+    setPollingWithdrawalId(null);
+    setPolledStatus(null);
+    setPolledTxHash(null);
+    setPolledBlockBeeStatus(null);
+    setIsPolling(false);
   };
 
   // Crypto wallet address validation
@@ -408,6 +469,13 @@ const Withdrawal = () => {
         if (response.data.success) {
           setWithdrawalStatus("success");
           setWithdrawalResult(response.data.data);
+
+          // ✅ ADD: Start polling for this withdrawal
+          setPollingWithdrawalId(
+            response.data.data._id || response.data.data.transactionId
+          );
+          setPolledStatus("processing");
+
           toast.success("Withdrawal request created successfully");
 
           // Update local account balance optimistically
@@ -549,7 +617,11 @@ const Withdrawal = () => {
         title="Withdraw Funds"
         subtitle={
           withdrawalStatus === "success"
-            ? "Withdrawal request submitted"
+            ? polledStatus === "completed"
+              ? "✅ Withdrawal completed!"
+              : polledStatus === "failed"
+              ? "❌ Withdrawal failed"
+              : "Withdrawal processing..."
             : withdrawalStatus === "error"
             ? "Withdrawal failed"
             : showWithdrawalDetails
@@ -561,163 +633,239 @@ const Withdrawal = () => {
       />
 
       <div className="max-w-6xl mx-auto py-6 px-4">
-        {/* Success Screen */}
+        {/* ✅ UPDATED: Success Screen with real-time status */}
         {withdrawalStatus === "success" && (
           <div className="max-w-2xl mx-auto">
             <Card className="p-8">
               <div className="text-center">
-                <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <CheckCircle className="text-white" size={40} />
+                <div
+                  className={`w-20 h-20 ${
+                    polledStatus === "completed"
+                      ? "bg-gradient-to-br from-green-400 to-green-600"
+                      : polledStatus === "failed"
+                      ? "bg-gradient-to-br from-red-400 to-red-600"
+                      : "bg-gradient-to-br from-blue-400 to-blue-600"
+                  } rounded-full flex items-center justify-center mx-auto mb-6`}
+                >
+                  {polledStatus === "completed" ? (
+                    <CheckCircle className="text-white" size={40} />
+                  ) : polledStatus === "failed" ? (
+                    <XCircle className="text-white" size={40} />
+                  ) : (
+                    <Loader2 className="text-white animate-spin" size={40} />
+                  )}
                 </div>
+
                 <h2 className="text-3xl font-bold mb-2 text-gray-900">
-                  Withdrawal Request Submitted!
+                  {polledStatus === "completed"
+                    ? "Withdrawal Completed!"
+                    : polledStatus === "failed"
+                    ? "Withdrawal Failed"
+                    : "Withdrawal Processing"}
                 </h2>
+
                 <p className="text-gray-600 mb-8">
-                  {isCryptoMethod()
-                    ? "Your cryptocurrency withdrawal is being processed"
-                    : "Your withdrawal is pending review"}
+                  {polledStatus === "completed"
+                    ? "Your funds have been sent successfully"
+                    : polledStatus === "failed"
+                    ? "The withdrawal has been refunded to your account"
+                    : isPolling
+                    ? "Checking blockchain status..."
+                    : "Your withdrawal is being processed"}
                 </p>
-              </div>
 
-              <div className="space-y-4 mb-8">
-                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
-                  <div className="text-sm text-green-600 font-medium mb-2">
-                    Amount Withdrawing
+                {/* Show BlockBee status */}
+                {polledBlockBeeStatus && (
+                  <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                    <div className="text-sm text-blue-900">
+                      <span className="font-semibold">Status:</span>{" "}
+                      {polledBlockBeeStatus}
+                    </div>
                   </div>
-                  <div className="text-4xl font-bold text-green-900 mb-1">
-                    ${withdrawalAmount}
+                )}
+
+                {/* Show TX Hash when available */}
+                {polledTxHash && (
+                  <div className="mb-6 bg-gray-50 p-4 rounded-lg">
+                    <div className="text-sm text-gray-600 mb-2">
+                      Transaction Hash:
+                    </div>
+                    <code className="text-xs bg-white px-3 py-2 rounded border break-all block">
+                      {polledTxHash}
+                    </code>
                   </div>
-                  <div className="text-xs text-green-700">
-                    {selectedAccount.currency}
+                )}
+
+                {/* Withdrawal details */}
+                <div className="space-y-4 mb-8">
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
+                    <div className="text-sm text-green-600 font-medium mb-2">
+                      Amount Withdrawing
+                    </div>
+                    <div className="text-4xl font-bold text-green-900 mb-1">
+                      ${withdrawalAmount}
+                    </div>
+                    <div className="text-xs text-green-700">
+                      {selectedAccount.currency}
+                    </div>
                   </div>
+
+                  {withdrawalResult?.transactionId && (
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="text-xs text-gray-600 mb-1">
+                        Transaction ID
+                      </div>
+                      <div className="font-mono text-sm text-gray-900 break-all">
+                        {withdrawalResult.transactionId}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="bg-white rounded-lg p-4 border">
+                      <div className="text-gray-600 mb-1">Method</div>
+                      <div className="font-medium">
+                        {selectedWithdrawalMethod.name}
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-lg p-4 border">
+                      <div className="text-gray-600 mb-1">Fee</div>
+                      <div className="font-medium">
+                        ${withdrawalResult?.fee || 0}
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-lg p-4 border">
+                      <div className="text-gray-600 mb-1">Status</div>
+                      <div
+                        className={`font-medium flex items-center gap-1 ${
+                          polledStatus === "completed"
+                            ? "text-green-600"
+                            : polledStatus === "failed"
+                            ? "text-red-600"
+                            : "text-amber-600"
+                        }`}
+                      >
+                        {polledStatus === "completed" && (
+                          <CheckCircle size={14} />
+                        )}
+                        {polledStatus === "failed" && <XCircle size={14} />}
+                        {polledStatus === "processing" && (
+                          <Loader2 size={14} className="animate-spin" />
+                        )}
+                        {polledStatus === "completed"
+                          ? "Completed"
+                          : polledStatus === "failed"
+                          ? "Failed"
+                          : "Processing"}
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-lg p-4 border">
+                      <div className="text-gray-600 mb-1">Processing Time</div>
+                      <div className="font-medium text-sm">
+                        {isCryptoMethod()
+                          ? "Automated (within hours)"
+                          : selectedWithdrawalMethod.processingTime}
+                      </div>
+                    </div>
+                  </div>
+
+                  {isCryptoMethod() && cryptoWalletAddress && (
+                    <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                      <div className="text-sm text-blue-600 font-medium mb-2">
+                        Your {selectedCurrency} Wallet
+                      </div>
+                      <div className="font-mono text-sm text-blue-900 break-all mb-2">
+                        {cryptoWalletAddress}
+                      </div>
+                      <div className="text-xs text-blue-700">
+                        Network: {selectedNetwork}
+                      </div>
+                    </div>
+                  )}
+
+                  {isBankMethod() && (
+                    <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                      <div className="text-sm text-blue-600 font-medium mb-2">
+                        Bank Details
+                      </div>
+                      <div className="text-sm space-y-1">
+                        <div>
+                          <span className="text-gray-600">Bank: </span>
+                          <span className="font-medium">
+                            {bankDetails.bankName}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Account: </span>
+                          <span className="font-medium">
+                            {bankDetails.accountNumber}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Name: </span>
+                          <span className="font-medium">
+                            {bankDetails.accountHolderName}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {withdrawalResult?.transactionId && (
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="text-xs text-gray-600 mb-1">
-                      Transaction ID
-                    </div>
-                    <div className="font-mono text-sm text-gray-900 break-all">
-                      {withdrawalResult.transactionId}
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="bg-white rounded-lg p-4 border">
-                    <div className="text-gray-600 mb-1">Method</div>
-                    <div className="font-medium">
-                      {selectedWithdrawalMethod.name}
-                    </div>
-                  </div>
-                  <div className="bg-white rounded-lg p-4 border">
-                    <div className="text-gray-600 mb-1">Fee</div>
-                    <div className="font-medium">
-                      ${withdrawalResult?.fee || 0}
-                    </div>
-                  </div>
-                  <div className="bg-white rounded-lg p-4 border">
-                    <div className="text-gray-600 mb-1">Status</div>
-                    <div className="font-medium text-amber-600">
-                      {withdrawalResult?.status === "pending"
-                        ? "Pending Review"
-                        : withdrawalResult?.status || "Pending"}
-                    </div>
-                  </div>
-                  <div className="bg-white rounded-lg p-4 border">
-                    <div className="text-gray-600 mb-1">Processing Time</div>
-                    <div className="font-medium text-sm">
-                      {isCryptoMethod()
-                        ? "Automated (within hours)"
-                        : selectedWithdrawalMethod.processingTime}
-                    </div>
-                  </div>
+                <div className="space-y-3">
+                  <Button
+                    className="w-full"
+                    size="lg"
+                    onClick={handleWithdrawalComplete}
+                  >
+                    View Transaction History
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={resetSelection}
+                  >
+                    Make Another Withdrawal
+                  </Button>
                 </div>
 
-                {isCryptoMethod() && cryptoWalletAddress && (
-                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                    <div className="text-sm text-blue-600 font-medium mb-2">
-                      Your {selectedCurrency} Wallet
+                <div className="mt-8 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+                      <Info size={20} className="text-white" />
                     </div>
-                    <div className="font-mono text-sm text-blue-900 break-all mb-2">
-                      {cryptoWalletAddress}
-                    </div>
-                    <div className="text-xs text-blue-700">
-                      Network: {selectedNetwork}
-                    </div>
-                  </div>
-                )}
-
-                {isBankMethod() && (
-                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                    <div className="text-sm text-blue-600 font-medium mb-2">
-                      Bank Details
-                    </div>
-                    <div className="text-sm space-y-1">
-                      <div>
-                        <span className="text-gray-600">Bank: </span>
-                        <span className="font-medium">
-                          {bankDetails.bankName}
-                        </span>
+                    <div className="text-left">
+                      <div className="font-semibold text-blue-900 mb-2">
+                        What's next:
                       </div>
-                      <div>
-                        <span className="text-gray-600">Account: </span>
-                        <span className="font-medium">
-                          {bankDetails.accountNumber}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Name: </span>
-                        <span className="font-medium">
-                          {bankDetails.accountHolderName}
-                        </span>
-                      </div>
+                      {polledStatus === "completed" ? (
+                        <div className="text-sm text-blue-800">
+                          Your withdrawal has been completed successfully! The
+                          funds have been sent to your{" "}
+                          {isCryptoMethod() ? "wallet" : "bank account"}.
+                        </div>
+                      ) : polledStatus === "failed" ? (
+                        <div className="text-sm text-blue-800">
+                          Your withdrawal failed and the amount has been
+                          refunded to your account. Please contact support if
+                          you need assistance.
+                        </div>
+                      ) : isCryptoMethod() ? (
+                        <div className="text-sm text-blue-800">
+                          Your cryptocurrency withdrawal is being processed
+                          automatically by our system. The funds will be sent to
+                          your wallet address once approved. This typically
+                          takes a few hours. You'll receive a notification when
+                          completed.
+                        </div>
+                      ) : (
+                        <div className="text-sm text-blue-800">
+                          Your withdrawal request is being reviewed by our team.
+                          You'll receive a notification once it's processed and
+                          the funds are transferred to your bank account.
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-3">
-                <Button
-                  className="w-full"
-                  size="lg"
-                  onClick={handleWithdrawalComplete}
-                >
-                  View Transaction History
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={resetSelection}
-                >
-                  Make Another Withdrawal
-                </Button>
-              </div>
-
-              <div className="mt-8 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl">
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
-                    <Info size={20} className="text-white" />
-                  </div>
-                  <div className="text-left">
-                    <div className="font-semibold text-blue-900 mb-2">
-                      What's next:
-                    </div>
-                    {isCryptoMethod() ? (
-                      <div className="text-sm text-blue-800">
-                        Your cryptocurrency withdrawal will be processed
-                        automatically by our system. The funds will be sent to
-                        your wallet address once approved. This typically takes
-                        a few hours. You'll receive a notification when
-                        completed.
-                      </div>
-                    ) : (
-                      <div className="text-sm text-blue-800">
-                        Your withdrawal request is being reviewed by our team.
-                        You'll receive a notification once it's processed and
-                        the funds are transferred to your bank account.
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
@@ -767,7 +915,7 @@ const Withdrawal = () => {
           </div>
         )}
 
-        {/* Main withdrawal flow - CONTINUES IN NEXT PART */}
+        {/* Main withdrawal flow - Method Selection, Configuration, Confirmation */}
         {!withdrawalStatus && (
           <>
             {!selectedWithdrawalMethod ? (
@@ -832,7 +980,7 @@ const Withdrawal = () => {
                 )}
               </div>
             ) : !showWithdrawalDetails ? (
-              /* Step 2: Configuration - SAME AS BEFORE BUT CONTINUES... */
+              /* Step 2: Configuration Form - CONTINUED IN ORIGINAL FILE */
               <div className="space-y-6">
                 <Button
                   variant="ghost"
@@ -844,7 +992,7 @@ const Withdrawal = () => {
                 </Button>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Left Column */}
+                  {/* Left Column - Form Fields */}
                   <div className="space-y-6">
                     {/* Selected Withdrawal Method */}
                     <Card className="p-6">
@@ -1036,7 +1184,7 @@ const Withdrawal = () => {
                         </Card>
                       )}
 
-                    {/* Bank Details - Same as before */}
+                    {/* Bank Details */}
                     {selectedAccount && withdrawalAmount && isBankMethod() && (
                       <Card className="p-6">
                         <h3 className="font-semibold mb-4">Bank Details</h3>
