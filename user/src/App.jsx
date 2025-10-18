@@ -25,7 +25,7 @@ import Sidebar from "./components/Sidebar";
 import Accounts from "./pages/trading/Accounts";
 import Summary from "./pages/trading/Summary";
 import HistoryOfOrders from "./pages/trading/HistoryOfOrders";
-import ExnessTerminal from "./pages/trading/ExnessTerminal";
+import TradingTerminal from "./pages/trading/TradingTerminal";
 import NewAccount from "./pages/trading/NewAccount";
 
 // Payments & Wallet components
@@ -194,7 +194,7 @@ function App() {
                 path="/trading/history-of-orders"
                 element={<HistoryOfOrders />}
               />
-              <Route path="/trading/webtrading" element={<ExnessTerminal />} />
+              <Route path="/trading/trading-terminal" element={<TradingTerminal />} />
               <Route path="/trading/new-account" element={<NewAccount />} />
 
               {/* Payments & Wallet Routes */}

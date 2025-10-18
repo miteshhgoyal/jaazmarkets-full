@@ -62,8 +62,8 @@ const Sidebar = ({ isOpen, onToggle, isCollapsed, toggleCollapsed }) => {
         },
         {
           name: "Trading Terminal",
-          href: "https://trade.mql5.com/trade", // External URL
-          isExternal: true, // Flag for external link
+          href: "/trading/trading-terminal",
+          //   isExternal: true, // Flag for external link
         },
       ],
     },
