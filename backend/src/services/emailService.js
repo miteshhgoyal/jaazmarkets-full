@@ -73,15 +73,37 @@ export const generateTraderPassword = () => {
     return password.split('').sort(() => Math.random() - 0.5).join('');
 };
 
-// Generate Account Number (format: JM + 8 digits)
-export const generateAccountNumber = () => {
-    return 'JM' + Math.floor(10000000 + Math.random() * 90000000);
+// Add this function for investor password generation
+export const generateInvestorPassword = () => {
+    const length = 10;
+    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+    const numbers = '0123456789';
+    const special = '!@#$%&*';
+
+    const allChars = uppercase + lowercase + numbers + special;
+    let password = '';
+
+    // Ensure at least one of each type
+    password += uppercase[Math.floor(Math.random() * uppercase.length)];
+    password += lowercase[Math.floor(Math.random() * lowercase.length)];
+    password += numbers[Math.floor(Math.random() * numbers.length)];
+    password += special[Math.floor(Math.random() * special.length)];
+
+    // Fill remaining length
+    for (let i = password.length; i < length; i++) {
+        password += allChars[Math.floor(Math.random() * allChars.length)];
+    }
+
+    // Shuffle the password
+    return password.split('').sort(() => Math.random() - 0.5).join('');
 };
 
 // ============================================
 // SIMPLIFIED REGISTRATION EMAIL
 // ============================================
 
+// Update registration email HTML to include investor password
 const registrationEmailHTML = (userData) => `
 <!DOCTYPE html>
 <html>
@@ -136,7 +158,7 @@ const registrationEmailHTML = (userData) => `
                                             <tr>
                                                 <td style="width: 35%; color: #666; font-size: 14px; font-weight: 600; vertical-align: top; padding-top: 10px;">Portal Password:</td>
                                                 <td style="color: #1a1a1a; font-size: 15px; font-weight: 700; font-family: 'Courier New', monospace; letter-spacing: 1px;">
-                                                    ${userData.portalPassword || '(Your signup password)'}
+                                                    ${userData.portalPassword}
                                                 </td>
                                             </tr>
                                             <tr>
@@ -158,7 +180,23 @@ const registrationEmailHTML = (userData) => `
                                             <tr>
                                                 <td></td>
                                                 <td style="padding-top: 0; padding-bottom: 10px; color: #92400e; font-size: 12px; font-weight: 600;">
-                                                    ⚠For MT4/MT5 platform login
+                                                    ⚠️ For MT4/MT5 full trading access
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        
+                                        <!-- Investor Password - NEW -->
+                                        <table width="100%" cellpadding="8" cellspacing="0" style="margin-bottom: 8px; background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); border: 2px solid #3b82f6; border-radius: 4px;">
+                                            <tr>
+                                                <td style="width: 35%; color: #1e3a8a; font-size: 14px; font-weight: 700; vertical-align: top; padding-top: 10px;">Investor Password:</td>
+                                                <td style="color: #1e3a8a; font-size: 16px; font-weight: 700; font-family: 'Courier New', monospace; letter-spacing: 2px;">
+                                                    ${userData.investorPassword}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td></td>
+                                                <td style="padding-top: 0; padding-bottom: 10px; color: #1e3a8a; font-size: 12px; font-weight: 600;">
+                                                    👁️ For MT4/MT5 read-only access
                                                 </td>
                                             </tr>
                                         </table>
@@ -168,7 +206,7 @@ const registrationEmailHTML = (userData) => `
                                             <tr>
                                                 <td style="width: 35%; color: #666; font-size: 14px; font-weight: 600; vertical-align: top; padding-top: 10px;">Account Number:</td>
                                                 <td style="color: #f97316; font-size: 16px; font-weight: 700; font-family: 'Courier New', monospace; letter-spacing: 1px;">
-                                                    ${userData.accountNumber || 'JM' + Math.floor(10000000 + Math.random() * 90000000)}
+                                                    ${userData.accountNumber}
                                                 </td>
                                             </tr>
                                         </table>
@@ -194,7 +232,7 @@ const registrationEmailHTML = (userData) => `
                         </td>
                     </tr>
                     
-                    <!-- Security Notice - Compact -->
+                    <!-- Security Notice -->
                     <tr>
                         <td style="padding: 0 20px 20px;">
                             <div style="background-color: #fef2f2; border-left: 3px solid #ef4444; padding: 12px; border-radius: 4px;">
@@ -205,7 +243,7 @@ const registrationEmailHTML = (userData) => `
                         </td>
                     </tr>
                     
-                    <!-- Support - Compact -->
+                    <!-- Support -->
                     <tr>
                         <td style="padding: 0 20px 20px;">
                             <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border-radius: 6px; padding: 12px;">
@@ -221,7 +259,7 @@ const registrationEmailHTML = (userData) => `
                         </td>
                     </tr>
                     
-                    <!-- Footer - Minimal -->
+                    <!-- Footer -->
                     <tr>
                         <td style="padding: 15px; background-color: #1f2937; text-align: center;">
                             <p style="margin: 0; color: #9ca3af; font-size: 12px;">
@@ -238,7 +276,7 @@ const registrationEmailHTML = (userData) => `
 </html>
 `;
 
-// Plain text version
+// Update plain text version
 const registrationEmailText = (userData) => `
 WELCOME TO JAAZ MARKETS
 =======================
@@ -250,13 +288,17 @@ Your account has been created successfully!
 YOUR LOGIN CREDENTIALS:
 -----------------------
 Login Email: ${userData.email}
-Portal Password: ${userData.portalPassword || '(Your signup password)'}
+
+Portal Password: ${userData.portalPassword}
                  For web dashboard login
 
 Trader Password: ${userData.traderPassword}
-                 ⚠For MT4/MT5 platform login
+                 ⚠️ For MT4/MT5 full trading access
 
-Account Number: ${userData.accountNumber || 'Pending'}
+Investor Password: ${userData.investorPassword}
+                   👁️ For MT4/MT5 read-only access
+
+Account Number: ${userData.accountNumber}
 
 SECURITY:
 ---------
@@ -537,5 +579,5 @@ export default {
     sendPasswordResetEmail,
     generateOTP,
     generateTraderPassword,
-    generateAccountNumber,
+    generateInvestorPassword
 };

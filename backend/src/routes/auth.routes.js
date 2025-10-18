@@ -8,8 +8,8 @@ import {
     sendRegistrationEmail,
     generateOTP,
     generateTraderPassword,
-    generateAccountNumber,
-    sendEmailVerificationOTP
+    sendEmailVerificationOTP,
+    generateInvestorPassword
 } from '../services/emailService.js';
 
 const router = express.Router();
@@ -25,22 +25,38 @@ const router = express.Router();
  */
 const generateUserId = async () => {
     const prefix = 'JZM';
-    let userId;
-    let isUnique = false;
+    const maxAttempts = 10;
+    let attempts = 0;
 
-    while (!isUnique) {
-        // Generate 8 random digits
+    while (attempts < maxAttempts) {
         const randomDigits = Math.floor(10000000 + Math.random() * 90000000).toString();
-        userId = `${prefix}${randomDigits}`;
+        const userId = `${prefix}${randomDigits}`;
 
-        // Check if userId already exists in database
         const existingUser = await User.findOne({ userId });
         if (!existingUser) {
-            isUnique = true;
+            return userId;
         }
+        attempts++;
     }
 
-    return userId;
+    throw new Error('Failed to generate unique User ID after multiple attempts');
+};
+
+const generateUniqueAccountNumber = async () => {
+    const maxAttempts = 10;
+    let attempts = 0;
+
+    while (attempts < maxAttempts) {
+        const accountNumber = 'JM' + Math.floor(10000000 + Math.random() * 90000000);
+
+        const existingAccount = await User.findOne({ accountNumber });
+        if (!existingAccount) {
+            return accountNumber;
+        }
+        attempts++;
+    }
+
+    throw new Error('Failed to generate unique Account Number after multiple attempts');
 };
 
 const generateTokens = (user) => {
@@ -134,7 +150,7 @@ router.post("/signup", async (req, res) => {
                 }
             }
 
-            // Update user details (allow them to change info before verification)
+            // Update user details
             existingUser.firstName = firstName;
             existingUser.lastName = lastName;
             existingUser.password = password;
@@ -144,7 +160,6 @@ router.post("/signup", async (req, res) => {
                 const referrer = await User.findOne({ userId: referralCode });
                 if (referrer) {
                     existingUser.referredBy = referrer._id;
-
                     await User.findByIdAndUpdate(referrer._id, {
                         $inc: { totalReferrals: 1 }
                     });
@@ -190,9 +205,10 @@ router.post("/signup", async (req, res) => {
             }
         }
 
-        // Generate unique user ID
+        // Generate unique identifiers
         const userId = await generateUserId();
-        console.log(`Generated User ID: ${userId}`);
+        const accountNumber = await generateUniqueAccountNumber();
+        console.log(`Generated User ID: ${userId}, Account Number: ${accountNumber}`);
 
         // Referral handling
         let referrerId = null;
@@ -206,18 +222,20 @@ router.post("/signup", async (req, res) => {
             }
         }
 
-        // Auto-generate trading credentials (STORE PLAIN TEXT)
+        // Auto-generate trading credentials (PLAIN TEXT - will be hashed on save)
         const plainTraderPassword = generateTraderPassword();
-        const accountNumber = generateAccountNumber();
+        const plainInvestorPassword = generateInvestorPassword();
 
         // Generate email verification OTP
         const verificationOTP = generateOTP();
 
+        // Create user with temporary storage of plain passwords
         const user = new User({
             userId,
             email: email.toLowerCase(),
             password,
             traderPassword: plainTraderPassword,
+            investorPassword: plainInvestorPassword,
             accountNumber,
             firstName,
             lastName,
@@ -231,8 +249,9 @@ router.post("/signup", async (req, res) => {
             referredBy: referrerId,
         });
 
-        // Store plain text trader password temporarily for email
-        user.plainTraderPassword = plainTraderPassword;
+        // Store plain passwords temporarily (NOT in schema, just in memory)
+        user._plainTraderPassword = plainTraderPassword;
+        user._plainInvestorPassword = plainInvestorPassword;
 
         await user.save();
 
@@ -278,7 +297,7 @@ router.post('/verify-email-otp', async (req, res) => {
 
         const user = await User.findOne({
             email: email.toLowerCase(),
-        }).select('+emailVerificationOTP +emailVerificationOTPExpiry +password +traderPassword');
+        }).select('+emailVerificationOTP +emailVerificationOTPExpiry +password +traderPassword +investorPassword');
 
         if (!user) {
             return res.status(404).json({
@@ -312,17 +331,15 @@ router.post('/verify-email-otp', async (req, res) => {
             });
         }
 
-        // Get plain trader password (it was stored temporarily)
-        const plainTraderPassword = user.plainTraderPassword || 'Contact support for trader password';
+        // Get plain passwords (stored temporarily in memory during signup)
+        const plainTraderPassword = user._plainTraderPassword || 'Contact support';
+        const plainInvestorPassword = user._plainInvestorPassword || 'Contact support';
 
         // Mark user as verified
         user.isVerified = true;
         user.accountStatus = 'active';
         user.emailVerificationOTP = undefined;
         user.emailVerificationOTPExpiry = undefined;
-
-        // Remove temporary plain text password property before saving
-        delete user.plainTraderPassword;
 
         await user.save();
 
@@ -332,8 +349,9 @@ router.post('/verify-email-otp', async (req, res) => {
                 email: user.email,
                 firstName: user.firstName,
                 lastName: user.lastName,
-                portalPassword: password, // This is the plain password from request
-                traderPassword: plainTraderPassword, // This is the plain trader password
+                portalPassword: password,
+                traderPassword: plainTraderPassword,
+                investorPassword: plainInvestorPassword,
                 accountNumber: user.accountNumber,
                 currency: user.currency,
                 referralCode: user.userId,
