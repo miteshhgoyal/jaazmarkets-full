@@ -13,18 +13,32 @@ const Navbar = ({ toggleSidebar, toggleSidebarCollapse, sidebarCollapsed }) => {
   const [balanceCurrency, setBalanceCurrency] = useState("USD");
   const userMenuRef = useRef(null);
 
-  // Get user info from auth context or localStorage
-  const userInfo = user || {
-    name: localStorage.getItem("user")
-      ? JSON.parse(localStorage.getItem("user")).firstName || "User"
-      : "User",
-    email: localStorage.getItem("user")
-      ? JSON.parse(localStorage.getItem("user")).email || "user@jaazmarkets.com"
-      : "user@jaazmarkets.com",
-    userId: localStorage.getItem("user")
-      ? JSON.parse(localStorage.getItem("user")).userId || "JZM00000000"
-      : "JZM00000000",
+  // Safe function to get user info from localStorage
+  const getUserInfo = () => {
+    try {
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        return {
+          name: parsedUser?.firstName || "User",
+          email: parsedUser?.email || "user@jaazmarkets.com",
+          userId: parsedUser?.userId || "JZM00000000",
+        };
+      }
+    } catch (error) {
+      console.error("Error parsing user data from localStorage:", error);
+    }
+
+    // Default fallback values
+    return {
+      name: "User",
+      email: "user@jaazmarkets.com",
+      userId: "JZM00000000",
+    };
   };
+
+  // Get user info from auth context or localStorage with safe fallback
+  const userInfo = user || getUserInfo();
 
   // Fetch total balance from all Real accounts
   useEffect(() => {
@@ -131,7 +145,7 @@ const Navbar = ({ toggleSidebar, toggleSidebarCollapse, sidebarCollapsed }) => {
           <div className="hidden md:flex items-center gap-2 text-slate-700 bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 px-3 py-2 rounded-lg">
             <Hash size={14} className="text-blue-600" />
             <span className="font-mono text-xs font-semibold text-blue-700">
-              {userInfo.userId}
+              {userInfo?.userId || "JZM00000000"}
             </span>
           </div>
 
@@ -181,20 +195,20 @@ const Navbar = ({ toggleSidebar, toggleSidebarCollapse, sidebarCollapsed }) => {
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
                       <span className="text-white font-bold text-sm">
-                        {userInfo.name.charAt(0).toUpperCase()}
+                        {userInfo?.name?.charAt(0)?.toUpperCase() || "U"}
                       </span>
                     </div>
                     <div className="flex-1">
                       <div className="font-medium text-slate-900">
-                        {userInfo.name}
+                        {userInfo?.name || "User"}
                       </div>
                       <div className="text-xs text-slate-500">
-                        {userInfo.email}
+                        {userInfo?.email || "user@jaazmarkets.com"}
                       </div>
                       <div className="flex items-center gap-1 mt-1">
                         <Hash size={12} className="text-blue-600" />
                         <span className="text-xs font-mono font-semibold text-blue-700">
-                          {userInfo.userId}
+                          {userInfo?.userId || "JZM00000000"}
                         </span>
                       </div>
                     </div>
@@ -239,7 +253,7 @@ const Navbar = ({ toggleSidebar, toggleSidebarCollapse, sidebarCollapsed }) => {
                     <div className="flex items-center gap-2 bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 px-2 py-1.5 rounded-md">
                       <Hash size={12} className="text-blue-600" />
                       <span className="text-xs font-mono font-semibold text-blue-700">
-                        {userInfo.userId}
+                        {userInfo?.userId || "JZM00000000"}
                       </span>
                       <span className="ml-auto text-xs text-slate-500">
                         User ID

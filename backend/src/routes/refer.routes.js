@@ -457,7 +457,7 @@ router.get("/commission-withdrawals", authenticateToken, async (req, res) => {
 // ============================================
 
 // GET REFERRAL SETTINGS
-router.get("/admin/settings", authenticateToken, authorize("admin", "superadmin"), async (req, res) => {
+router.get("/admin/settings", authenticateToken, authorize(["admin", "superadmin"]), async (req, res) => {
     try {
         const settings = await Settings.findOne();
         res.json({
@@ -475,7 +475,7 @@ router.get("/admin/settings", authenticateToken, authorize("admin", "superadmin"
 });
 
 // UPDATE REFERRAL SETTINGS
-router.put("/admin/settings", authenticateToken, authorize("admin", "superadmin"), async (req, res) => {
+router.put("/admin/settings", authenticateToken, authorize(["admin", "superadmin"]), async (req, res) => {
     try {
         const { commissionPercentage, minPayoutAmount, payoutMethod } = req.body;
 
@@ -505,7 +505,7 @@ router.put("/admin/settings", authenticateToken, authorize("admin", "superadmin"
 });
 
 // GET ALL REFERRAL STATS (Admin)
-router.get("/admin/stats", authenticateToken, authorize("admin", "superadmin"), async (req, res) => {
+router.get("/admin/stats", authenticateToken, authorize(["admin", "superadmin"]), async (req, res) => {
     try {
         const totalReferrers = await User.countDocuments({ totalReferrals: { $gt: 0 } });
         const totalReferred = await User.countDocuments({ referredBy: { $ne: null } });

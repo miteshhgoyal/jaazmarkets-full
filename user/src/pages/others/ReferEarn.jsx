@@ -220,9 +220,7 @@ const ReferEarn = () => {
 
       <PageHeader
         title="Refer & Earn"
-        subtitle={`Earn ${(commissionRate * 100).toFixed(
-          1
-        )}% commission on trades`}
+        subtitle={`Earn ${commissionRate.toFixed(3)}% commission on trades`}
       />
 
       <div className="py-6 space-y-6 px-4 max-w-7xl mx-auto">
@@ -269,7 +267,7 @@ const ReferEarn = () => {
               <div>
                 <p className="text-xs text-gray-600 mb-1">Commission Rate</p>
                 <p className="text-2xl font-bold text-purple-600">
-                  {(commissionRate * 100).toFixed(1)}%
+                  {commissionRate.toFixed(3)}%
                 </p>
               </div>
               <Wallet className="text-purple-500" size={24} />
@@ -340,10 +338,9 @@ const ReferEarn = () => {
           <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
             <p className="text-sm text-blue-800">
               <strong>How it works:</strong> Share your link with friends. When
-              they register and trade, you earn{" "}
-              {(commissionRate * 100).toFixed(1)}% commission on their trade
-              volume. Minimum withdrawal: $10. Admin processes withdrawals
-              within 24 hours.
+              they register and trade, you earn {commissionRate.toFixed(3)}%
+              commission on their trade volume. Minimum withdrawal: $10. Admin
+              processes withdrawals within 24 hours.
             </p>
           </div>
         </Card>
