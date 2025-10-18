@@ -108,7 +108,7 @@ const registrationEmailHTML = (userData) => `
                     <tr>
                         <td style="padding: 20px; border-bottom: 1px solid #000000;">
                             <h1 style="margin: 0; font-size: 18px; font-weight: bold; text-transform: uppercase;">JAAZ MARKETS</h1>
-                            <p style="margin: 5px 0 0; font-size: 12px;">Trading Platform</p>
+                            <p style="margin: 5px 0 0; font-size: 12px;">Welcome to Our Platform</p>
                         </td>
                     </tr>
                     
@@ -119,53 +119,37 @@ const registrationEmailHTML = (userData) => `
                             <p style="margin: 0 0 10px; font-size: 14px;">Dear ${userData.firstName} ${userData.lastName},</p>
                             
                             <p style="margin: 0 0 20px; font-size: 14px; line-height: 1.6;">
-                                Your trading account has been successfully created. Please find your account credentials below.
+                                Welcome to Jaaz Markets! Your account has been successfully created. Please find your portal login credentials below.
                             </p>
                             
                             <table width="100%" cellpadding="8" cellspacing="0" style="border: 1px solid #000000; font-size: 13px; margin-bottom: 20px;">
                                 <tr style="border-bottom: 1px solid #000000;">
                                     <td colspan="2" style="font-weight: bold; background-color: #f5f5f5; text-transform: uppercase; font-size: 12px;">
-                                        ACCOUNT CREDENTIALS
+                                        PORTAL CREDENTIALS
                                     </td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #cccccc;">
-                                    <td style="width: 40%; font-weight: bold; padding: 12px 8px;">Account Number:</td>
+                                    <td style="width: 40%; font-weight: bold; padding: 12px 8px;">User ID:</td>
                                     <td style="font-family: 'Courier New', monospace; padding: 12px 8px;">${userData.accountNumber}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #cccccc;">
-                                    <td style="font-weight: bold; padding: 12px 8px;">Login Email:</td>
+                                    <td style="font-weight: bold; padding: 12px 8px;">Email:</td>
                                     <td style="padding: 12px 8px;">${userData.email}</td>
                                 </tr>
-                                <tr style="border-bottom: 1px solid #cccccc;">
+                                <tr>
                                     <td style="font-weight: bold; padding: 12px 8px;">Portal Password:</td>
                                     <td style="font-family: 'Courier New', monospace; padding: 12px 8px;">${userData.portalPassword}</td>
                                 </tr>
-                                <tr style="border-bottom: 1px solid #cccccc;">
-                                    <td style="font-weight: bold; padding: 12px 8px;">Trader Password:</td>
-                                    <td style="font-family: 'Courier New', monospace; padding: 12px 8px;">${userData.traderPassword}</td>
-                                </tr>
-                                <tr>
-                                    <td style="font-weight: bold; padding: 12px 8px;">Investor Password:</td>
-                                    <td style="font-family: 'Courier New', monospace; padding: 12px 8px;">${userData.investorPassword}</td>
-                                </tr>
                             </table>
                             
-                            <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #000000; margin-bottom: 20px;">
+                            <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f97316; margin-bottom: 20px; background-color: #fff7ed;">
                                 <tr>
                                     <td style="padding: 15px; font-size: 12px; line-height: 1.6;">
-                                        <p style="margin: 0 0 10px; font-weight: bold; text-transform: uppercase;">Password Usage:</p>
-                                        <p style="margin: 0 0 8px;"><strong>Portal Password:</strong> Use this to access the web dashboard</p>
-                                        <p style="margin: 0 0 8px;"><strong>Trader Password:</strong> Use this for full trading access on MT4/MT5 platforms</p>
-                                        <p style="margin: 0;"><strong>Investor Password:</strong> Use this for read-only access on MT4/MT5 platforms</p>
-                                    </td>
-                                </tr>
-                            </table>
-                            
-                            <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #000000; margin-bottom: 20px;">
-                                <tr>
-                                    <td style="padding: 15px; font-size: 12px; line-height: 1.6;">
-                                        <p style="margin: 0 0 10px; font-weight: bold; text-transform: uppercase;">Security Notice:</p>
-                                        <p style="margin: 0;">Never share your passwords with anyone. Enable two-factor authentication in your account settings. Jaaz Markets will never ask for your password via email or phone.</p>
+                                        <p style="margin: 0 0 10px; font-weight: bold; text-transform: uppercase; color: #c2410c;">📌 Next Steps:</p>
+                                        <p style="margin: 0 0 8px;">1. Login to your dashboard using the credentials above</p>
+                                        <p style="margin: 0 0 8px;">2. Complete your profile and KYC verification</p>
+                                        <p style="margin: 0 0 8px;">3. Create your first trading account (Demo or Real)</p>
+                                        <p style="margin: 0;">4. You will receive separate credentials for each trading account you create</p>
                                     </td>
                                 </tr>
                             </table>
@@ -211,8 +195,6 @@ ACCOUNT CREDENTIALS
 Account Number:    ${userData.accountNumber}
 Login Email:       ${userData.email}
 Portal Password:   ${userData.portalPassword}
-Trader Password:   ${userData.traderPassword}
-Investor Password: ${userData.investorPassword}
 
 PASSWORD USAGE:
 Portal Password: Use this to access the web dashboard
@@ -662,6 +644,222 @@ export const sendPasswordResetEmail = async (email, otp, name) => {
     }
 };
 
+// TRADING ACCOUNT CREATION EMAIL
+const tradingAccountCreatedHTML = (accountData) => `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Courier New', Courier, monospace; background-color: #ffffff;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 650px; margin: 0 auto; padding: 30px 20px;">
+        <tr>
+            <td>
+                <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #000000;">
+                    <tr>
+                        <td style="padding: 20px; border-bottom: 1px solid #000000;">
+                            <h1 style="margin: 0; font-size: 18px; font-weight: bold; text-transform: uppercase;">JAAZ MARKETS</h1>
+                            <p style="margin: 5px 0 0; font-size: 12px;">Trading Account Created</p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td style="padding: 20px;">
+                            <p style="margin: 0 0 15px; font-size: 14px;">Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                            
+                            <p style="margin: 0 0 10px; font-size: 14px;">Dear ${accountData.userName},</p>
+                            
+                            <p style="margin: 0 0 20px; font-size: 14px; line-height: 1.6;">
+                                Your ${accountData.accountType} trading account has been successfully created. Please find your account credentials below.
+                            </p>
+                            
+                            <table width="100%" cellpadding="8" cellspacing="0" style="border: 1px solid #000000; font-size: 13px; margin-bottom: 20px;">
+                                <tr style="border-bottom: 1px solid #000000;">
+                                    <td colspan="2" style="font-weight: bold; background-color: #f5f5f5; text-transform: uppercase; font-size: 12px;">
+                                        ACCOUNT CREDENTIALS
+                                    </td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #cccccc;">
+                                    <td style="width: 40%; font-weight: bold; padding: 12px 8px;">Account Number:</td>
+                                    <td style="font-family: 'Courier New', monospace; padding: 12px 8px;">${accountData.accountNumber}</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #cccccc;">
+                                    <td style="font-weight: bold; padding: 12px 8px;">Login:</td>
+                                    <td style="font-family: 'Courier New', monospace; padding: 12px 8px;">${accountData.login}</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #cccccc;">
+                                    <td style="font-weight: bold; padding: 12px 8px;">Platform:</td>
+                                    <td style="padding: 12px 8px;">${accountData.platform}</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #cccccc;">
+                                    <td style="font-weight: bold; padding: 12px 8px;">Server:</td>
+                                    <td style="padding: 12px 8px;">${accountData.server}</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #cccccc;">
+                                    <td style="font-weight: bold; padding: 12px 8px;">Account Type:</td>
+                                    <td style="padding: 12px 8px;">${accountData.accountClass}</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #cccccc;">
+                                    <td style="font-weight: bold; padding: 12px 8px;">Leverage:</td>
+                                    <td style="padding: 12px 8px;">${accountData.leverage}</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #cccccc;">
+                                    <td style="font-weight: bold; padding: 12px 8px;">Currency:</td>
+                                    <td style="padding: 12px 8px;">${accountData.currency}</td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight: bold; padding: 12px 8px;">Balance:</td>
+                                    <td style="padding: 12px 8px;">${accountData.currency} ${accountData.balance}</td>
+                                </tr>
+                            </table>
+                            
+                            <table width="100%" cellpadding="8" cellspacing="0" style="border: 2px solid #f97316; font-size: 13px; margin-bottom: 20px; background-color: #fff7ed;">
+                                <tr style="border-bottom: 1px solid #f97316;">
+                                    <td colspan="2" style="font-weight: bold; background-color: #fed7aa; text-transform: uppercase; font-size: 12px;">
+                                        🔐 TRADING PASSWORDS
+                                    </td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #fed7aa;">
+                                    <td style="width: 40%; font-weight: bold; padding: 12px 8px;">Trader Password:</td>
+                                    <td style="font-family: 'Courier New', monospace; padding: 12px 8px; font-weight: bold; color: #c2410c;">${accountData.traderPassword}</td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight: bold; padding: 12px 8px;">Investor Password:</td>
+                                    <td style="font-family: 'Courier New', monospace; padding: 12px 8px; font-weight: bold; color: #c2410c;">${accountData.investorPassword}</td>
+                                </tr>
+                            </table>
+                            
+                            <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #000000; margin-bottom: 20px;">
+                                <tr>
+                                    <td style="padding: 15px; font-size: 12px; line-height: 1.6;">
+                                        <p style="margin: 0 0 10px; font-weight: bold; text-transform: uppercase;">Password Usage:</p>
+                                        <p style="margin: 0 0 8px;"><strong>Trader Password:</strong> Use this for full trading access on ${accountData.platform} platform (place trades, modify orders, manage positions)</p>
+                                        <p style="margin: 0;"><strong>Investor Password:</strong> Use this for read-only access on ${accountData.platform} platform (view trades and history only, cannot trade)</p>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <table width="100%" cellpadding="0" cellspacing="0" style="border: 2px solid #dc2626; margin-bottom: 20px; background-color: #fef2f2;">
+                                <tr>
+                                    <td style="padding: 15px; font-size: 12px; line-height: 1.6;">
+                                        <p style="margin: 0 0 10px; font-weight: bold; text-transform: uppercase; color: #dc2626;">⚠️ SECURITY NOTICE:</p>
+                                        <p style="margin: 0 0 8px;">• Never share your Trader Password with anyone</p>
+                                        <p style="margin: 0 0 8px;">• You can share the Investor Password with mentors/analysts for monitoring only</p>
+                                        <p style="margin: 0 0 8px;">• Enable two-factor authentication in your account settings</p>
+                                        <p style="margin: 0;">• Jaaz Markets will never ask for your password via email or phone</p>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <p style="margin: 20px 0 10px; font-size: 14px;">Dashboard URL: ${process.env.FRONTEND_URL || 'https://jaazmarkets.com'}/dashboard</p>
+                            
+                            <p style="margin: 20px 0 0; font-size: 14px; line-height: 1.6;">
+                                Should you require any assistance, please contact our support team at support@jaazmarkets.com
+                            </p>
+                            
+                            <p style="margin: 20px 0 0; font-size: 14px;">
+                                Sincerely,<br/>
+                                <strong>Jaaz Markets Team</strong>
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td style="padding: 15px; border-top: 1px solid #000000; font-size: 11px; text-align: center;">
+                            &copy; ${new Date().getFullYear()} Jaaz Markets. All rights reserved.
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+`;
+
+const tradingAccountCreatedText = (accountData) => `
+JAAZ MARKETS
+Trading Account Created
+
+Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+
+Dear ${accountData.userName},
+
+Your ${accountData.accountType} trading account has been successfully created. Please find your account credentials below.
+
+ACCOUNT CREDENTIALS
+-------------------
+Account Number:    ${accountData.accountNumber}
+Login:             ${accountData.login}
+Platform:          ${accountData.platform}
+Server:            ${accountData.server}
+Account Type:      ${accountData.accountClass}
+Leverage:          ${accountData.leverage}
+Currency:          ${accountData.currency}
+Balance:           ${accountData.currency} ${accountData.balance}
+
+TRADING PASSWORDS
+-----------------
+Trader Password:   ${accountData.traderPassword}
+Investor Password: ${accountData.investorPassword}
+
+PASSWORD USAGE:
+Trader Password: Use this for full trading access on ${accountData.platform} platform (place trades, modify orders, manage positions)
+Investor Password: Use this for read-only access on ${accountData.platform} platform (view trades and history only, cannot trade)
+
+SECURITY NOTICE:
+• Never share your Trader Password with anyone
+• You can share the Investor Password with mentors/analysts for monitoring only
+• Enable two-factor authentication in your account settings
+• Jaaz Markets will never ask for your password via email or phone
+
+Dashboard URL: ${process.env.FRONTEND_URL || 'https://jaazmarkets.com'}/dashboard
+
+Should you require any assistance, please contact our support team at support@jaazmarkets.com
+
+Sincerely,
+Jaaz Markets Team
+
+---
+© ${new Date().getFullYear()} Jaaz Markets. All rights reserved.
+`;
+
+// Export function
+export const sendTradingAccountCreatedEmail = async (accountData) => {
+    try {
+        if (!transporter || !isVerified) {
+            const initialized = await initializeTransporter();
+            if (!initialized) {
+                throw new Error('Email service is not available');
+            }
+        }
+
+        const mailOptions = {
+            from: {
+                name: 'Jaaz Markets',
+                address: process.env.EMAIL_USER
+            },
+            to: accountData.email,
+            subject: `${accountData.accountType} Trading Account Created - ${accountData.accountNumber}`,
+            html: tradingAccountCreatedHTML(accountData),
+            text: tradingAccountCreatedText(accountData),
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log('Trading account creation email sent:', info.messageId);
+
+        return {
+            success: true,
+            messageId: info.messageId,
+        };
+
+    } catch (error) {
+        console.error('Error sending trading account email:', error);
+        throw new Error(`Failed to send email: ${error.message}`);
+    }
+};
+
 export const sendMarginCallEmail = async (userData) => {
     try {
         if (!transporter || !isVerified) {
@@ -702,6 +900,7 @@ export default {
     sendPasswordResetEmail,
     sendEmailVerificationOTP,
     sendMarginCallEmail,
+    sendTradingAccountCreatedEmail,
     generateOTP,
     generateTraderPassword,
     generateInvestorPassword

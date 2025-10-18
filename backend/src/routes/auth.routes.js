@@ -7,9 +7,9 @@ import {
     sendPasswordResetEmail,
     sendRegistrationEmail,
     generateOTP,
-    generateTraderPassword,
+
     sendEmailVerificationOTP,
-    generateInvestorPassword
+
 } from '../services/emailService.js';
 
 const router = express.Router();
@@ -125,7 +125,7 @@ router.post("/signup", async (req, res) => {
         // ===== CHECK IF USER EXISTS =====
         const existingUser = await User.findOne({
             email: email.toLowerCase()
-        }).select('+emailVerificationOTP +emailVerificationOTPExpiry +plainTraderPassword +plainInvestorPassword');
+        }).select('+emailVerificationOTP +emailVerificationOTPExpiry');
 
         // If user exists and is already verified - reject signup
         if (existingUser && existingUser.isVerified) {
@@ -159,17 +159,7 @@ router.post("/signup", async (req, res) => {
             existingUser.password = password;
             if (mobile) existingUser.phoneNumber = mobile;
 
-            // Regenerate trading passwords if they don't exist
-            if (!existingUser.plainTraderPassword) {
-                const newTraderPassword = generateTraderPassword();
-                existingUser.traderPassword = newTraderPassword;
-                existingUser.plainTraderPassword = newTraderPassword;
-            }
-            if (!existingUser.plainInvestorPassword) {
-                const newInvestorPassword = generateInvestorPassword();
-                existingUser.investorPassword = newInvestorPassword;
-                existingUser.plainInvestorPassword = newInvestorPassword;
-            }
+
 
             if (referralCode && !existingUser.referredBy) {
                 const referrer = await User.findOne({ userId: referralCode });
@@ -237,10 +227,6 @@ router.post("/signup", async (req, res) => {
             }
         }
 
-        // Auto-generate trading credentials (PLAIN TEXT)
-        const plainTraderPassword = generateTraderPassword();
-        const plainInvestorPassword = generateInvestorPassword();
-
         // Generate email verification OTP
         const verificationOTP = generateOTP();
 
@@ -249,10 +235,6 @@ router.post("/signup", async (req, res) => {
             userId,
             email: email.toLowerCase(),
             password,
-            traderPassword: plainTraderPassword,        // Will be hashed by pre-save hook
-            investorPassword: plainInvestorPassword,    // Will be hashed by pre-save hook
-            plainTraderPassword: plainTraderPassword,   // Stored as plain text temporarily
-            plainInvestorPassword: plainInvestorPassword, // Stored as plain text temporarily
             accountNumber,
             firstName,
             lastName,
@@ -321,7 +303,7 @@ router.post('/verify-email-otp', async (req, res) => {
         // Fetch user with plain passwords included
         const user = await User.findOne({
             email: email.toLowerCase(),
-        }).select('+emailVerificationOTP +emailVerificationOTPExpiry +password +traderPassword +investorPassword +plainTraderPassword +plainInvestorPassword');
+        }).select('+emailVerificationOTP +emailVerificationOTPExpiry +password');
 
         if (!user) {
             return res.status(404).json({
@@ -355,19 +337,11 @@ router.post('/verify-email-otp', async (req, res) => {
             });
         }
 
-        // ===== GET PLAIN PASSWORDS FROM DATABASE =====
-        const plainTraderPassword = user.plainTraderPassword || 'Not Available - Contact Support';
-        const plainInvestorPassword = user.plainInvestorPassword || 'Not Available - Contact Support';
-
         // Mark user as verified
         user.isVerified = true;
         user.accountStatus = 'active';
         user.emailVerificationOTP = undefined;
         user.emailVerificationOTPExpiry = undefined;
-
-        // ===== DELETE PLAIN PASSWORDS AFTER RETRIEVAL =====
-        user.plainTraderPassword = undefined;
-        user.plainInvestorPassword = undefined;
 
         await user.save();
 
@@ -378,8 +352,6 @@ router.post('/verify-email-otp', async (req, res) => {
                 firstName: user.firstName,
                 lastName: user.lastName,
                 portalPassword: password,              // From request body
-                traderPassword: plainTraderPassword,   // From database
-                investorPassword: plainInvestorPassword, // From database
                 accountNumber: user.accountNumber,
                 currency: user.currency,
                 referralCode: user.userId,
@@ -428,7 +400,7 @@ router.post('/resend-verification-otp', async (req, res) => {
 
         const user = await User.findOne({
             email: email.toLowerCase()
-        }).select('+emailVerificationOTP +emailVerificationOTPExpiry +plainTraderPassword +plainInvestorPassword');
+        }).select('+emailVerificationOTP +emailVerificationOTPExpiry');
 
         if (!user) {
             return res.status(404).json({
@@ -444,18 +416,7 @@ router.post('/resend-verification-otp', async (req, res) => {
             });
         }
 
-        // Ensure plain passwords still exist
-        if (!user.plainTraderPassword || !user.plainInvestorPassword) {
-            console.warn(`⚠️ Plain passwords missing for ${user.email} - regenerating`);
 
-            const newTraderPassword = generateTraderPassword();
-            const newInvestorPassword = generateInvestorPassword();
-
-            user.traderPassword = newTraderPassword;
-            user.investorPassword = newInvestorPassword;
-            user.plainTraderPassword = newTraderPassword;
-            user.plainInvestorPassword = newInvestorPassword;
-        }
 
         // Generate new OTP
         const verificationOTP = generateOTP();

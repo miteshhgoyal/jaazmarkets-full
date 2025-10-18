@@ -1,5 +1,6 @@
 // models/TradingAccount.js
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 
 const tradingAccountSchema = new mongoose.Schema({
     userId: {
@@ -23,6 +24,30 @@ const tradingAccountSchema = new mongoose.Schema({
     password: {
         type: String,
         required: true,
+        select: false
+    },
+
+    // ===== NEW: TRADER & INVESTOR PASSWORDS =====
+    traderPassword: {
+        type: String,
+        required: true,
+        select: false  // Hidden by default for security
+    },
+    investorPassword: {
+        type: String,
+        required: true,
+        select: false  // Hidden by default for security
+    },
+
+    // TEMPORARY - Store plain passwords until email is sent
+    plainTraderPassword: {
+        type: String,
+        required: false,
+        select: false
+    },
+    plainInvestorPassword: {
+        type: String,
+        required: false,
         select: false
     },
 
@@ -91,6 +116,12 @@ const tradingAccountSchema = new mongoose.Schema({
         index: true
     },
 
+    // Nickname
+    nickname: {
+        type: String,
+        default: ''
+    },
+
     // Orders Reference
     orders: [{
         type: mongoose.Schema.Types.ObjectId,
@@ -105,6 +136,30 @@ const tradingAccountSchema = new mongoose.Schema({
 }, {
     timestamps: true
 });
+
+// Hash trader password before saving
+tradingAccountSchema.pre('save', async function (next) {
+    if (!this.isModified('traderPassword') || !this.traderPassword) return next();
+    this.traderPassword = await bcrypt.hash(this.traderPassword, 12);
+    next();
+});
+
+// Hash investor password before saving
+tradingAccountSchema.pre('save', async function (next) {
+    if (!this.isModified('investorPassword') || !this.investorPassword) return next();
+    this.investorPassword = await bcrypt.hash(this.investorPassword, 12);
+    next();
+});
+
+// Compare trader password method
+tradingAccountSchema.methods.compareTraderPassword = async function (candidatePassword) {
+    return await bcrypt.compare(candidatePassword, this.traderPassword);
+};
+
+// Compare investor password method
+tradingAccountSchema.methods.compareInvestorPassword = async function (candidatePassword) {
+    return await bcrypt.compare(candidatePassword, this.investorPassword);
+};
 
 // Index for querying user's accounts
 tradingAccountSchema.index({ userId: 1, accountType: 1 });

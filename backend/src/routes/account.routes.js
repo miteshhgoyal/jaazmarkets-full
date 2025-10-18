@@ -1,9 +1,13 @@
-// backend/src/routes/account.routes.js
 import express from 'express';
 import TradingAccount from '../models/TradingAccount.js';
 import User from '../models/User.js';
 import Settings from '../models/Setting.js';
 import { authenticateToken, authorize } from '../middlewares/auth.js';
+import {
+    sendTradingAccountCreatedEmail,
+    generateTraderPassword,
+    generateInvestorPassword
+} from '../services/emailService.js';
 
 const router = express.Router();
 
@@ -174,10 +178,23 @@ router.post('/create', authenticateToken, async (req, res) => {
             });
         }
 
+        // Get user details for email
+        const user = await User.findById(req.user.userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
         const accountNumber = await generateAccountNumber();
         const login = generateLogin();
         const password = generatePassword();
         const server = getServerUrl(platform);
+
+        // ===== GENERATE TRADER & INVESTOR PASSWORDS =====
+        const plainTraderPassword = generateTraderPassword();
+        const plainInvestorPassword = generateInvestorPassword();
 
         const balance = accountType === 'Demo' ? (startingBalance || 10000) : 0;
 
@@ -186,6 +203,10 @@ router.post('/create', authenticateToken, async (req, res) => {
             accountNumber,
             login,
             password,
+            traderPassword: plainTraderPassword,      // Will be hashed by pre-save hook
+            investorPassword: plainInvestorPassword,  // Will be hashed by pre-save hook
+            plainTraderPassword: plainTraderPassword,   // Temporary - for email
+            plainInvestorPassword: plainInvestorPassword, // Temporary - for email
             accountType,
             platform,
             accountClass,
@@ -195,23 +216,25 @@ router.post('/create', authenticateToken, async (req, res) => {
             balance,
             equity: balance,
             freeMargin: balance,
+            nickname: nickname || accountClass,
             status: 'active'
         });
 
         await tradingAccount.save();
 
+        // Add to user's trading accounts
         await User.findByIdAndUpdate(
             req.user.userId,
             { $push: { tradingAccounts: tradingAccount._id } }
         );
 
-        res.status(201).json({
-            success: true,
-            message: 'Trading account created successfully',
-            data: {
+        // ===== SEND EMAIL WITH ALL CREDENTIALS =====
+        try {
+            await sendTradingAccountCreatedEmail({
+                email: user.email,
+                userName: `${user.firstName} ${user.lastName}`,
                 accountNumber: tradingAccount.accountNumber,
                 login: tradingAccount.login,
-                password: password,
                 platform: tradingAccount.platform,
                 server: tradingAccount.server,
                 accountType: tradingAccount.accountType,
@@ -219,7 +242,38 @@ router.post('/create', authenticateToken, async (req, res) => {
                 currency: tradingAccount.currency,
                 leverage: tradingAccount.leverage,
                 balance: tradingAccount.balance,
-                nickname: nickname || accountClass
+                traderPassword: plainTraderPassword,    // Plain text for email
+                investorPassword: plainInvestorPassword // Plain text for email
+            });
+            console.log(`✅ Trading account email sent to ${user.email}`);
+
+            // ===== DELETE PLAIN PASSWORDS AFTER EMAIL SENT =====
+            tradingAccount.plainTraderPassword = undefined;
+            tradingAccount.plainInvestorPassword = undefined;
+            await tradingAccount.save();
+
+        } catch (emailError) {
+            console.error('❌ Trading account email failed:', emailError);
+            // Don't fail the request - account is still created
+        }
+
+        res.status(201).json({
+            success: true,
+            message: 'Trading account created successfully',
+            data: {
+                accountNumber: tradingAccount.accountNumber,
+                login: tradingAccount.login,
+                password: password,  // Main password (for MT terminal login)
+                traderPassword: plainTraderPassword,
+                investorPassword: plainInvestorPassword,
+                platform: tradingAccount.platform,
+                server: tradingAccount.server,
+                accountType: tradingAccount.accountType,
+                accountClass: tradingAccount.accountClass,
+                currency: tradingAccount.currency,
+                leverage: tradingAccount.leverage,
+                balance: tradingAccount.balance,
+                nickname: tradingAccount.nickname
             }
         });
     } catch (error) {
