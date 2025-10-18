@@ -22,7 +22,7 @@ const createTransporter = () => {
         maxMessages: 100,
     };
 
-    return nodemailer.createTransporter(config);
+    return nodemailer.createTransport(config);
 };
 
 let transporter = null;
