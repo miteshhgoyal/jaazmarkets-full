@@ -3,7 +3,7 @@ import { tokenService } from './tokenService';
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_REACT_APP_API_URL || 'https://jaazmarkets-backend.onrender.com',
-    timeout: 30000,
+    timeout: 120000,
     headers: {
         'Content-Type': 'application/json',
     },
