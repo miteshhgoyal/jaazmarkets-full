@@ -494,7 +494,7 @@ const Deposits = () => {
                         <td className="px-4 py-3 whitespace-nowrap">
                           {user ? (
                             <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold text-xs">
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-semibold text-xs">
                                 {user.firstName?.charAt(0) || ""}
                                 {user.lastName?.charAt(0) || ""}
                               </div>
@@ -775,7 +775,7 @@ const ViewDepositModal = ({ deposit, onClose }) => {
                 User Information
               </h3>
               <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-semibold">
                   {user.firstName?.charAt(0)}
                   {user.lastName?.charAt(0)}
                 </div>

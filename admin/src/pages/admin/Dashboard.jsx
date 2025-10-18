@@ -462,7 +462,7 @@ const Dashboard = () => {
         </div>
 
         {/* Total Equity */}
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-4 text-white">
+        <div className="bg-gradient-to-br from-orange-400 to-orange-600 rounded-xl p-4 text-white">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
               <p className="text-xs uppercase tracking-wide font-medium opacity-90 mb-1">

@@ -508,7 +508,7 @@ const Deposits = () => {
                   </>
                 ) : (
                   <>
-                    <div className="w-20 h-20 bg-gradient-to-br from-blue-400 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <div className="w-20 h-20 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center mx-auto mb-6">
                       <Wallet className="text-white" size={40} />
                     </div>
                     <h2 className="text-3xl font-bold mb-2 text-gray-900">
@@ -532,7 +532,7 @@ const Deposits = () => {
 
                         <div className="relative w-full h-3 bg-blue-200 rounded-full overflow-hidden">
                           <div
-                            className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-1000 ease-out"
+                            className="absolute top-0 left-0 h-full bg-gradient-to-r from-orange-400 to-orange-600 transition-all duration-1000 ease-out"
                             style={{ width: `${verificationProgress}%` }}
                           >
                             <div className="absolute inset-0 bg-white/30 animate-pulse"></div>
@@ -773,7 +773,7 @@ const Deposits = () => {
             {!showConfirmation ? (
               <div className="max-w-2xl mx-auto space-y-6">
                 {/* Info Banner */}
-                <Card className="p-6 bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+                <Card className="p-6 bg-gradient-to-br from-orange-400 to-orange-600 text-white">
                   <div className="flex items-start gap-4">
                     <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
                       <Zap size={24} className="text-white" />
@@ -1010,7 +1010,7 @@ const Deposits = () => {
 
                 <Card className="p-8">
                   <div className="text-center">
-                    <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <div className="w-16 h-16 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center mx-auto mb-6">
                       <Zap className="text-white" size={32} />
                     </div>
 

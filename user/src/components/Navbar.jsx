@@ -193,7 +193,7 @@ const Navbar = ({ toggleSidebar, toggleSidebarCollapse, sidebarCollapsed }) => {
                 {/* User Info */}
                 <div className="px-4 py-3 border-b border-slate-100">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
+                    <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center">
                       <span className="text-white font-bold text-sm">
                         {userInfo?.name?.charAt(0)?.toUpperCase() || "U"}
                       </span>

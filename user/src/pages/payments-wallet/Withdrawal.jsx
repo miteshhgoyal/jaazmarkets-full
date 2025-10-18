@@ -774,7 +774,7 @@ const Withdrawal = () => {
               /* Step 1: Select Withdrawal Method */
               <div className="space-y-6">
                 {/* Info Banner for Crypto */}
-                <Card className="p-6 bg-gradient-to-br from-purple-500 to-indigo-600 text-white">
+                <Card className="p-6 bg-gradient-to-br from-orange-400 to-orange-600 text-white">
                   <div className="flex items-start gap-4">
                     <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
                       <Zap size={24} className="text-white" />
@@ -1258,7 +1258,7 @@ const Withdrawal = () => {
                 <div className="max-w-2xl mx-auto">
                   <Card className="p-8">
                     <div className="text-center">
-                      <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <div className="w-16 h-16 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center mx-auto mb-6">
                         <img
                           src={selectedWithdrawalMethod.image}
                           alt={selectedWithdrawalMethod.name}
