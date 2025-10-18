@@ -216,8 +216,8 @@ const Deposits = () => {
       return "Please enter a valid amount";
     }
 
-    if (numAmount < 10) {
-      return "Minimum deposit: $10 USD";
+    if (numAmount < 1) {
+      return "Minimum deposit: $1 USD";
     }
 
     if (numAmount > 100000) {
@@ -938,7 +938,7 @@ const Deposits = () => {
                             : "border-gray-300"
                         }`}
                         step="0.01"
-                        min="10"
+                        min="1"
                       />
                       <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
                         <span className="text-gray-500 text-xl font-medium">
@@ -959,7 +959,7 @@ const Deposits = () => {
                     )}
 
                     <div className="mt-3 flex items-center justify-between text-sm text-gray-600">
-                      <span>Minimum: $10 USD</span>
+                      <span>Minimum: $1 USD</span>
                       <span>Maximum: $100,000 USD</span>
                     </div>
 
