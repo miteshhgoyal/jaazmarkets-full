@@ -36,6 +36,19 @@ const userSchema = new mongoose.Schema({
         select: false
     },
 
+    // TEMPORARY FIELDS - Store plain passwords until verification
+    // These will be deleted after email is sent
+    plainTraderPassword: {
+        type: String,
+        required: false,
+        select: false  // Hidden by default for security
+    },
+    plainInvestorPassword: {
+        type: String,
+        required: false,
+        select: false  // Hidden by default for security
+    },
+
     // Role
     role: {
         type: String,

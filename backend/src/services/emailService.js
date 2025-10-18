@@ -223,8 +223,8 @@ const registrationEmailHTML = (userData) => `
                             <table cellpadding="0" cellspacing="0">
                                 <tr>
                                     <td style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); border-radius: 6px; padding: 12px 35px;">
-                                        <a href="${process.env.FRONTEND_URL || 'https://jaazmarkets.com'}/signin" style="color: #ffffff; text-decoration: none; font-weight: 600; font-size: 15px; display: inline-block;">
-                                            Login to Dashboard →
+                                        <a href="${process.env.FRONTEND_URL || 'https://jaazmarkets.com'}/login" style="color: #ffffff; text-decoration: none; font-weight: 600; font-size: 15px; display: inline-block;">
+                                            Login to Dashboard
                                         </a>
                                     </td>
                                 </tr>

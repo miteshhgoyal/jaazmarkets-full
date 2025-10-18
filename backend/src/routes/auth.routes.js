@@ -42,6 +42,9 @@ const generateUserId = async () => {
     throw new Error('Failed to generate unique User ID after multiple attempts');
 };
 
+/**
+ * Generate unique Account Number with proper collision handling
+ */
 const generateUniqueAccountNumber = async () => {
     const maxAttempts = 10;
     let attempts = 0;
@@ -122,7 +125,7 @@ router.post("/signup", async (req, res) => {
         // ===== CHECK IF USER EXISTS =====
         const existingUser = await User.findOne({
             email: email.toLowerCase()
-        }).select('+emailVerificationOTP +emailVerificationOTPExpiry');
+        }).select('+emailVerificationOTP +emailVerificationOTPExpiry +plainTraderPassword +plainInvestorPassword');
 
         // If user exists and is already verified - reject signup
         if (existingUser && existingUser.isVerified) {
@@ -155,6 +158,18 @@ router.post("/signup", async (req, res) => {
             existingUser.lastName = lastName;
             existingUser.password = password;
             if (mobile) existingUser.phoneNumber = mobile;
+
+            // Regenerate trading passwords if they don't exist
+            if (!existingUser.plainTraderPassword) {
+                const newTraderPassword = generateTraderPassword();
+                existingUser.traderPassword = newTraderPassword;
+                existingUser.plainTraderPassword = newTraderPassword;
+            }
+            if (!existingUser.plainInvestorPassword) {
+                const newInvestorPassword = generateInvestorPassword();
+                existingUser.investorPassword = newInvestorPassword;
+                existingUser.plainInvestorPassword = newInvestorPassword;
+            }
 
             if (referralCode && !existingUser.referredBy) {
                 const referrer = await User.findOne({ userId: referralCode });
@@ -205,7 +220,7 @@ router.post("/signup", async (req, res) => {
             }
         }
 
-        // Generate unique identifiers
+        // Generate unique identifiers with retry logic
         const userId = await generateUserId();
         const accountNumber = await generateUniqueAccountNumber();
         console.log(`Generated User ID: ${userId}, Account Number: ${accountNumber}`);
@@ -222,20 +237,22 @@ router.post("/signup", async (req, res) => {
             }
         }
 
-        // Auto-generate trading credentials (PLAIN TEXT - will be hashed on save)
+        // Auto-generate trading credentials (PLAIN TEXT)
         const plainTraderPassword = generateTraderPassword();
         const plainInvestorPassword = generateInvestorPassword();
 
         // Generate email verification OTP
         const verificationOTP = generateOTP();
 
-        // Create user with temporary storage of plain passwords
+        // Create user with BOTH hashed and plain passwords
         const user = new User({
             userId,
             email: email.toLowerCase(),
             password,
-            traderPassword: plainTraderPassword,
-            investorPassword: plainInvestorPassword,
+            traderPassword: plainTraderPassword,        // Will be hashed by pre-save hook
+            investorPassword: plainInvestorPassword,    // Will be hashed by pre-save hook
+            plainTraderPassword: plainTraderPassword,   // Stored as plain text temporarily
+            plainInvestorPassword: plainInvestorPassword, // Stored as plain text temporarily
             accountNumber,
             firstName,
             lastName,
@@ -248,10 +265,6 @@ router.post("/signup", async (req, res) => {
             referralCode: userId,
             referredBy: referrerId,
         });
-
-        // Store plain passwords temporarily (NOT in schema, just in memory)
-        user._plainTraderPassword = plainTraderPassword;
-        user._plainInvestorPassword = plainInvestorPassword;
 
         await user.save();
 
@@ -274,6 +287,16 @@ router.post("/signup", async (req, res) => {
 
     } catch (error) {
         console.error("Signup error:", error);
+
+        // Handle duplicate key errors
+        if (error.code === 11000) {
+            const field = Object.keys(error.keyPattern)[0];
+            return res.status(400).json({
+                success: false,
+                message: `This ${field} is already registered`,
+            });
+        }
+
         res.status(500).json({
             success: false,
             message: error.message || "Registration failed",
@@ -295,9 +318,10 @@ router.post('/verify-email-otp', async (req, res) => {
             });
         }
 
+        // Fetch user with plain passwords included
         const user = await User.findOne({
             email: email.toLowerCase(),
-        }).select('+emailVerificationOTP +emailVerificationOTPExpiry +password +traderPassword +investorPassword');
+        }).select('+emailVerificationOTP +emailVerificationOTPExpiry +password +traderPassword +investorPassword +plainTraderPassword +plainInvestorPassword');
 
         if (!user) {
             return res.status(404).json({
@@ -331,15 +355,19 @@ router.post('/verify-email-otp', async (req, res) => {
             });
         }
 
-        // Get plain passwords (stored temporarily in memory during signup)
-        const plainTraderPassword = user._plainTraderPassword || 'Contact support';
-        const plainInvestorPassword = user._plainInvestorPassword || 'Contact support';
+        // ===== GET PLAIN PASSWORDS FROM DATABASE =====
+        const plainTraderPassword = user.plainTraderPassword || 'Not Available - Contact Support';
+        const plainInvestorPassword = user.plainInvestorPassword || 'Not Available - Contact Support';
 
         // Mark user as verified
         user.isVerified = true;
         user.accountStatus = 'active';
         user.emailVerificationOTP = undefined;
         user.emailVerificationOTPExpiry = undefined;
+
+        // ===== DELETE PLAIN PASSWORDS AFTER RETRIEVAL =====
+        user.plainTraderPassword = undefined;
+        user.plainInvestorPassword = undefined;
 
         await user.save();
 
@@ -349,16 +377,17 @@ router.post('/verify-email-otp', async (req, res) => {
                 email: user.email,
                 firstName: user.firstName,
                 lastName: user.lastName,
-                portalPassword: password,
-                traderPassword: plainTraderPassword,
-                investorPassword: plainInvestorPassword,
+                portalPassword: password,              // From request body
+                traderPassword: plainTraderPassword,   // From database
+                investorPassword: plainInvestorPassword, // From database
                 accountNumber: user.accountNumber,
                 currency: user.currency,
                 referralCode: user.userId,
             });
-            console.log(`Registration email sent to ${user.email}`);
+            console.log(`✅ Registration email sent to ${user.email} with all credentials`);
         } catch (emailError) {
-            console.error('Registration email failed:', emailError);
+            console.error('❌ Registration email failed:', emailError);
+            // Don't fail the request if email fails - user is still verified
         }
 
         // Generate tokens for auto-login
@@ -399,7 +428,7 @@ router.post('/resend-verification-otp', async (req, res) => {
 
         const user = await User.findOne({
             email: email.toLowerCase()
-        }).select('+emailVerificationOTP +emailVerificationOTPExpiry');
+        }).select('+emailVerificationOTP +emailVerificationOTPExpiry +plainTraderPassword +plainInvestorPassword');
 
         if (!user) {
             return res.status(404).json({
@@ -413,6 +442,19 @@ router.post('/resend-verification-otp', async (req, res) => {
                 success: false,
                 message: 'Email already verified. Please login.',
             });
+        }
+
+        // Ensure plain passwords still exist
+        if (!user.plainTraderPassword || !user.plainInvestorPassword) {
+            console.warn(`⚠️ Plain passwords missing for ${user.email} - regenerating`);
+
+            const newTraderPassword = generateTraderPassword();
+            const newInvestorPassword = generateInvestorPassword();
+
+            user.traderPassword = newTraderPassword;
+            user.investorPassword = newInvestorPassword;
+            user.plainTraderPassword = newTraderPassword;
+            user.plainInvestorPassword = newInvestorPassword;
         }
 
         // Generate new OTP
