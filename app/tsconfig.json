@@ -1,0 +1,18 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts",
+    "nativewind-env.d.ts"
+, "app/(app)/home.jsx", "app/(app)/_layout.jsx", "services/env.js", "services/firebase.js", "context/authContext.js", "app/_layout.js", "app/index.js", "app/auth.js", "app/(auth)/signup.js"  ]
+}
