@@ -1927,7 +1927,7 @@ router.get('/blockbee/deposits/logs/:paymentId', authenticateToken, async (req, 
 });
 
 // ============================================
-// BLOCKBEE WITHDRAWAL - CREATE REQUEST (User)
+// BLOCKBEE WITHDRAWAL - CREATE REQUEST (User) - FIXED
 // ============================================
 router.post('/blockbee/withdrawal/request', authenticateToken, async (req, res) => {
     try {
@@ -1972,8 +1972,7 @@ router.post('/blockbee/withdrawal/request', authenticateToken, async (req, res) 
         // Get withdrawal method settings to calculate fee
         const settings = await Settings.findOne();
         const methodConfig = settings?.withdrawalMethods?.find(m =>
-            m.currencyType === coin.split('/')[0].toUpperCase() ||
-            m.type === 'crypto'
+            m.currencyType === coin.split('-')[0].toUpperCase() && m.type === 'crypto'
         );
 
         // Calculate fee
@@ -1988,7 +1987,7 @@ router.post('/blockbee/withdrawal/request', authenticateToken, async (req, res) 
         const netAmount = amount - fee;
 
         // Generate transaction ID
-        const transactionId = `WDR${Date.now()}${Math.floor(Math.random() * 1000)}`;
+        const transactionId = `WDR-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
         // Determine coin name based on ticker
         const coinName = coin === 'bep20/usdt' ? 'BEP20 (USDT)' :
@@ -1996,7 +1995,7 @@ router.post('/blockbee/withdrawal/request', authenticateToken, async (req, res) 
                 coin === 'erc20/usdt' ? 'ERC20 (USDT)' :
                     coin.toUpperCase();
 
-        // Create withdrawal record
+        // ✅ FIX: Create withdrawal - DO NOT deduct balance yet
         const withdrawal = new Withdrawal({
             userId,
             tradingAccountId,
@@ -2017,23 +2016,16 @@ router.post('/blockbee/withdrawal/request', authenticateToken, async (req, res) 
                 blockBeeStatus: 'created',
                 createdAt: new Date()
             },
-            status: 'pending' // Will be approved by admin or auto-approved
+            status: 'pending' // ✅ Pending admin/auto approval
         });
 
         await withdrawal.save();
 
-        // Deduct amount from account balance immediately (pending withdrawal)
-        account.balance -= amount;
-        account.equity = account.balance;
-        account.freeMargin = account.balance;
-        await account.save();
-
-        // TODO: In production, you would call BlockBee Payout API here
-        // For now, we'll mark it as pending admin approval
+        // ✅ FIX: DO NOT deduct balance here - wait for bulk process
 
         res.status(201).json({
             success: true,
-            message: 'Withdrawal request created successfully',
+            message: 'Withdrawal request created successfully. Pending approval.',
             data: {
                 transactionId: withdrawal.transactionId,
                 amount: withdrawal.amount,
@@ -2057,16 +2049,16 @@ router.post('/blockbee/withdrawal/request', authenticateToken, async (req, res) 
 });
 
 // ============================================
-// BLOCKBEE WITHDRAWAL - BATCH PROCESS (Admin) - UPDATED
+// BLOCKBEE WITHDRAWAL - BATCH PROCESS (Admin) - FIXED
 // ============================================
 router.post('/blockbee/withdrawal/process-batch',
     authenticateToken,
     authorize(['admin', 'superadmin']),
     async (req, res) => {
         try {
-            const { withdrawalIds } = req.body; // Optional: pass specific IDs
+            const { withdrawalIds } = req.body;
 
-            // Get BlockBee settings from database
+            // Get BlockBee settings
             const blockBeeSettings = await getBlockBeeSettings();
 
             // Get pending BlockBee withdrawals
@@ -2075,12 +2067,12 @@ router.post('/blockbee/withdrawal/process-batch',
                 withdrawalMethod: 'blockbee-crypto'
             };
 
-            // If specific IDs provided, use them
             if (withdrawalIds && withdrawalIds.length > 0) {
                 query._id = { $in: withdrawalIds };
             }
 
-            const pendingWithdrawals = await Withdrawal.find(query);
+            const pendingWithdrawals = await Withdrawal.find(query)
+                .populate('tradingAccountId');
 
             if (pendingWithdrawals.length === 0) {
                 return res.json({
@@ -2101,7 +2093,7 @@ router.post('/blockbee/withdrawal/process-batch',
 
             const results = [];
 
-            // Process each coin separately using bulk process
+            // Process each coin separately
             for (const [ticker, withdrawals] of Object.entries(withdrawalsByCoin)) {
                 try {
                     // Build outputs object for BlockBee
@@ -2113,7 +2105,7 @@ router.post('/blockbee/withdrawal/process-batch',
                     console.log(`Processing ${withdrawals.length} ${ticker} withdrawals...`);
                     console.log('Outputs:', outputs);
 
-                    // Call BlockBee bulk process API
+                    // Call BlockBee bulk/process API
                     const response = await fetch(
                         `https://api.blockbee.io/${ticker}/payout/request/bulk/process/?apikey=${blockBeeSettings.apiKeyV2}`,
                         {
@@ -2127,13 +2119,12 @@ router.post('/blockbee/withdrawal/process-batch',
                     );
 
                     const result = await response.json();
-
                     console.log(`BlockBee Response for ${ticker}:`, JSON.stringify(result, null, 2));
 
                     if (result.status === 'success') {
                         const payoutId = result.payout_info.id;
 
-                        // Update withdrawal records
+                        // ✅ FIX: Update withdrawal records AND deduct balances
                         for (const w of withdrawals) {
                             w.blockBee.payoutId = payoutId;
                             w.blockBee.blockBeeStatus = 'processing';
@@ -2141,6 +2132,19 @@ router.post('/blockbee/withdrawal/process-batch',
                             w.status = 'processing';
                             w.processedBy = req.user.userId;
                             w.processedAt = new Date();
+
+                            // ✅ FIX: Deduct balance NOW (not on request creation)
+                            if (w.tradingAccountId) {
+                                const account = await TradingAccount.findById(w.tradingAccountId);
+                                if (account) {
+                                    account.balance -= w.amount;
+                                    account.equity = account.balance;
+                                    account.freeMargin = account.balance;
+                                    await account.save();
+                                    console.log(`✅ Deducted ${w.amount} from ${account.accountNumber}`);
+                                }
+                            }
+
                             await w.save();
                         }
 
@@ -2160,24 +2164,12 @@ router.post('/blockbee/withdrawal/process-batch',
                         console.log(`✅ Processed ${withdrawals.length} ${ticker} withdrawals. Payout ID: ${payoutId}`);
 
                     } else {
-                        // Mark all as failed
+                        // ✅ FIX: Mark all as failed - NO balance deduction
                         for (const w of withdrawals) {
                             w.blockBee.blockBeeStatus = 'error';
                             w.blockBee.errorMessage = result.error || 'Failed to process';
                             w.status = 'failed';
-
-                            // Refund to account
-                            await TradingAccount.findByIdAndUpdate(
-                                w.tradingAccountId,
-                                {
-                                    $inc: {
-                                        balance: w.amount,
-                                        equity: w.amount,
-                                        freeMargin: w.amount
-                                    }
-                                }
-                            );
-
+                            w.rejectionReason = result.error;
                             await w.save();
                         }
 
@@ -2198,7 +2190,6 @@ router.post('/blockbee/withdrawal/process-batch',
                         status: 'error',
                         error: coinError.message
                     });
-
                     console.error(`Error processing ${ticker} withdrawals:`, coinError);
                 }
             }
@@ -2703,7 +2694,7 @@ router.post('/blockbee/webhook/deposit', express.json(), async (req, res) => {
 });
 
 // ============================================
-// AUTO-CHECK SINGLE WITHDRAWAL STATUS
+// USER: Check single withdrawal status (NEW - for frontend polling)
 // ============================================
 router.get('/withdrawals/:withdrawalId/check-status', authenticateToken, async (req, res) => {
     try {
@@ -2712,14 +2703,19 @@ router.get('/withdrawals/:withdrawalId/check-status', authenticateToken, async (
         const withdrawal = await Withdrawal.findOne({
             _id: withdrawalId,
             userId: req.user.userId
-        });
+        }).populate('tradingAccountId', 'accountNumber balance');
 
         if (!withdrawal) {
-            return res.status(404).json({ success: false, message: 'Withdrawal not found' });
+            return res.status(404).json({
+                success: false,
+                message: 'Withdrawal not found'
+            });
         }
 
-        // Only check if it has a payoutId and is in processing
-        if (!withdrawal.blockBee?.payoutId || withdrawal.status === 'completed' || withdrawal.status === 'failed') {
+        // Only check if it has a payoutId and is processing
+        if (!withdrawal.blockBee?.payoutId ||
+            withdrawal.status === 'completed' ||
+            withdrawal.status === 'failed') {
             return res.json({
                 success: true,
                 data: {
@@ -2732,52 +2728,38 @@ router.get('/withdrawals/:withdrawalId/check-status', authenticateToken, async (
 
         // Fetch status from BlockBee
         const blockBeeSettings = await getBlockBeeSettings();
-        const ticker = withdrawal.blockBee.ticker || 'bep20_usdt';
         const payoutId = withdrawal.blockBee.payoutId;
 
-        const apiUrl = `https://api.blockbee.io/${ticker}/payout/info/?apikey=${blockBeeSettings.apiKeyV2}&payoutid=${payoutId}`;
-        const response = await httpsGet(apiUrl);
+        const response = await fetch(
+            'https://api.blockbee.io/payout/status/?apikey=' + blockBeeSettings.apiKeyV2,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': blockBeeSettings.apiKeyV2
+                },
+                body: JSON.stringify({ payout_id: payoutId })
+            }
+        );
 
-        if (response.status === 'success' && response.data) {
-            const payoutData = response.data;
+        const result = await response.json();
 
-            // Update withdrawal
-            withdrawal.blockBee.blockBeeStatus = payoutData.status;
+        if (result.status === 'success') {
+            const payoutStatus = result.payout_info.status.toLowerCase();
+
+            withdrawal.blockBee.blockBeeStatus = payoutStatus;
             withdrawal.blockBee.lastStatusCheck = new Date();
 
-            if (payoutData.txid || payoutData.txhash) {
-                withdrawal.withdrawalDetails.txHash = payoutData.txid || payoutData.txhash;
-                withdrawal.blockBee.txHash = payoutData.txid || payoutData.txhash;
-            }
-
-            // ✅ FIX: Auto-complete when done
-            if (payoutData.status === 'done' || payoutData.status === 'completed') {
+            if (payoutStatus === 'done') {
                 withdrawal.status = 'completed';
                 withdrawal.completedAt = new Date();
-
-                // Update user total withdrawals
-                await User.findByIdAndUpdate(withdrawal.userId, {
-                    $inc: { totalWithdrawals: withdrawal.amount }
-                });
-
-                console.log('✅ Withdrawal auto-completed:', withdrawal.transactionId);
-            }
-            // ✅ FIX: Auto-fail and refund if error
-            else if (payoutData.status === 'error' || payoutData.status === 'failed') {
+                if (result.payout_info.txid) {
+                    withdrawal.blockBee.txHash = result.payout_info.txid;
+                    withdrawal.withdrawalDetails.txHash = result.payout_info.txid;
+                }
+            } else if (payoutStatus === 'error') {
                 withdrawal.status = 'failed';
-                withdrawal.blockBee.errorMessage = payoutData.error || 'Payout failed';
-                withdrawal.rejectionReason = payoutData.error;
-
-                // Refund to account
-                await TradingAccount.findByIdAndUpdate(withdrawal.tradingAccountId, {
-                    $inc: {
-                        balance: withdrawal.amount,
-                        equity: withdrawal.amount,
-                        freeMargin: withdrawal.amount
-                    }
-                });
-
-                console.log('❌ Withdrawal failed and refunded:', withdrawal.transactionId);
+                withdrawal.blockBee.errorMessage = result.payout_info.error;
             }
 
             await withdrawal.save();
@@ -2785,19 +2767,28 @@ router.get('/withdrawals/:withdrawalId/check-status', authenticateToken, async (
             return res.json({
                 success: true,
                 data: {
+                    transactionId: withdrawal.transactionId,
                     status: withdrawal.status,
                     blockBeeStatus: withdrawal.blockBee.blockBeeStatus,
-                    txHash: withdrawal.withdrawalDetails?.txHash
+                    txHash: withdrawal.withdrawalDetails.txHash
                 }
+            });
+        } else {
+            return res.json({
+                success: false,
+                message: 'Failed to fetch status from BlockBee'
             });
         }
 
-        res.json({ success: false, message: 'Failed to fetch status from BlockBee' });
     } catch (error) {
         console.error('Withdrawal status check error:', error);
-        res.status(500).json({ success: false, message: 'Failed to check withdrawal status' });
+        res.status(500).json({
+            success: false,
+            message: 'Failed to check withdrawal status'
+        });
     }
 });
+
 
 // FIXED: CREATE BLOCKBEE DEPOSIT (Direct Crypto Address)
 router.post('/deposits/blockbee/create', authenticateToken, async (req, res) => {

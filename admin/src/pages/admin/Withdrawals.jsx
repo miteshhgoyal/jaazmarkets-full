@@ -64,6 +64,9 @@ const Withdrawals = () => {
   const [editModalWithdrawal, setEditModalWithdrawal] = useState(null);
   const [deleteConfirmWithdrawal, setDeleteConfirmWithdrawal] = useState(null);
 
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [statusChecking, setStatusChecking] = useState(false);
+
   // Fetch all withdrawals with populated data
   useEffect(() => {
     fetchAllData();
@@ -83,6 +86,83 @@ const Withdrawals = () => {
       setError(err.response?.data?.message || "Failed to fetch data");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Bulk Process Pending Withdrawals
+  const handleBulkProcessWithdrawals = async () => {
+    if (
+      !window.confirm(
+        `Process ${stats.pendingWithdrawals} pending BlockBee withdrawals?`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setBulkProcessing(true);
+
+      const response = await api.post(
+        "/transactions/blockbee/withdrawal/process-batch"
+      );
+
+      if (response.data.success) {
+        const resultsText = response.data.results
+          .map(
+            (r) =>
+              `${r.ticker}: ${r.status} (${r.count} withdrawals${
+                r.payoutId ? ` - ID: ${r.payoutId}` : ""
+              })`
+          )
+          .join("\n");
+
+        alert(`✅ Bulk processing completed!\n\n${resultsText}`);
+        await fetchAllData(); // Refresh list
+      } else {
+        alert("❌ Bulk processing failed: " + response.data.message);
+      }
+    } catch (err) {
+      console.error("Bulk process error:", err);
+      alert(
+        "❌ Error: " +
+          (err.response?.data?.message || "Failed to process withdrawals")
+      );
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
+  // Auto Check Status of Processing Withdrawals
+  const handleAutoCheckStatus = async () => {
+    try {
+      setStatusChecking(true);
+
+      const response = await api.post(
+        "/transactions/blockbee/withdrawal/check-status"
+      );
+
+      if (response.data.success) {
+        const resultsText = response.data.results
+          .map(
+            (r) =>
+              `Payout ${r.payoutId}: ${r.status || r.error} (${
+                r.withdrawalCount || 0
+              } withdrawals)`
+          )
+          .join("\n");
+
+        alert(`✅ Status check completed!\n\n${resultsText}`);
+        await fetchAllData(); // Refresh list
+      } else {
+        alert("❌ Status check failed: " + response.data.message);
+      }
+    } catch (err) {
+      console.error("Status check error:", err);
+      alert(
+        "❌ Error: " + (err.response?.data?.message || "Failed to check status")
+      );
+    } finally {
+      setStatusChecking(false);
     }
   };
 
@@ -409,6 +489,64 @@ const Withdrawals = () => {
           Download CSV
         </CSVLink>
       </div>
+
+      {/* Bulk Actions Section - ADD THIS */}
+      {stats.pendingWithdrawals > 0 && (
+        <div className="mt-4 bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-xl p-4 shadow-lg">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-1 flex items-center gap-2">
+                <ArrowDownCircle className="w-4 h-4 text-blue-600" />
+                Bulk Actions
+              </h3>
+              <p className="text-xs text-gray-600">
+                Process pending withdrawals or sync status with BlockBee
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              {/* Bulk Process Button */}
+              <button
+                onClick={handleBulkProcessWithdrawals}
+                disabled={stats.pendingWithdrawals === 0 || bulkProcessing}
+                className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-105"
+                title="Process all pending BlockBee withdrawals"
+              >
+                {bulkProcessing ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <ArrowDownCircle className="w-4 h-4" />
+                    Bulk Process ({stats.pendingWithdrawals})
+                  </>
+                )}
+              </button>
+
+              {/* Auto Check Status Button */}
+              <button
+                onClick={handleAutoCheckStatus}
+                disabled={statusChecking}
+                className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-105"
+                title="Check status of all processing withdrawals"
+              >
+                {statusChecking ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Checking...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    Auto Check Status
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Results Count */}
       <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
