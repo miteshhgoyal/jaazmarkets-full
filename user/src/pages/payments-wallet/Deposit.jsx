@@ -84,10 +84,11 @@ const Deposits = () => {
     fetchAccounts();
   }, []);
 
-  // ✅ UPDATED: Check payment status from backend
   const checkPaymentStatus = async () => {
     try {
-      const response = await api.get(`/transactions/deposits/${depositId}`);
+      const response = await api.get(
+        `/transactions/deposits/${depositId}/status`
+      );
 
       if (response.data.success) {
         const deposit = response.data.data;
@@ -97,16 +98,20 @@ const Deposits = () => {
           setConfirmations(deposit.blockBee.confirmations);
         }
 
-        // ✅ Check if completed
+        // ✅ FIX: Check if completed
         if (deposit.status === "completed") {
           setPaymentReceived(true);
           setIsVerifying(false);
           setVerificationProgress(100);
-          toast.success("Payment received and confirmed! ✅");
+          setDepositStatus("success");
+          toast.success(
+            "Payment received and confirmed! Your account has been credited."
+          );
           return true; // Stop polling
         }
+
         // Show confirmation progress
-        else if (deposit.blockBee?.confirmations > 0) {
+        if (deposit.blockBee?.confirmations > 0) {
           const progress = Math.min(
             (deposit.blockBee.confirmations / 1) * 100,
             90
@@ -116,34 +121,43 @@ const Deposits = () => {
             `Payment detected! ${deposit.blockBee.confirmations} confirmation(s)...`
           );
         }
-      }
 
-      return false;
+        // ✅ FIX: Update deposit status in UI
+        if (deposit.status === "processing" && !paymentReceived) {
+          setDepositStatus("processing");
+        }
+
+        return false;
+      }
     } catch (error) {
       console.error("Payment status check error:", error);
       return false;
     }
   };
 
-  // ✅ UPDATED: Start payment verification polling when deposit is created
+  // UPDATED: Start payment verification polling
   useEffect(() => {
-    if (!depositId || paymentReceived || depositStatus !== "success") return;
+    if (!depositId || paymentReceived || depositStatus === "success") {
+      return;
+    }
 
     setIsVerifying(true);
 
     // Initial check after 5 seconds
     const initialTimeout = setTimeout(() => {
       checkPaymentStatus();
-    }, 5000);
+    }, 3000);
 
     // Poll every 10 seconds
     const pollInterval = setInterval(async () => {
-      const isComplete = await checkPaymentStatus();
-      if (isComplete) {
+      const completed = await checkPaymentStatus();
+      if (completed) {
         clearInterval(pollInterval);
+        setIsVerifying(false);
       }
-    }, 10000);
+    }, 3000); // Check every 10 seconds
 
+    // Cleanup
     return () => {
       clearTimeout(initialTimeout);
       clearInterval(pollInterval);
@@ -472,44 +486,59 @@ const Deposits = () => {
             <Card className="p-8">
               <div className="text-center">
                 {paymentReceived ? (
-                  <>
-                    <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
-                      <CheckCircle className="text-white" size={40} />
+                  <div className="animate-bounce-in">
+                    <div className="w-24 h-24 bg-gradient-to-br from-green-400 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl animate-pulse">
+                      <CheckCircle className="text-white" size={48} />
                     </div>
-                    <h2 className="text-3xl font-bold mb-2 text-green-900">
-                      Payment Confirmed! 🎉
-                    </h2>
-                    <p className="text-gray-600 mb-8">
-                      Your deposit has been successfully credited to your
-                      account
-                    </p>
-
-                    <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border-2 border-green-200 mb-8">
-                      <div className="text-4xl font-bold text-green-900 mb-2">
-                        ${depositAmount} USD
-                      </div>
-                      <div className="text-sm text-green-700">
-                        Credited to {selectedAccount?.accountNumber}
+                    <div className="text-center space-y-2">
+                      <h2 className="text-4xl font-bold text-green-900 animate-fade-in">
+                        Payment Confirmed!
+                      </h2>
+                      <p className="text-green-700 text-lg">
+                        Your deposit has been successfully processed
+                      </p>
+                      <div className="inline-block px-4 py-2 bg-green-100 border-2 border-green-300 rounded-full">
+                        <span className="text-green-800 font-semibold text-sm">
+                          ✓ {confirmations} Blockchain Confirmation
+                          {confirmations > 1 ? "s" : ""}
+                        </span>
                       </div>
                     </div>
 
-                    <div className="space-y-3">
+                    {/* Amount Display */}
+                    <div className="mt-8 bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-8 border-2 border-green-200 shadow-lg">
+                      <div className="text-center">
+                        <div className="text-sm text-green-600 font-medium mb-2">
+                          Amount Credited
+                        </div>
+                        <div className="text-5xl font-bold text-green-900 mb-3">
+                          ${depositAmount} <span className="text-3xl">USD</span>
+                        </div>
+                        <div className="text-sm text-green-700 bg-green-100 inline-block px-4 py-2 rounded-full">
+                          ✓ Deposited to {selectedAccount?.accountNumber}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Success Actions */}
+                    <div className="mt-8 space-y-3">
                       <Button
-                        className="w-full bg-gradient-to-r from-blue-600 to-purple-600"
+                        className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all"
                         size="lg"
                         onClick={handleViewHistory}
                       >
+                        <CheckCircle size={20} className="mr-2" />
                         View Transaction History
                       </Button>
                       <Button
                         variant="outline"
-                        className="w-full"
+                        className="w-full border-2 hover:bg-gray-50"
                         onClick={resetSelection}
                       >
                         Make Another Deposit
                       </Button>
                     </div>
-                  </>
+                  </div>
                 ) : (
                   <>
                     <div className="w-20 h-20 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -523,44 +552,120 @@ const Deposits = () => {
                     </p>
 
                     {isVerifying && (
-                      <div className="mb-8 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border-2 border-blue-200">
+                      <div className="mb-8 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border-2 border-blue-200 shadow-lg">
                         <div className="flex items-center justify-center gap-3 mb-4">
                           <Loader2
                             className="animate-spin text-blue-600"
                             size={24}
                           />
-                          <span className="text-blue-900 font-semibold">
-                            Verifying Payment...
+                          <span className="text-blue-900 font-semibold text-lg">
+                            {confirmations === 0
+                              ? "Waiting for Payment..."
+                              : confirmations >= 1
+                              ? "Processing Confirmation..."
+                              : "Verifying Payment..."}
                           </span>
                         </div>
 
-                        <div className="relative w-full h-3 bg-blue-200 rounded-full overflow-hidden">
+                        {/* Progress Bar */}
+                        <div className="relative w-full h-4 bg-blue-200 rounded-full overflow-hidden shadow-inner">
                           <div
-                            className="absolute top-0 left-0 h-full bg-gradient-to-r from-orange-400 to-orange-600 transition-all duration-1000 ease-out"
+                            className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 via-purple-500 to-blue-600 transition-all duration-1000 ease-out"
                             style={{ width: `${verificationProgress}%` }}
                           >
                             <div className="absolute inset-0 bg-white/30 animate-pulse"></div>
+                            {/* Shimmer effect */}
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-shimmer"></div>
                           </div>
                         </div>
 
+                        {/* Status Info */}
                         <div className="mt-4 flex items-center justify-between text-sm">
                           <div className="text-blue-700 flex items-center gap-2">
                             <Clock size={16} />
-                            <span>Checking blockchain...</span>
+                            <span>
+                              {confirmations === 0
+                                ? "Monitoring blockchain..."
+                                : confirmations >= 1
+                                ? "Almost complete!"
+                                : "Checking confirmations..."}
+                            </span>
                           </div>
-                          <span className="text-blue-900 font-semibold">
+                          <span className="text-blue-900 font-bold">
                             {verificationProgress}%
                           </span>
                         </div>
 
+                        {/* Confirmation Badge */}
+                        {confirmations > 0 ? (
+                          <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg animate-pulse">
+                            <div className="flex items-center gap-3 justify-center">
+                              <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                                <CheckCircle size={18} className="text-white" />
+                              </div>
+                              <div>
+                                <div className="text-green-900 font-bold text-base">
+                                  Payment Detected! 🎉
+                                </div>
+                                <div className="text-green-700 text-sm">
+                                  {confirmations} confirmation
+                                  {confirmations > 1 ? "s" : ""} received
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mt-4 p-4 bg-blue-100 border border-blue-200 rounded-lg">
+                            <div className="flex items-center gap-3 text-blue-800">
+                              <Info size={18} className="text-blue-600" />
+                              <div className="text-sm">
+                                <div className="font-semibold">
+                                  Send crypto to the address above
+                                </div>
+                                <div className="text-xs text-blue-600 mt-1">
+                                  Automatic detection • Usually takes 5-30
+                                  minutes
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Transaction Hash (if available) */}
                         {confirmations > 0 && (
-                          <div className="mt-3 p-3 bg-green-100 border border-green-300 rounded-lg">
-                            <div className="flex items-center gap-2 text-green-800">
-                              <CheckCircle size={16} />
-                              <span className="text-sm font-medium">
-                                {confirmations} confirmation
-                                {confirmations > 1 ? "s" : ""} received
-                              </span>
+                          <div className="mt-3 p-3 bg-white border border-gray-200 rounded-lg">
+                            <div className="text-xs text-gray-600 mb-1">
+                              Transaction Status
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  {confirmations >= 1 ? (
+                                    <>
+                                      <CheckCircle
+                                        size={14}
+                                        className="text-green-600"
+                                      />
+                                      <span className="text-sm font-medium text-green-700">
+                                        Confirmed ✓
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Loader2
+                                        size={14}
+                                        className="animate-spin text-orange-600"
+                                      />
+                                      <span className="text-sm font-medium text-orange-700">
+                                        Pending
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="text-xs font-mono text-gray-500">
+                                {confirmations}/1 confirmations
+                              </div>
                             </div>
                           </div>
                         )}
