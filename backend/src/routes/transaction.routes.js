@@ -2844,50 +2844,51 @@ router.post('/deposits/blockbee/create', authenticateToken, async (req, res) => 
             currency: 'USDT',
             paymentMethod: 'blockbee-crypto',
             status: 'pending',
-            blockBee: {
-                uuid,
-                ticker,
-                blockBeeStatus: 'initiated'
-            }
+            // ✅ FIX: Use proper coin name that matches your schema
+            blockbee_coin: ticker.includes('bep20') ? 'BEP20 USDT' :
+                ticker.includes('trc20') ? 'TRC20 USDT' :
+                    ticker.toUpperCase()
         });
 
         await deposit.save();
 
-        // FIX: Build proper callback URL with correct encoding
+        // ✅ FIX: Build callback URL properly - NO ENCODING HERE
         const baseUrl = process.env.BASE_URL || 'http://localhost:8000';
         const callbackUrl = `${baseUrl}/api/transactions/blockbee/callback/${uuid}`;
 
-        // Build BlockBee API request
-        const queryParams = {
+        // ✅ FIX: Build query params - URLSearchParams will encode properly
+        const queryParams = new URLSearchParams({
             apikey: blockBeeSettings.apiKeyV2,
-            callback: callbackUrl,
-            pending: 0,
-            confirmations: 1,
-            post: 1,
+            callback: callbackUrl,  // Will be properly encoded by URLSearchParams
+            pending: '0',
+            confirmations: '1',
+            post: '1',
             priority: 'default',
-            multi_token: 0,
-            convert: 1
-        };
+            multi_token: '0',
+            convert: '1'
+        });
 
-        const queryString = new URLSearchParams(queryParams).toString();
-        const apiUrl = `https://api.blockbee.io/${ticker}/create/?${queryString}`;
+        const apiUrl = `https://api.blockbee.io/${ticker}/create/?${queryParams.toString()}`;
 
-        console.log('BlockBee API Request:', apiUrl);
+        console.log('🔗 BlockBee API Request:', apiUrl);
+        console.log('🔗 Callback URL (decoded):', callbackUrl);
 
-        // Call BlockBee API
         const response = await httpsGet(apiUrl);
-        console.log('BlockBee API Response:', JSON.stringify(response, null, 2));
+        console.log('📦 BlockBee API Response:', JSON.stringify(response, null, 2));
 
-        // FIX: Check if successful and UPDATE deposit immediately
         if (response.status === 'success' && response.address_in) {
-            // Determine coin name
             const coinName = ticker.includes('bep20') ? 'BEP20 USDT' :
                 ticker.includes('trc20') ? 'TRC20 USDT' :
                     ticker.toUpperCase();
 
-            // FIX: Update deposit with BlockBee data AND mark as ready
+            // ✅ FIX: Update deposit with proper structure
+            deposit.blockbee_coin = coinName;
+            deposit.blockbee_address = response.address_in;
+            deposit.status = 'processing';
+            deposit.api_response = JSON.stringify(response);
+
             deposit.blockBee = {
-                ...deposit.blockBee,
+                uuid,
                 coin: coinName,
                 ticker,
                 address: response.address_in,
@@ -2895,17 +2896,16 @@ router.post('/deposits/blockbee/create', authenticateToken, async (req, res) => 
                 qrCodeUrl: response.qrcode_url || null,
                 callbackUrl,
                 apiResponse: response,
-                blockBeeStatus: 'pending_payment', // Waiting for user to send crypto
+                blockBeeStatus: 'pending_payment',
+                isProcessed: false,
                 createdAt: new Date()
             };
 
-            deposit.status = 'processing'; // ✅ Change from 'pending' to 'processing'
             await deposit.save();
 
-            // FIX: Return proper response to frontend
             return res.status(201).json({
                 success: true,
-                message: 'Deposit address created successfully. Please send crypto to the address.',
+                message: 'Payment address created successfully',
                 data: {
                     depositId: deposit._id,
                     transactionId: deposit.transactionId,
@@ -2916,16 +2916,13 @@ router.post('/deposits/blockbee/create', authenticateToken, async (req, res) => 
                     qrCodeUrl: response.qrcode_url || null,
                     ticker,
                     network: coinName,
-                    status: deposit.status, // ✅ Returns 'processing'
-                    blockBeeStatus: deposit.blockBee.blockBeeStatus,
-                    callbackUrl,
+                    status: deposit.status,
+                    blockBeeStatus: 'pending_payment',
                     minimumAmount: response.minimum_transaction_coin
                 }
             });
         } else {
-            // BlockBee API failed
             deposit.status = 'failed';
-            deposit.blockBee.blockBeeStatus = 'failed';
             await deposit.save();
 
             return res.status(400).json({
@@ -2943,27 +2940,26 @@ router.post('/deposits/blockbee/create', authenticateToken, async (req, res) => 
     }
 });
 
-
-// FIX: BLOCKBEE CALLBACK HANDLER - Auto-complete on confirmation
 router.post('/blockbee/callback/:uuid', express.json(), async (req, res) => {
     try {
         const { uuid } = req.params;
         const webhookData = req.body;
 
-        console.log('✅ BlockBee Callback:', { uuid, webhookData });
+        console.log('📥 BlockBee Callback Received:', uuid);
+        console.log('📦 Webhook Data:', JSON.stringify(webhookData, null, 2));
 
         // Find deposit by UUID
         const deposit = await Deposit.findOne({ 'blockBee.uuid': uuid });
 
         if (!deposit) {
             console.error('❌ Deposit not found for UUID:', uuid);
-            return res.status(200).send('ok');
+            return res.status(200).send('*ok*');  // Still respond OK to prevent retries
         }
 
-        // Log webhook (ignore duplicates)
+        // ✅ Log webhook (handle duplicates gracefully)
         try {
             await WebhookLog.create({
-                uuid: `${uuid}-${webhookData.txid_in}-${Date.now()}`,
+                uuid: `${uuid}-${webhookData.txid_in || Date.now()}`,
                 userId: deposit.userId.toString(),
                 type: 'blockbee-callback',
                 payload: webhookData,
@@ -2974,33 +2970,29 @@ router.post('/blockbee/callback/:uuid', express.json(), async (req, res) => {
             console.log('⚠️ Webhook log duplicate (non-critical)');
         }
 
-        // FIX: Always update with latest blockchain data
+        // ✅ Always update blockchain data
+        if (!deposit.blockBee) deposit.blockBee = {};
+
         deposit.blockBee.txHash = webhookData.txid_in;
-        deposit.blockBee.confirmations = webhookData.confirmations;
+        deposit.blockBee.confirmations = webhookData.confirmations || 0;
         deposit.blockBee.valueReceived = webhookData.value_coin;
         deposit.blockBee.valuePaid = webhookData.value_forwarded_coin;
         deposit.blockBee.lastCallbackAt = new Date();
 
-        // FIX: Process and complete when confirmed (confirmations >= 1)
-        const shouldComplete =
-            webhookData.confirmations >= 1 &&
-            deposit.status !== 'completed';
+        // ✅ Process deposit when confirmed AND not already processed
+        const isConfirmed = webhookData.confirmations >= 1;
+        const notYetProcessed = deposit.status !== 'completed' && !deposit.blockBee.isProcessed;
 
-        if (shouldComplete) {
-            console.log('✅ Processing confirmed payment:', {
-                transactionId: deposit.transactionId,
-                amount: webhookData.value_forwarded_coin,
-                confirmations: webhookData.confirmations
-            });
+        if (isConfirmed && notYetProcessed) {
+            console.log('✅ Processing confirmed deposit:', deposit.transactionId);
 
-            // Update deposit amount and status
             deposit.amount = parseFloat(webhookData.value_forwarded_coin);
-            deposit.status = 'completed'; // ✅ Mark as completed
+            deposit.status = 'completed';
             deposit.completedAt = new Date();
             deposit.blockBee.isProcessed = true;
             deposit.blockBee.blockBeeStatus = 'completed';
 
-            // FIX: Credit trading account balance ✅
+            // ✅ Credit trading account
             if (deposit.tradingAccountId) {
                 const account = await TradingAccount.findById(deposit.tradingAccountId);
                 if (account) {
@@ -3012,29 +3004,23 @@ router.post('/blockbee/callback/:uuid', express.json(), async (req, res) => {
                 }
             }
 
-            // Update user total deposits
-            await User.findByIdAndUpdate(deposit.userId, {
-                $inc: { totalDeposits: parseFloat(webhookData.value_forwarded_coin) }
-            });
-
-            console.log('✅ Deposit completed:', deposit.transactionId);
-        } else {
-            console.log('⏳ Waiting for confirmations:', {
-                current: webhookData.confirmations,
-                required: 1,
-                status: deposit.status
-            });
+            // ✅ Update user total deposits
+            await User.findByIdAndUpdate(
+                deposit.userId,
+                { $inc: { totalDeposits: parseFloat(webhookData.value_forwarded_coin) } }
+            );
         }
 
         await deposit.save();
-        res.status(200).send('ok');
+
+        console.log('✅ Deposit updated successfully');
+        return res.status(200).send('*ok*');
 
     } catch (error) {
-        console.error('❌ Callback error:', error);
-        res.status(200).send('ok');
+        console.error('❌ Callback handler error:', error);
+        return res.status(200).send('*ok*');  // Always respond OK
     }
 });
-
 
 // FIX: Add status check endpoint for frontend polling
 router.get('/deposits/:depositId/status', authenticateToken, async (req, res) => {

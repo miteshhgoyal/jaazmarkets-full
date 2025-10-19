@@ -71,15 +71,18 @@ const depositSchema = new mongoose.Schema({
         walletId: String
     },
 
+    blockbee_coin: {
+        type: String,
+        enum: ['BEP20 USDT', 'TRC20 USDT', 'BTC', 'ETH', 'MATIC', 'BEP20 (USDT)', 'TRC20 (USDT)'],
+        required: false
+    },
+
     // BlockBee Integration Fields (NEW - for automated deposits)
     blockBee: {
         paymentId: String,              // BlockBee payment ID
         paymentUrl: String,             // Checkout URL
         uuid: String,                   // Unique webhook ID per transaction
-        coin: {
-            type: String,
-            enum: ['BTC', 'ETH', 'BEP20 (USDT)', 'TRC20 (USDT)', 'ERC20 (USDT)', null]  // ✅ ADDED ENUM
-        },
+        coin: String,
         ticker: {
             type: String,
             enum: ['btc', 'eth', 'bep20/usdt', 'trc20/usdt', 'erc20/usdt', null]  // ✅ ADDED ENUM
