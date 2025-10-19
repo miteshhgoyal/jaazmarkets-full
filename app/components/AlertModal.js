@@ -1,144 +1,122 @@
 import React from 'react';
-import { Modal, View, Text, Pressable } from 'react-native';
-import { useAuth } from '@/context/authContext';
+import { View, Text, Modal, TouchableOpacity, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 
 const AlertModal = ({
     visible,
     title,
     message,
+    type = 'info', // 'success', 'error', 'warning', 'info'
     onConfirm,
     onCancel,
     confirmText = 'OK',
     cancelText = 'Cancel',
-    type = 'info',
-    icon,
-    allowBackgroundClose = true, // New prop to control background tap
-    showCrossIcon = true // New prop to control cross icon visibility
+    showCancel = false
 }) => {
-    const { isDarkMode } = useAuth();
-
+    // Icon and color based on type
     const getTypeConfig = () => {
         switch (type) {
             case 'success':
-                return { color: '#10b981', icon: 'checkmark-circle' };
-            case 'warning':
-                return { color: '#f59e0b', icon: 'warning' };
+                return {
+                    icon: 'checkmark-circle',
+                    color: '#10b981',
+                    bgColor: '#d1fae5',
+                    borderColor: '#6ee7b7'
+                };
             case 'error':
-                return { color: '#ef4444', icon: 'close-circle' };
-            default:
-                return { color: '#f97316', icon: 'information-circle' };
+                return {
+                    icon: 'close-circle',
+                    color: '#ef4444',
+                    bgColor: '#fee2e2',
+                    borderColor: '#fca5a5'
+                };
+            case 'warning':
+                return {
+                    icon: 'warning',
+                    color: '#f59e0b',
+                    bgColor: '#fef3c7',
+                    borderColor: '#fcd34d'
+                };
+            default: // info
+                return {
+                    icon: 'information-circle',
+                    color: '#3b82f6',
+                    bgColor: '#dbeafe',
+                    borderColor: '#93c5fd'
+                };
         }
     };
 
-    const typeConfig = getTypeConfig();
-
-    // Close modal handler
-    const handleClose = () => {
-        if (onCancel) {
-            onCancel();
-        } else if (onConfirm) {
-            // If no onCancel provided, fallback to onConfirm
-            onConfirm();
-        }
-    };
-
-    // Handle confirm and close
-    const handleConfirm = () => {
-        if (onConfirm) {
-            onConfirm();
-        }
-    };
-
-    // Handle background press
-    const handleBackgroundPress = () => {
-        if (allowBackgroundClose) {
-            handleClose();
-        }
-    };
+    const config = getTypeConfig();
 
     return (
-        <Modal visible={visible} transparent animationType='fade'>
-            <View className="flex-1 bg-black/60 justify-center items-center px-5">
-                {/* Backdrop - tap to close */}
+        <Modal
+            transparent
+            visible={visible}
+            animationType="fade"
+            onRequestClose={onCancel || onConfirm}
+        >
+            <Pressable
+                className="flex-1 bg-black/50 justify-center items-center px-6"
+                onPress={onCancel || onConfirm}
+            >
                 <Pressable
-                    className="absolute inset-0"
-                    onPress={handleBackgroundPress}
-                />
-
-                <View className={`${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'} rounded-3xl p-6 w-full max-w-sm shadow-2xl relative`}>
-
-                    {/* Cross Icon - ALWAYS visible (top right) */}
-                    {showCrossIcon && (
-                        <Pressable
-                            className="absolute top-4 right-4 w-8 h-8 rounded-full items-center justify-center z-10"
-                            style={{ backgroundColor: isDarkMode ? '#374151' : '#f3f4f6' }}
-                            onPress={handleClose}
-                        >
-                            <Ionicons
-                                name="close"
-                                size={18}
-                                color={isDarkMode ? '#9ca3af' : '#6b7280'}
-                            />
-                        </Pressable>
-                    )}
-
+                    className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl"
+                    onPress={(e) => e.stopPropagation()}
+                >
                     {/* Icon */}
                     <View className="items-center mb-4">
                         <View
-                            className="w-16 h-16 rounded-full items-center justify-center mb-3"
-                            style={{ backgroundColor: typeConfig.color + '20' }}
+                            className="w-16 h-16 rounded-full items-center justify-center"
+                            style={{ backgroundColor: config.bgColor }}
                         >
                             <Ionicons
-                                name={icon || typeConfig.icon}
-                                size={32}
-                                color={typeConfig.color}
+                                name={config.icon}
+                                size={40}
+                                color={config.color}
                             />
                         </View>
                     </View>
 
                     {/* Title */}
                     {title && (
-                        <Text className={`text-lg font-bold text-center mb-3 ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+                        <Text className="text-xl font-bold text-gray-900 text-center mb-2">
                             {title}
                         </Text>
                     )}
 
                     {/* Message */}
-                    <Text className={`text-base text-center mb-6 leading-5 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                        {message}
-                    </Text>
+                    {message && (
+                        <Text className="text-base text-gray-600 text-center mb-6">
+                            {message}
+                        </Text>
+                    )}
 
                     {/* Buttons */}
-                    <View className={`${onCancel ? 'flex-row' : 'flex-col'} gap-3`}>
-                        {onCancel && (
-                            <Pressable
-                                className="flex-1 bg-gray-500 px-5 py-3 rounded-lg"
+                    <View className="flex-row gap-3">
+                        {showCancel && onCancel && (
+                            <TouchableOpacity
                                 onPress={onCancel}
+                                className="flex-1 bg-gray-100 py-3 px-4 rounded-lg"
                             >
-                                <Text className="text-gray-100 font-semibold text-center">
+                                <Text className="text-gray-700 font-semibold text-center">
                                     {cancelText}
                                 </Text>
-                            </Pressable>
+                            </TouchableOpacity>
                         )}
 
-                        <Pressable
-                            className="flex-1 rounded-lg overflow-hidden"
-                            onPress={handleConfirm}
+                        <TouchableOpacity
+                            onPress={onConfirm}
+                            className="flex-1 py-3 px-4 rounded-lg"
+                            style={{ backgroundColor: config.color }}
                         >
-                            <LinearGradient
-                                colors={[typeConfig.color, typeConfig.color]}
-                                className="px-5 py-3 items-center"
-                            >
-                                <Text className="text-gray-100 font-semibold text-base">
-                                    {confirmText}
-                                </Text>
-                            </LinearGradient>
-                        </Pressable>
+                            <Text className="text-white font-semibold text-center">
+                                {confirmText}
+                            </Text>
+                        </TouchableOpacity>
                     </View>
-                </View>
-            </View>
+                </Pressable>
+            </Pressable>
         </Modal>
     );
 };

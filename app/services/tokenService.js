@@ -1,71 +1,45 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const tokenService = {
-    setToken: async (token) => {
-        try {
-            await AsyncStorage.setItem('token', token);
-        } catch (error) {
-            console.error('Error storing token:', error);
-        }
-    },
-
     getToken: async () => {
         try {
-            return await AsyncStorage.getItem('token');
+            return await AsyncStorage.getItem('accessToken');
         } catch (error) {
-            console.error('Error retrieving token:', error);
+            console.error('Error getting access token:', error);
             return null;
         }
     },
 
-    removeToken: async () => {
+    setToken: async (token) => {
         try {
-            await AsyncStorage.multiRemove(['token', 'user']);
+            await AsyncStorage.setItem('accessToken', token);
         } catch (error) {
-            console.error('Error removing tokens:', error);
+            console.error('Error setting access token:', error);
         }
     },
 
-    isTokenExpired: (token) => {
-        // Check if token exists and is a string
-        if (!token || typeof token !== 'string') {
-            console.log('Token is invalid or missing');
-            return true;
-        }
-
+    getRefreshToken: async () => {
         try {
-            // JWT tokens have 3 parts separated by dots
-            const parts = token.split('.');
-            if (parts.length !== 3) {
-                console.log('Invalid JWT token format');
-                return true;
-            }
-
-            // Decode the payload (second part)
-            const payload = JSON.parse(atob(parts[1]));
-            const currentTime = Date.now() / 1000;
-
-            // Check if token has expiration time
-            if (!payload.exp) {
-                console.log('Token does not have expiration time');
-                return false; // Consider non-expiring token as valid
-            }
-
-            return payload.exp < currentTime;
+            return await AsyncStorage.getItem('refreshToken');
         } catch (error) {
-            console.error('Error checking token expiration:', error);
-            return true;
+            console.error('Error getting refresh token:', error);
+            return null;
         }
     },
 
-    // Helper method for getting token synchronously when you already have it
-    isTokenValid: async () => {
+    setRefreshToken: async (token) => {
         try {
-            const token = await AsyncStorage.getItem('token');
-            return !tokenService.isTokenExpired(token);
+            await AsyncStorage.setItem('refreshToken', token);
         } catch (error) {
-            console.error('Error validating token:', error);
-            return false;
+            console.error('Error setting refresh token:', error);
+        }
+    },
+
+    clearTokens: async () => {
+        try {
+            await AsyncStorage.multiRemove(['accessToken', 'refreshToken', 'user']);
+        } catch (error) {
+            console.error('Error clearing tokens:', error);
         }
     }
 };

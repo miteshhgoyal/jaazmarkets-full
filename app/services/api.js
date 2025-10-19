@@ -1,10 +1,8 @@
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { tokenService } from './tokenService'; // Add this import
 
-const API_BASE_URL = 'http://192.168.1.83:5000';
-// const API_BASE_URL = 'https://jaaz-app-backend.onrender.com';
+const API_BASE_URL = 'http://192.168.1.66:8000';
 
-// Create axios instance with proper base URL
 const api = axios.create({
     baseURL: API_BASE_URL,
     timeout: 30000,
@@ -13,26 +11,28 @@ const api = axios.create({
     },
 });
 
-// Routes that don't require authentication
 const PUBLIC_ROUTES = [
     '/api/auth/send-otp',
     '/api/auth/verify-otp',
     '/api/health'
 ];
 
-// Add request interceptor for debugging
+// Updated request interceptor
 api.interceptors.request.use(
     async (config) => {
         console.log('API Request:', config.method?.toUpperCase(), config.url);
 
-        // Skip token check for public routes
         const isPublicRoute = PUBLIC_ROUTES.some(route => config.url?.includes(route));
 
         if (!isPublicRoute) {
             try {
-                const token = await AsyncStorage.getItem('authToken');
+                // Use tokenService instead of directly accessing AsyncStorage
+                const token = await tokenService.getToken();
                 if (token && typeof token === 'string' && token.length > 0) {
                     config.headers.Authorization = `Bearer ${token}`;
+                    console.log('Token attached:', token.substring(0, 20) + '...'); // Debug log
+                } else {
+                    console.log('No token found'); // Debug log
                 }
             } catch (error) {
                 console.error('Error getting token:', error);
@@ -47,7 +47,7 @@ api.interceptors.request.use(
     }
 );
 
-// Response interceptor to handle errors
+// Updated response interceptor
 api.interceptors.response.use(
     (response) => {
         console.log('API Response:', response.status, response.config.url);
@@ -63,13 +63,8 @@ api.interceptors.response.use(
         });
 
         if (error.response?.status === 401) {
-            // Token expired or invalid, clear storage
-            try {
-                await AsyncStorage.removeItem('authToken');
-                await AsyncStorage.removeItem('userData');
-            } catch (clearError) {
-                console.error('Error clearing storage:', clearError);
-            }
+            // Use tokenService to clear tokens
+            await tokenService.clearTokens();
         }
         return Promise.reject(error);
     }

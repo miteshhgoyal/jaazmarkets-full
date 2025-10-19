@@ -1,48 +1,64 @@
-import { View, Text, TextInput, TouchableOpacity, Pressable, ScrollView, StatusBar } from 'react-native'
-import React, { useEffect, useRef, useState } from 'react'
+import { View, Text, TextInput, TouchableOpacity, Pressable, ScrollView, StatusBar, BackHandler } from 'react-native'
+import React, { useEffect, useState } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useRouter } from 'expo-router'
-import { LinearGradient } from 'expo-linear-gradient'
+import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import Loading from "../../components/Loading"
+import Loading from '../../components/Loading'
 import CustomKeyboardView from "../../components/CustomKeyboardView"
 import AlertModal from '../../components/AlertModal'
 import { useAuth } from '@/context/authContext'
-import { useTheme } from '@/context/themeContext'
 import api from '@/services/api'
 
 const signup = () => {
-    const router = useRouter()
     const { login } = useAuth()
-    const { theme } = useTheme()
-    const [loading, setLoading] = useState(false)
-    const [countries, setCountries] = useState([])
-    const [showPassword, setShowPassword] = useState({})
-    const [agreeTax, setAgreeTax] = useState(false)
+    const router = useRouter()
+    const searchParams = useLocalSearchParams()
+
+    // States
+    const [step, setStep] = useState(1) // 1 = form, 2 = OTP
+    const [formData, setFormData] = useState({
+        firstName: '',
+        lastName: '',
+        email: '',
+        mobile: '',
+        password: '',
+        referralCode: ''
+    })
+    const [otp, setOtp] = useState(['', '', '', '', '', ''])
+    const [passwordVisible, setPasswordVisible] = useState(false)
+    const [isLoading, setIsLoading] = useState(false)
+    const [errors, setErrors] = useState({})
+    const [resendTimer, setResendTimer] = useState(0)
     const [alertVisible, setAlertVisible] = useState(false)
     const [alertData, setAlertData] = useState({})
 
-    // Form refs
-    const nameRef = useRef("")
-    const emailRef = useRef("")
-    const countryRef = useRef("")
-    const partnerCodeRef = useRef("")
-    const passwordRef = useRef("")
-    const confirmPasswordRef = useRef("")
-
-    // Fetch country list
+    // Auto-fill referral code from URL
     useEffect(() => {
-        fetch("https://restcountries.com/v3.1/all?fields=name")
-            .then((res) => res.json())
-            .then((data) =>
-                setCountries(
-                    data.map((c) => c.name.common).sort((a, b) => a.localeCompare(b))
-                )
-            )
-            .catch(() => setCountries([]))
-    }, [])
+        const refCode = searchParams.ref
+        if (refCode) {
+            setFormData(prev => ({ ...prev, referralCode: refCode }))
+        }
+    }, [searchParams])
 
-    const pwRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,15}$/
+    // Resend timer countdown
+    useEffect(() => {
+        if (resendTimer > 0) {
+            const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000)
+            return () => clearTimeout(timer)
+        }
+    }, [resendTimer])
+
+    // PREVENT BACK NAVIGATION WHEN ON OTP STEP
+    useEffect(() => {
+        if (step === 2) {
+            const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+                // Show warning or just prevent going back
+                setErrors({ otp: 'Please complete OTP verification or start over' })
+                return true // Prevent default back
+            })
+            return () => backHandler.remove()
+        }
+    }, [step])
 
     const showAlert = (title, message, type = 'info', onConfirm = null) => {
         setAlertData({
@@ -54,415 +70,429 @@ const signup = () => {
         setAlertVisible(true)
     }
 
-    const togglePasswordVisibility = (field) => {
-        setShowPassword((prev) => ({ ...prev, [field]: !prev[field] }))
+    // FORM HANDLERS
+    const handleInputChange = (name, value) => {
+        setFormData(prev => ({ ...prev, [name]: value }))
+        if (errors[name]) {
+            setErrors(prev => ({ ...prev, [name]: '' }))
+        }
     }
 
-    const isValidEmail = (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)
+    const isValidEmail = (email) => {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+    }
 
     const validateForm = () => {
-        const name = nameRef.current?.trim()
-        const email = emailRef.current?.trim()
-        const country = countryRef.current?.trim()
-        const password = passwordRef.current?.trim()
-        const confirmPassword = confirmPasswordRef.current?.trim()
+        const newErrors = {}
 
-        if (!name || name.length < 3) {
-            showAlert("Validation Error", "Full name must be at least 3 characters", 'error')
-            return false
+        if (!formData.firstName.trim()) {
+            newErrors.firstName = 'First name is required'
+        }
+        if (!formData.lastName.trim()) {
+            newErrors.lastName = 'Last name is required'
+        }
+        if (!formData.email.trim()) {
+            newErrors.email = 'Email is required'
+        } else if (!isValidEmail(formData.email)) {
+            newErrors.email = 'Enter a valid email'
+        }
+        if (!formData.mobile.trim()) {
+            newErrors.mobile = 'Mobile number is required'
+        }
+        if (!formData.password) {
+            newErrors.password = 'Password is required'
+        } else if (formData.password.length < 6) {
+            newErrors.password = 'Password must be at least 6 characters'
         }
 
-        if (!email || !isValidEmail(email)) {
-            showAlert("Validation Error", "Please enter a valid email address", 'error')
-            return false
-        }
-
-        if (!country) {
-            showAlert("Validation Error", "Please select your country of residence", 'error')
-            return false
-        }
-
-        if (!password || !pwRegex.test(password)) {
-            showAlert("Validation Error", "Password must be 8-15 characters with uppercase, lowercase, number, and special character", 'error')
-            return false
-        }
-
-        if (password !== confirmPassword) {
-            showAlert("Validation Error", "Passwords don't match", 'error')
-            return false
-        }
-
-        if (!agreeTax) {
-            showAlert("Validation Error", "You must confirm the tax declaration", 'error')
-            return false
-        }
-
-        return true
+        setErrors(newErrors)
+        return Object.keys(newErrors).length === 0
     }
 
+    // STEP 1: SUBMIT REGISTRATION FORM
     const handleSubmit = async () => {
         if (!validateForm()) return
 
-        setLoading(true)
+        setIsLoading(true)
+        setErrors({})
+
         try {
-            const response = await api.post("/auth/register", {
-                name: nameRef.current?.trim(),
-                email: emailRef.current?.trim(),
-                country: countryRef.current?.trim(),
-                partnerCode: partnerCodeRef.current?.trim(),
-                password: passwordRef.current?.trim(),
-                agreeTax
+            const response = await api.post('/auth/signup', {
+                firstName: formData.firstName,
+                lastName: formData.lastName,
+                email: formData.email,
+                mobile: formData.mobile,
+                password: formData.password,
+                referralCode: formData.referralCode
             })
 
-            if (response.data.token) {
-                await login(response.data.token, response.data.user)
-                showAlert("Welcome! 🎉", "Account created successfully!", 'success',
-                    () => {
-                        setAlertVisible(false)
-                        router.replace('/verify-otp')
-                    }
-                )
+            if (response.data.success) {
+                setStep(2) // Move to OTP verification step
+                setResendTimer(60) // Start 60 second timer
+                setOtp(['', '', '', '', '', '']) // Clear OTP
+            } else {
+                // Check if user exists and is verified
+                if (response.data.userExists && response.data.isVerified) {
+                    setErrors({
+                        submit: response.data.message,
+                        redirectToLogin: true
+                    })
+                } else {
+                    setErrors({ submit: response.data.message || 'Registration failed' })
+                }
             }
-        } catch (error) {
-            const message = error.response?.data?.message || "Registration failed"
-            showAlert("Registration Error", message, 'error')
+        } catch (err) {
+            console.error('Registration error:', err)
+            const errorMessage = err.response?.data?.message || 'Registration failed. Please try again.'
+            const shouldRedirect = err.response?.data?.userExists && err.response?.data?.isVerified
+
+            setErrors({
+                submit: errorMessage,
+                redirectToLogin: shouldRedirect
+            })
         } finally {
-            setLoading(false)
+            setIsLoading(false)
         }
     }
 
-    const handleGoogle = () => {
-        showAlert("Coming Soon", "Google sign-in will be available soon", 'info')
+    // OTP INPUT HANDLERS
+    const handleOtpChange = (index, value) => {
+        // Only allow numbers
+        if (!/^\d*$/.test(value)) return
+
+        const newOtp = [...otp]
+        newOtp[index] = value
+        setOtp(newOtp)
+
+        // Clear errors when user types
+        if (errors.otp) {
+            setErrors(prev => ({ ...prev, otp: '' }))
+        }
     }
+
+    // STEP 2: VERIFY OTP
+    const handleVerifyOtp = async () => {
+        const otpValue = otp.join('')
+
+        if (otpValue.length !== 6) {
+            setErrors({ otp: 'Please enter complete 6-digit code' })
+            return
+        }
+
+        setIsLoading(true)
+        setErrors({})
+
+        try {
+            const response = await api.post('/auth/verify-email-otp', {
+                email: formData.email,
+                otp: otpValue,
+                password: formData.password // Pass for registration email
+            })
+
+            if (response.data.success && response.data.data) {
+                const { accessToken, refreshToken, user } = response.data.data
+
+                // Save auth data
+                await login({ accessToken, refreshToken, user })
+
+                // Redirect to dashboard
+                router.replace('/tabs/accounts')
+            } else {
+                setErrors({ otp: response.data.message || 'Verification failed' })
+            }
+        } catch (err) {
+            console.error('OTP verification error:', err)
+            const errorMsg = err.response?.data?.message || 'Invalid or expired code. Please try again.'
+            const isExpired = err.response?.data?.expired
+
+            setErrors({
+                otp: errorMsg,
+                expired: isExpired
+            })
+
+            // Auto-trigger resend if expired
+            if (isExpired) {
+                setTimeout(() => handleResendOtp(), 2000)
+            }
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    // RESEND OTP
+    const handleResendOtp = async () => {
+        if (resendTimer > 0) return
+
+        setIsLoading(true)
+        setErrors({})
+
+        try {
+            const response = await api.post('/auth/resend-verification-otp', {
+                email: formData.email
+            })
+
+            if (response.data.success) {
+                setResendTimer(60)
+                setOtp(['', '', '', '', '', ''])
+                showAlert('Success', 'New verification code sent!', 'success')
+            } else {
+                setErrors({ otp: response.data.message || 'Failed to resend code' })
+            }
+        } catch (err) {
+            console.error('Resend OTP error:', err)
+            setErrors({ otp: err.response?.data?.message || 'Failed to resend code' })
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    // RENDER FUNCTIONS
+    const renderFormField = ({ name, label, type, placeholder, icon, required }) => {
+        const isPw = name === 'password'
+        const showPw = isPw && passwordVisible
+
+        return (
+            <View key={name} className="mb-4">
+                <Text className="block text-sm font-medium text-gray-700 mb-1">
+                    {label}
+                </Text>
+                <View className="relative">
+                    <View className="absolute left-3 top-3 z-10">
+                        <Ionicons name={icon} size={20} color="#9ca3af" />
+                    </View>
+                    <TextInput
+                        value={formData[name]}
+                        onChangeText={(value) => handleInputChange(name, value)}
+                        placeholder={placeholder}
+                        placeholderTextColor="#9ca3af"
+                        secureTextEntry={isPw && !showPw}
+                        keyboardType={type === 'email' ? 'email-address' : type === 'tel' ? 'phone-pad' : 'default'}
+                        autoCapitalize={type === 'email' ? 'none' : 'words'}
+                        className="w-full pl-10 pr-12 py-2.5 border border-gray-300 rounded-lg text-gray-900"
+                        style={{ fontSize: 16 }}
+                    />
+                    {isPw && (
+                        <TouchableOpacity
+                            onPress={() => setPasswordVisible(!passwordVisible)}
+                            className="absolute right-3 top-3"
+                        >
+                            <Ionicons
+                                name={showPw ? "eye-off" : "eye"}
+                                size={20}
+                                color="#9ca3af"
+                            />
+                        </TouchableOpacity>
+                    )}
+                </View>
+                {errors[name] && (
+                    <Text className="mt-1 text-sm text-red-600">{errors[name]}</Text>
+                )}
+            </View>
+        )
+    }
+
+    const renderRegistrationForm = () => (
+        <View>
+            {renderFormField({
+                name: 'firstName',
+                label: 'First Name',
+                type: 'text',
+                placeholder: 'Enter your first name',
+                icon: 'person',
+                required: true
+            })}
+            {renderFormField({
+                name: 'lastName',
+                label: 'Last Name',
+                type: 'text',
+                placeholder: 'Enter your last name',
+                icon: 'person',
+                required: true
+            })}
+            {renderFormField({
+                name: 'email',
+                label: 'Email',
+                type: 'email',
+                placeholder: 'Enter your email',
+                icon: 'mail',
+                required: true
+            })}
+            {renderFormField({
+                name: 'mobile',
+                label: 'Mobile Number',
+                type: 'tel',
+                placeholder: 'Enter your mobile number',
+                icon: 'call',
+                required: true
+            })}
+            {renderFormField({
+                name: 'password',
+                label: 'Password',
+                type: 'password',
+                placeholder: 'Create a password',
+                icon: 'lock-closed',
+                required: true
+            })}
+            {renderFormField({
+                name: 'referralCode',
+                label: 'Referral Code (Optional)',
+                type: 'text',
+                placeholder: 'Enter referral code if you have one',
+                icon: 'people',
+                required: false
+            })}
+
+            <TouchableOpacity
+                onPress={handleSubmit}
+                disabled={isLoading}
+                className="w-full bg-gradient-to-r from-orange-400 to-orange-600 py-3 px-4 rounded-lg items-center shadow-md"
+                style={{ opacity: isLoading ? 0.5 : 1, backgroundColor: '#fb923c' }}
+            >
+                {isLoading ? (
+                    <Loading size={24} />
+                ) : (
+                    <Text className="text-white font-medium">Continue</Text>
+                )}
+            </TouchableOpacity>
+        </View>
+    )
+
+    const renderOtpForm = () => (
+        <View>
+            <View className="items-center mb-6">
+                <View className="w-16 h-16 bg-orange-100 rounded-full items-center justify-center mb-3">
+                    <Ionicons name="mail" size={32} color="#ea580c" />
+                </View>
+                <Text className="text-xl font-semibold text-gray-900 mb-2">
+                    Verify Your Email
+                </Text>
+                <Text className="text-sm text-gray-600 text-center">
+                    We've sent a 6-digit code to{'\n'}
+                    <Text className="font-medium text-gray-900">{formData.email}</Text>
+                </Text>
+            </View>
+
+            {/* OTP Input */}
+            <View className="mb-6">
+                <Text className="block text-sm font-medium text-gray-700 mb-2 text-center">
+                    Enter Verification Code
+                </Text>
+                <View className="flex-row gap-2 justify-center">
+                    {otp.map((digit, index) => (
+                        <TextInput
+                            key={index}
+                            value={digit}
+                            onChangeText={(value) => handleOtpChange(index, value)}
+                            maxLength={1}
+                            keyboardType="number-pad"
+                            className="w-12 h-12 text-center text-xl font-bold border-2 border-gray-300 rounded-lg"
+                            style={{ fontSize: 20 }}
+                        />
+                    ))}
+                </View>
+                {errors.otp && (
+                    <Text className="mt-2 text-sm text-red-600 text-center">{errors.otp}</Text>
+                )}
+            </View>
+
+            {/* Verify Button */}
+            <TouchableOpacity
+                onPress={handleVerifyOtp}
+                disabled={isLoading || otp.join('').length !== 6}
+                className="w-full bg-gradient-to-r from-orange-400 to-orange-600 py-3 px-4 rounded-lg items-center shadow-md mb-4"
+                style={{ opacity: (isLoading || otp.join('').length !== 6) ? 0.5 : 1, backgroundColor: '#fb923c' }}
+            >
+                {isLoading ? (
+                    <Loading size={24} />
+                ) : (
+                    <Text className="text-white font-medium">Verify & Continue</Text>
+                )}
+            </TouchableOpacity>
+
+            {/* Resend Code */}
+            <View className="items-center">
+                <Text className="text-sm text-gray-600">
+                    Didn't receive the code?{' '}
+                    {resendTimer > 0 ? (
+                        <Text className="text-gray-900 font-medium">
+                            Resend in {resendTimer}s
+                        </Text>
+                    ) : (
+                        <TouchableOpacity onPress={handleResendOtp} disabled={isLoading}>
+                            <Text className="text-orange-600 font-medium">Resend Code</Text>
+                        </TouchableOpacity>
+                    )}
+                </Text>
+            </View>
+
+            {/* Start Over */}
+            <View className="items-center pt-4 mt-4 border-t border-gray-200">
+                <Text className="text-xs text-gray-500">
+                    Need to change email?{' '}
+                    <TouchableOpacity
+                        onPress={() => {
+                            setStep(1)
+                            setOtp(['', '', '', '', '', ''])
+                            setErrors({})
+                        }}
+                    >
+                        <Text className="text-orange-600 font-medium">Start over</Text>
+                    </TouchableOpacity>
+                </Text>
+            </View>
+        </View>
+    )
 
     return (
         <CustomKeyboardView>
-            <StatusBar barStyle={theme.statusBarStyle} />
-            <LinearGradient
-                colors={[theme.bgPrimary, theme.bgSecondary]}
-                className="flex-1"
+            <StatusBar barStyle="dark-content" backgroundColor="#fff5f0" />
+            <ScrollView
+                className="flex-1 bg-gradient-to-br from-orange-50 via-white to-blue-50"
+                contentContainerStyle={{ flexGrow: 1 }}
+                showsVerticalScrollIndicator={false}
             >
-                <SafeAreaView className="flex-1">
+                <SafeAreaView className="flex-1 px-4 py-8">
                     {/* Header */}
-                    <View className="px-6 pt-6 pb-4">
-                        <View className="items-center w-full">
-                            <View
-                                className="w-16 h-16 rounded-lg items-center justify-center mb-4"
-                                style={{ backgroundColor: theme.primary }}
-                            >
-                                <Ionicons name="trending-up" size={32} color="white" />
-                            </View>
-                            <Text
-                                className="text-3xl font-bold"
-                                style={{ color: theme.textPrimary }}
-                            >
-                                Create Account
-                            </Text>
-                            <Text
-                                className="text-base mt-2"
-                                style={{ color: theme.textSecondary }}
-                            >
-                                Join Jaazmarkets today
-                            </Text>
-                        </View>
+                    <View className="items-center mb-8">
+                        <Text className="text-3xl font-bold text-gray-900 mb-2">
+                            {step === 1 ? 'Create Account' : 'Email Verification'}
+                        </Text>
+                        <Text className="text-gray-600">
+                            {step === 1 ? 'Join Jaaz Markets today' : 'Complete your registration'}
+                        </Text>
                     </View>
 
-                    {/* Form Content */}
-                    <ScrollView className="flex-1 px-6" showsVerticalScrollIndicator={false}>
-                        <View
-                            className="rounded-3xl p-6 mb-6"
-                            style={{ backgroundColor: theme.cardBg }}
-                        >
-                            {/* Full Name */}
-                            <View className="mb-4">
-                                <Text
-                                    className="text-sm font-medium mb-1"
-                                    style={{ color: theme.textPrimary }}
-                                >
-                                    Full Name *
-                                </Text>
-                                <View
-                                    className="flex-row items-center px-4 py-3 rounded-lg"
-                                    style={{
-                                        backgroundColor: theme.inputBg,
-                                        borderWidth: 1,
-                                        borderColor: theme.inputBorder
-                                    }}
-                                >
-                                    <Ionicons name="person-outline" size={20} color={theme.textSecondary} />
-                                    <TextInput
-                                        onChangeText={value => nameRef.current = value}
-                                        placeholder="Enter your full name"
-                                        placeholderTextColor={theme.textTertiary}
-                                        className="flex-1 ml-3 py-0 text-base"
-                                        style={{ color: theme.textPrimary }}
-                                    />
-                                </View>
+                    {/* Form Container */}
+                    <View className="bg-white rounded-xl p-8 shadow-xl border border-gray-100">
+                        {errors.submit && (
+                            <View className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                <Text className="text-red-700 text-sm">{errors.submit}</Text>
+                                {errors.redirectToLogin && (
+                                    <Pressable onPress={() => router.push('/signin')} className="mt-2">
+                                        <Text className="text-orange-600 font-medium text-sm">Go to Login</Text>
+                                    </Pressable>
+                                )}
                             </View>
+                        )}
 
-                            {/* Email */}
-                            <View className="mb-4">
-                                <Text
-                                    className="text-sm font-medium mb-1"
-                                    style={{ color: theme.textPrimary }}
-                                >
-                                    Email *
-                                </Text>
-                                <View
-                                    className="flex-row items-center px-4 py-3 rounded-lg"
-                                    style={{
-                                        backgroundColor: theme.inputBg,
-                                        borderWidth: 1,
-                                        borderColor: theme.inputBorder
-                                    }}
-                                >
-                                    <Ionicons name="mail-outline" size={20} color={theme.textSecondary} />
-                                    <TextInput
-                                        onChangeText={value => emailRef.current = value}
-                                        placeholder="Enter your email"
-                                        placeholderTextColor={theme.textTertiary}
-                                        keyboardType="email-address"
-                                        autoCapitalize="none"
-                                        className="flex-1 ml-3 py-0 text-base"
-                                        style={{ color: theme.textPrimary }}
-                                    />
-                                </View>
-                            </View>
+                        {step === 1 ? renderRegistrationForm() : renderOtpForm()}
+                    </View>
 
-                            {/* Country */}
-                            <View className="mb-4">
-                                <Text
-                                    className="text-sm font-medium mb-1"
-                                    style={{ color: theme.textPrimary }}
-                                >
-                                    Country of Residence *
-                                </Text>
-                                <View
-                                    className="flex-row items-center px-4 py-3 rounded-lg"
-                                    style={{
-                                        backgroundColor: theme.inputBg,
-                                        borderWidth: 1,
-                                        borderColor: theme.inputBorder
-                                    }}
-                                >
-                                    <Ionicons name="globe-outline" size={20} color={theme.textSecondary} />
-                                    <TextInput
-                                        onChangeText={value => countryRef.current = value}
-                                        placeholder="Select country"
-                                        placeholderTextColor={theme.textTertiary}
-                                        className="flex-1 ml-3 py-0 text-base"
-                                        style={{ color: theme.textPrimary }}
-                                    />
-                                    <Ionicons name="chevron-down-outline" size={20} color={theme.textSecondary} />
-                                </View>
-                                <Text
-                                    className="text-xs mt-1 ml-1"
-                                    style={{ color: theme.textTertiary }}
-                                >
-                                    Type or select from list
-                                </Text>
-                            </View>
-
-                            {/* Partner Code */}
-                            <View className="mb-4">
-                                <Text
-                                    className="text-sm font-medium mb-1"
-                                    style={{ color: theme.textPrimary }}
-                                >
-                                    Partner Code (optional)
-                                </Text>
-                                <View
-                                    className="flex-row items-center px-4 py-3 rounded-lg"
-                                    style={{
-                                        backgroundColor: theme.inputBg,
-                                        borderWidth: 1,
-                                        borderColor: theme.inputBorder
-                                    }}
-                                >
-                                    <Ionicons name="people-outline" size={20} color={theme.textSecondary} />
-                                    <TextInput
-                                        onChangeText={value => partnerCodeRef.current = value}
-                                        placeholder="Enter code"
-                                        placeholderTextColor={theme.textTertiary}
-                                        className="flex-1 ml-3 py-0 text-base"
-                                        style={{ color: theme.textPrimary }}
-                                    />
-                                </View>
-                            </View>
-
-                            {/* Password */}
-                            <View className="mb-4">
-                                <Text
-                                    className="text-sm font-medium mb-1"
-                                    style={{ color: theme.textPrimary }}
-                                >
-                                    Password *
-                                </Text>
-                                <View
-                                    className="flex-row items-center px-4 py-3 rounded-lg"
-                                    style={{
-                                        backgroundColor: theme.inputBg,
-                                        borderWidth: 1,
-                                        borderColor: theme.inputBorder
-                                    }}
-                                >
-                                    <Ionicons name="lock-closed-outline" size={20} color={theme.textSecondary} />
-                                    <TextInput
-                                        onChangeText={value => passwordRef.current = value}
-                                        placeholder="Create a password"
-                                        placeholderTextColor={theme.textTertiary}
-                                        secureTextEntry={!showPassword.password}
-                                        className="flex-1 ml-3 py-0 text-base"
-                                        style={{ color: theme.textPrimary }}
-                                    />
-                                    <TouchableOpacity onPress={() => togglePasswordVisibility('password')}>
-                                        <Ionicons
-                                            name={showPassword.password ? "eye-off-outline" : "eye-outline"}
-                                            size={20}
-                                            color={theme.textSecondary}
-                                        />
-                                    </TouchableOpacity>
-                                </View>
-                                <View className="mt-2 ml-1">
-                                    <Text className="text-xs" style={{ color: theme.textTertiary }}>• 8-15 characters</Text>
-                                    <Text className="text-xs" style={{ color: theme.textTertiary }}>• Upper & lower case</Text>
-                                    <Text className="text-xs" style={{ color: theme.textTertiary }}>• At least one number</Text>
-                                    <Text className="text-xs" style={{ color: theme.textTertiary }}>• At least one special character</Text>
-                                </View>
-                            </View>
-
-                            {/* Confirm Password */}
-                            <View className="mb-4">
-                                <Text
-                                    className="text-sm font-medium mb-1"
-                                    style={{ color: theme.textPrimary }}
-                                >
-                                    Confirm Password *
-                                </Text>
-                                <View
-                                    className="flex-row items-center px-4 py-3 rounded-lg"
-                                    style={{
-                                        backgroundColor: theme.inputBg,
-                                        borderWidth: 1,
-                                        borderColor: theme.inputBorder
-                                    }}
-                                >
-                                    <Ionicons name="lock-closed-outline" size={20} color={theme.textSecondary} />
-                                    <TextInput
-                                        onChangeText={value => confirmPasswordRef.current = value}
-                                        placeholder="Confirm your password"
-                                        placeholderTextColor={theme.textTertiary}
-                                        secureTextEntry={!showPassword.confirmPassword}
-                                        className="flex-1 ml-3 py-0 text-base"
-                                        style={{ color: theme.textPrimary }}
-                                    />
-                                    <TouchableOpacity onPress={() => togglePasswordVisibility('confirmPassword')}>
-                                        <Ionicons
-                                            name={showPassword.confirmPassword ? "eye-off-outline" : "eye-outline"}
-                                            size={20}
-                                            color={theme.textSecondary}
-                                        />
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-
-                            {/* Tax Declaration Checkbox */}
-                            <View className="mb-6">
-                                <TouchableOpacity
-                                    onPress={() => setAgreeTax(!agreeTax)}
-                                    className="flex-row items-start"
-                                >
-                                    <View
-                                        className="w-5 h-5 rounded border-2 items-center justify-center mr-3 mt-0.5"
-                                        style={{
-                                            backgroundColor: agreeTax ? theme.primary : 'transparent',
-                                            borderColor: agreeTax ? theme.primary : theme.borderSecondary
-                                        }}
-                                    >
-                                        {agreeTax && <Ionicons name="checkmark" size={16} color="white" />}
-                                    </View>
-                                    <Text
-                                        className="flex-1 text-sm"
-                                        style={{ color: theme.textPrimary }}
-                                    >
-                                        I declare that I am not a citizen or resident of the United States for tax purposes.
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-
-                            {/* Continue Button */}
-                            {loading ? (
-                                <View className='py-4 items-center'>
-                                    <Loading size="48" />
-                                </View>
-                            ) : (
-                                <TouchableOpacity onPress={handleSubmit} className='rounded-lg overflow-hidden mb-4'>
-                                    <LinearGradient
-                                        colors={[theme.primary, theme.primaryDark]}
-                                        className="py-4 items-center"
-                                    >
-                                        <Text className="text-white text-base font-bold">
-                                            Continue
-                                        </Text>
-                                    </LinearGradient>
-                                </TouchableOpacity>
-                            )}
-
-                            {/* Divider */}
-                            {/* <View className="flex-row items-center my-4">
-                                <View
-                                    className="flex-1 h-px"
-                                    style={{ backgroundColor: theme.borderPrimary }}
-                                />
-                                <Text
-                                    className="mx-4 text-sm"
-                                    style={{ color: theme.textSecondary }}
-                                >
-                                    or sign up with
-                                </Text>
-                                <View
-                                    className="flex-1 h-px"
-                                    style={{ backgroundColor: theme.borderPrimary }}
-                                />
-                            </View> */}
-
-                            {/* Google Sign In */}
-                            {/* <TouchableOpacity
-                                onPress={handleGoogle}
-                                disabled={loading}
-                                className="flex-row items-center justify-center py-3 rounded-lg"
-                                style={{ backgroundColor: theme.inputBg }}
-                            >
-                                <Ionicons name="logo-google" size={20} color={theme.textPrimary} />
-                                <Text
-                                    className="ml-2 text-base font-semibold"
-                                    style={{ color: theme.textPrimary }}
-                                >
-                                    Google
-                                </Text>
-                            </TouchableOpacity> */}
-                        </View>
-
-                        {/* Sign In Link */}
-                        <View className="flex-row justify-center pb-8">
-                            <Text
-                                className="text-base"
-                                style={{ color: theme.textSecondary }}
-                            >
-                                Already have an account?
+                    {/* Sign In Link */}
+                    {step === 1 && (
+                        <View className="mt-6 flex-row justify-center">
+                            <Text className="text-sm text-gray-600">
+                                Already have an account?{' '}
                             </Text>
                             <Pressable onPress={() => router.push('/signin')}>
-                                <Text
-                                    className="text-base font-bold ml-1"
-                                    style={{ color: theme.primary }}
-                                >
+                                <Text className="text-sm text-orange-600 font-medium">
                                     Sign in
                                 </Text>
                             </Pressable>
                         </View>
-                    </ScrollView>
+                    )}
                 </SafeAreaView>
-            </LinearGradient>
+            </ScrollView>
 
             <AlertModal
                 visible={alertVisible}
@@ -470,6 +500,7 @@ const signup = () => {
                 message={alertData.message}
                 type={alertData.type}
                 onConfirm={alertData.onConfirm}
+                onCancel={() => setAlertVisible(false)}
                 confirmText="OK"
             />
         </CustomKeyboardView>

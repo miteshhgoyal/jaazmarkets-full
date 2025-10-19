@@ -1,39 +1,37 @@
 import React, { useEffect, useRef } from 'react';
 import { Stack, useSegments, useRouter } from 'expo-router';
 import { StatusBar, BackHandler, ToastAndroid, Platform } from 'react-native';
-import { AuthContextProvider, useAuth } from '@/context/authContext';
-import { ThemeProvider } from '@/context/themeContext';
+import { AuthProvider, useAuth } from '@/context/authContext';
 import './globals.css';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 function MainLayout() {
-    const { isAuthenticated, isLoading } = useAuth();
+    const { isAuthenticated, loading } = useAuth();
     const segments = useSegments();
     const router = useRouter();
     const backPressedOnce = useRef(false);
 
+    // Auth-based navigation
     useEffect(() => {
-        if (typeof isAuthenticated === 'undefined' || isLoading) return;
+        if (loading) return;
 
         const inAuth = segments[0] === '(auth)';
-        const inApp = segments[0] === '(app)';
+        const inTabs = segments[0] === '(tabs)';
 
-        if (isAuthenticated && !inApp) {
-            setTimeout(() => {
-                router.replace('/tabs/accounts');
-            }, 0);
-        } else if (!isAuthenticated && !inAuth) {
-            setTimeout(() => {
-                router.replace('/(auth)/signin');
-            }, 0);
+        if (isAuthenticated && !inTabs) {
+            router.replace('/(tabs)/accounts');
+        } else if (isAuthenticated === false && !inAuth) {
+            router.replace('/(auth)/signin');
         }
-    }, [isAuthenticated, isLoading]);
+    }, [isAuthenticated, loading, segments]);
 
+    // Back button handler
     useEffect(() => {
         const backAction = () => {
-            const isHome = segments[0] === '(app)' && segments[1] === 'tabs' && segments[2] === 'home';
+            const isOnAccountsTab =
+                segments[0] === '(tabs)' &&
+                segments[1] === 'accounts';
 
-            if (isHome) {
+            if (isOnAccountsTab) {
                 if (backPressedOnce.current) {
                     BackHandler.exitApp();
                     return true;
@@ -42,7 +40,9 @@ function MainLayout() {
                     if (Platform.OS === 'android') {
                         ToastAndroid.show('Press back again to exit', ToastAndroid.SHORT);
                     }
-                    setTimeout(() => { backPressedOnce.current = false; }, 2000);
+                    setTimeout(() => {
+                        backPressedOnce.current = false;
+                    }, 2000);
                     return true;
                 }
             }
@@ -57,26 +57,36 @@ function MainLayout() {
         <Stack
             screenOptions={{
                 headerShown: false,
-                animation: 'slide_from_right'
+                animation: 'slide_from_right',
+                contentStyle: { backgroundColor: 'white' }
             }}
-            initialRouteName="index"
-        />
+        >
+            <Stack.Screen name="index" />
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(tabs)" />
+
+            {/* Modal Screens at ROOT level */}
+            <Stack.Screen
+                name="new-account"
+                options={{
+                    presentation: 'modal',
+                    headerShown: true,
+                    title: 'Create New Account'
+                }}
+            />
+        </Stack>
     );
 }
 
 export default function RootLayout() {
     return (
-        <ThemeProvider>
-            <AuthContextProvider>
-                <SafeAreaView style={{ flex: 0, backgroundColor: 'transparent' }}>
-                    <StatusBar
-                        barStyle="dark-content"
-                        backgroundColor="transparent"
-                        translucent={true}
-                    />
-                </SafeAreaView>
-                <MainLayout />
-            </AuthContextProvider>
-        </ThemeProvider>
+        <AuthProvider>
+            <StatusBar
+                barStyle="dark-content"
+                backgroundColor="transparent"
+                translucent={true}
+            />
+            <MainLayout />
+        </AuthProvider>
     );
 }

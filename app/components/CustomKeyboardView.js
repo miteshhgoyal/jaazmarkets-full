@@ -1,29 +1,26 @@
-import { View, Text, Platform, KeyboardAvoidingView, ScrollView } from 'react-native';
 import React from 'react';
+import { KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
 
-const ios = Platform.OS === 'ios';
+const CustomKeyboardView = ({ children, inScrollView = false }) => {
+    const content = inScrollView ? (
+        <ScrollView
+            bounces={false}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ flexGrow: 1 }}
+        >
+            {children}
+        </ScrollView>
+    ) : (
+        children
+    );
 
-const CustomKeyboardView = ({
-    children,
-    keyboardVerticalOffset = 0,
-    scrollViewProps = {}
-}) => {
     return (
         <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={{ flex: 1 }}
-            behavior={ios ? 'padding' : 'height'}
-            keyboardVerticalOffset={keyboardVerticalOffset}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
-            <ScrollView
-                style={{ flex: 1 }}
-                contentContainerStyle={{ flexGrow: 1 }}
-                bounces={false}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                {...scrollViewProps}
-            >
-                {children}
-            </ScrollView>
+            {content}
         </KeyboardAvoidingView>
     );
 };

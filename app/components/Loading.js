@@ -1,12 +1,12 @@
-import { View, Text } from 'react-native'
-import React from 'react'
+import React from 'react';
+import { View, ActivityIndicator } from 'react-native';
 
-const Loading = ({ size }) => {
+const Loading = ({ size = 'large', color = '#f97316' }) => {
     return (
-        <View style={{ height: size, aspectRatio: 1 }}>
-            {/* <LottieView style={{ flex: 1 }} source={require("../assets/images/loading.json")} autoPlay loop /> */}
+        <View className="items-center justify-center">
+            <ActivityIndicator size={size} color={color} />
         </View>
-    )
-}
+    );
+};
 
-export default Loading
+export default Loading;

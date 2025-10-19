@@ -1,0 +1,17 @@
+CORS_ORIGIN=http://localhost:5173
+FRONTEND_URL=http://localhost:5173
+BASE_URL=http://localhost:8000
+NODE_ENV=development
+
+MONGODB_URI=mongodb://localhost:27017/jaazcrm
+MONGODB_URI_PROD=
+
+# JWT Secrets
+JWT_SECRET=sdlfsdfifysiefdifsdifuysdsdfuiysduid
+JWT_REFRESH_SECRET=dfyiuyfisduysdiusdlfsdfifysiefdifsdifuysdsdfuiysduid
+
+# Email (for OTP sending)
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=
+EMAIL_PASSWORD=

@@ -1,27 +1,30 @@
-import { View, Text, TextInput, TouchableOpacity, Pressable, StatusBar } from 'react-native'
-import React, { useRef, useState } from 'react'
+import { View, Text, TextInput, TouchableOpacity, Pressable, ScrollView, StatusBar } from 'react-native'
+import React, { useState } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useRouter } from 'expo-router'
-import { LinearGradient } from 'expo-linear-gradient'
+import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import Loading from '../../components/Loading'
 import CustomKeyboardView from "../../components/CustomKeyboardView"
 import AlertModal from '../../components/AlertModal'
 import { useAuth } from '@/context/authContext'
-import { useTheme } from '@/context/themeContext'
 import api from '@/services/api'
 
-const Signin = () => {
+const signin = () => {
+    const { login } = useAuth()
     const router = useRouter()
-    const [loading, setLoading] = useState(false)
-    const [showPassword, setShowPassword] = useState(false)
+    const searchParams = useLocalSearchParams()
+    const from = searchParams.from || '/(tabs)/accounts'
+    const successMessage = searchParams.message
+
+    const [formData, setFormData] = useState({
+        email: '',
+        password: ''
+    })
+    const [passwordVisible, setPasswordVisible] = useState(false)
+    const [isLoading, setIsLoading] = useState(false)
+    const [errors, setErrors] = useState({})
     const [alertVisible, setAlertVisible] = useState(false)
     const [alertData, setAlertData] = useState({})
-    const { login } = useAuth()
-    const { theme } = useTheme()
-
-    const userInputRef = useRef("")
-    const passwordRef = useRef("")
 
     const showAlert = (title, message, type = 'info', onConfirm = null) => {
         setAlertData({
@@ -33,240 +36,190 @@ const Signin = () => {
         setAlertVisible(true)
     }
 
-    const validateForm = () => {
-        const userInput = userInputRef.current?.trim()
-        const password = passwordRef.current?.trim()
-
-        if (!userInput) {
-            showAlert("Validation Error", "Username or Email is required", 'error')
-            return false
+    const handleInputChange = (name, value) => {
+        setFormData(prev => ({ ...prev, [name]: value }))
+        if (errors[name]) {
+            setErrors(prev => ({ ...prev, [name]: '' }))
         }
-
-        if (!password) {
-            showAlert("Validation Error", "Password is required", 'error')
-            return false
-        }
-
-        return true
     }
 
-    const handleSignin = async () => {
+    const validateForm = () => {
+        const newErrors = {}
+
+        if (!formData.email?.trim()) {
+            newErrors.email = 'Email is required'
+        }
+        if (!formData.password?.trim()) {
+            newErrors.password = 'Password is required'
+        }
+
+        setErrors(newErrors)
+        return Object.keys(newErrors).length === 0
+    }
+
+    const handleSubmit = async () => {
         if (!validateForm()) return
 
-        setLoading(true)
+        setIsLoading(true)
         try {
-            const response = await api.post('/auth/login', {
-                userInput: userInputRef.current?.trim(),
-                password: passwordRef.current?.trim()
+            // Use /auth/signin endpoint with email and password
+            const response = await api.post('/auth/signin', {
+                email: formData.email,
+                password: formData.password
             })
 
-            if (response.data.token) {
-                await login(response.data.token, response.data.user);
-                showAlert("Welcome!", "Sign in successful!", 'success',
-                    () => {
-                        setAlertVisible(false)
-                        router.replace('/tabs/accounts')
-                    }
-                )
+            if (response.data.data) {
+                const { accessToken, refreshToken, user } = response.data.data
+
+                await login({
+                    accessToken,
+                    refreshToken,
+                    user
+                })
+
+                router.replace(from)
             }
         } catch (error) {
-            const message = error.response?.data?.message || "Invalid credentials. Please try again."
-            showAlert("Sign In Error", message, 'error')
+            console.error('Login error:', error)
+            const message = error.response?.data?.message || 'Invalid credentials. Please try again.'
+            setErrors({ submit: message })
+            showAlert('Login Error', message, 'error')
         } finally {
-            setLoading(false)
+            setIsLoading(false)
         }
-    }
-
-    const handleGoogleLogin = () => {
-        showAlert("Coming Soon", "Google login will be available soon", 'info')
     }
 
     return (
         <CustomKeyboardView>
-            <StatusBar barStyle={theme.statusBarStyle} />
-            <LinearGradient
-                colors={[theme.bgPrimary, theme.bgSecondary]}
-                className="flex-1"
+            <StatusBar barStyle="dark-content" backgroundColor="#fff5f0" />
+            <ScrollView
+                className="flex-1 bg-gradient-to-br from-orange-50 to-white"
+                contentContainerStyle={{ flexGrow: 1 }}
+                showsVerticalScrollIndicator={false}
             >
-                <SafeAreaView className="flex-1">
+                <SafeAreaView className="flex-1 px-4 py-8">
                     {/* Header */}
-                    <View className="px-6 pt-8 pb-6">
-                        <View className="items-center mb-8">
-                            <View
-                                className="w-16 h-16 rounded-lg items-center justify-center mb-4"
-                                style={{ backgroundColor: theme.primary }}
-                            >
-                                <Ionicons name="trending-up" size={32} color="white" />
-                            </View>
-                            <Text
-                                className="text-3xl text-center font-bold"
-                                style={{ color: theme.textPrimary }}
-                            >
-                                Welcome to Jaazmarkets
-                            </Text>
-                            <Text
-                                className="text-base mt-2"
-                                style={{ color: theme.textSecondary }}
-                            >
-                                Sign in to your account
-                            </Text>
+                    <View className="items-center mb-8">
+                        <View className="w-16 h-16 bg-orange-500 rounded-full items-center justify-center mb-4">
+                            <Ionicons name="trending-up" size={32} color="white" />
                         </View>
+                        <Text className="text-2xl font-bold text-gray-900">
+                            Welcome to JaazMarkets
+                        </Text>
                     </View>
 
+                    {/* Success Message */}
+                    {successMessage && (
+                        <View className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                            <Text className="text-green-700 text-sm">{successMessage}</Text>
+                        </View>
+                    )}
+
+                    {/* Error Message */}
+                    {errors.submit && (
+                        <View className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                            <Text className="text-red-700 text-sm">{errors.submit}</Text>
+                        </View>
+                    )}
+
                     {/* Form Container */}
-                    <View className="px-6">
-                        <View
-                            className="rounded-3xl p-6 mb-6"
-                            style={{ backgroundColor: theme.cardBg }}
-                        >
-                            {/* Username or Email Input */}
-                            <View className="mb-5">
-                                <Text
-                                    className="text-sm font-medium mb-1"
-                                    style={{ color: theme.textPrimary }}
-                                >
-                                    Email or Username
-                                </Text>
-                                <View
-                                    className="flex-row items-center px-4 py-3 rounded-lg"
-                                    style={{
-                                        backgroundColor: theme.inputBg,
-                                        borderWidth: 1,
-                                        borderColor: theme.inputBorder
-                                    }}
-                                >
-                                    <Ionicons name="person-outline" size={20} color={theme.textSecondary} />
-                                    <TextInput
-                                        onChangeText={value => userInputRef.current = value}
-                                        placeholder="Enter username or email"
-                                        placeholderTextColor={theme.textTertiary}
-                                        autoCapitalize="none"
-                                        className="flex-1 ml-3 py-0 text-base"
-                                        style={{ color: theme.textPrimary }}
-                                    />
+                    <View className="bg-white rounded-md p-6 shadow-lg border border-gray-200">
+                        {/* Email Input */}
+                        <View className="mb-4">
+                            <Text className="block text-sm font-medium text-gray-700 mb-1">
+                                Email
+                            </Text>
+                            <View className="relative">
+                                <View className="absolute left-3 top-3 z-10">
+                                    <Ionicons name="person" size={20} color="#9ca3af" />
                                 </View>
+                                <TextInput
+                                    value={formData.email}
+                                    onChangeText={(value) => handleInputChange('email', value)}
+                                    placeholder="Enter your email"
+                                    placeholderTextColor="#9ca3af"
+                                    keyboardType="email-address"
+                                    autoCapitalize="none"
+                                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md text-gray-900"
+                                    style={{ fontSize: 16 }}
+                                />
                             </View>
+                            {errors.email && (
+                                <Text className="mt-1 text-sm text-red-600">{errors.email}</Text>
+                            )}
+                        </View>
 
-                            {/* Password Input */}
-                            <View className="mb-4">
-                                <Text
-                                    className="text-sm font-medium mb-1"
-                                    style={{ color: theme.textPrimary }}
-                                >
-                                    Password
-                                </Text>
-                                <View
-                                    className="flex-row items-center px-4 py-3 rounded-lg"
-                                    style={{
-                                        backgroundColor: theme.inputBg,
-                                        borderWidth: 1,
-                                        borderColor: theme.inputBorder
-                                    }}
-                                >
-                                    <Ionicons name="lock-closed-outline" size={20} color={theme.textSecondary} />
-                                    <TextInput
-                                        onChangeText={value => passwordRef.current = value}
-                                        placeholder="Enter your password"
-                                        placeholderTextColor={theme.textTertiary}
-                                        secureTextEntry={!showPassword}
-                                        className="flex-1 ml-3 py-0 text-base"
-                                        style={{ color: theme.textPrimary }}
-                                    />
-                                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                                        <Ionicons
-                                            name={showPassword ? "eye-off-outline" : "eye-outline"}
-                                            size={20}
-                                            color={theme.textSecondary}
-                                        />
-                                    </TouchableOpacity>
+                        {/* Password Input */}
+                        <View className="mb-4">
+                            <Text className="block text-sm font-medium text-gray-700 mb-1">
+                                Password
+                            </Text>
+                            <View className="relative">
+                                <View className="absolute left-3 top-3 z-10">
+                                    <Ionicons name="lock-closed" size={20} color="#9ca3af" />
                                 </View>
-                            </View>
-
-                            {/* Forgot Password */}
-                            <Pressable onPress={() => router.push('/forgot-password')} className="mb-6">
-                                <Text
-                                    className="text-right text-sm font-semibold"
-                                    style={{ color: theme.primary }}
+                                <TextInput
+                                    value={formData.password}
+                                    onChangeText={(value) => handleInputChange('password', value)}
+                                    placeholder="Enter your password"
+                                    placeholderTextColor="#9ca3af"
+                                    secureTextEntry={!passwordVisible}
+                                    className="w-full pl-10 pr-12 py-2 border border-gray-300 rounded-md text-gray-900"
+                                    style={{ fontSize: 16 }}
+                                />
+                                <TouchableOpacity
+                                    onPress={() => setPasswordVisible(!passwordVisible)}
+                                    className="absolute right-3 top-3"
                                 >
+                                    <Ionicons
+                                        name={passwordVisible ? "eye-off" : "eye"}
+                                        size={20}
+                                        color="#9ca3af"
+                                    />
+                                </TouchableOpacity>
+                            </View>
+                            {errors.password && (
+                                <Text className="mt-1 text-sm text-red-600">{errors.password}</Text>
+                            )}
+                        </View>
+
+                        {/* Forgot Password */}
+                        <View className="items-end mb-4">
+                            <Pressable onPress={() => router.push('/reset-password')}>
+                                <Text className="text-sm text-blue-500 font-medium">
                                     I forgot my password
                                 </Text>
                             </Pressable>
+                        </View>
 
-                            {/* Sign In Button */}
-                            {loading ? (
-                                <View className='py-4 items-center'>
-                                    <Loading size="48" />
-                                </View>
+                        {/* Submit Button */}
+                        <TouchableOpacity
+                            onPress={handleSubmit}
+                            disabled={isLoading}
+                            className="w-full bg-orange-500 py-3 px-4 rounded-md items-center mb-4"
+                            style={{ opacity: isLoading ? 0.5 : 1 }}
+                        >
+                            {isLoading ? (
+                                <Loading size={24} />
                             ) : (
-                                <TouchableOpacity onPress={handleSignin} className='rounded-lg overflow-hidden mb-4'>
-                                    <LinearGradient
-                                        colors={[theme.primary, theme.primaryDark]}
-                                        className="py-4 items-center"
-                                    >
-                                        <Text className="text-white text-base font-bold">
-                                            Continue
-                                        </Text>
-                                    </LinearGradient>
-                                </TouchableOpacity>
+                                <Text className="text-white font-medium">Continue</Text>
                             )}
-
-                            {/* Divider */}
-                            {/* <View className="flex-row items-center my-4">
-                                <View
-                                    className="flex-1 h-px"
-                                    style={{ backgroundColor: theme.borderPrimary }}
-                                />
-                                <Text
-                                    className="mx-4 text-sm"
-                                    style={{ color: theme.textSecondary }}
-                                >
-                                    or sign in with
-                                </Text>
-                                <View
-                                    className="flex-1 h-px"
-                                    style={{ backgroundColor: theme.borderPrimary }}
-                                />
-                            </View> */}
-
-                            {/* Google Sign In */}
-                            {/* <TouchableOpacity
-                                onPress={handleGoogleLogin}
-                                disabled={loading}
-                                className="flex-row items-center justify-center py-3 rounded-lg"
-                                style={{ backgroundColor: theme.inputBg }}
-                            >
-                                <Ionicons name="logo-google" size={20} color={theme.textPrimary} />
-                                <Text
-                                    className="ml-2 text-base font-semibold"
-                                    style={{ color: theme.textPrimary }}
-                                >
-                                    Google
-                                </Text>
-                            </TouchableOpacity> */}
-                        </View>
-
-                        {/* Sign Up Link */}
-                        <View className="flex-row justify-center pb-8">
-                            <Text
-                                className="text-base"
-                                style={{ color: theme.textSecondary }}
-                            >
-                                Don't have an account?
-                            </Text>
-                            <Pressable onPress={() => router.push('/signup')}>
-                                <Text
-                                    className="text-base font-bold ml-1"
-                                    style={{ color: theme.primary }}
-                                >
-                                    Sign up
-                                </Text>
-                            </Pressable>
-                        </View>
+                        </TouchableOpacity>
                     </View>
 
-                    <View className="h-8" />
+                    {/* Sign Up Link */}
+                    <View className="mt-6 flex-row justify-center">
+                        <Text className="text-sm text-gray-600">
+                            Don't have an account?{' '}
+                        </Text>
+                        <Pressable onPress={() => router.push('/signup')}>
+                            <Text className="text-sm text-orange-600 font-medium">
+                                Sign up
+                            </Text>
+                        </Pressable>
+                    </View>
                 </SafeAreaView>
-            </LinearGradient>
+            </ScrollView>
 
             <AlertModal
                 visible={alertVisible}
@@ -281,4 +234,4 @@ const Signin = () => {
     )
 }
 
-export default Signin
+export default signin
