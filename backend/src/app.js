@@ -18,11 +18,32 @@ import referRoutes from "./routes/refer.routes.js";
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-// CORS Configuration
+const allowedOrigins = [
+    'https://jaazmarkets-user.vercel.app',
+    'https://jaazmarkets-admin.vercel.app',
+    'https://jaazmarkets.com',
+    'https://client.jaazmarkets.com',
+    'https://dashboard.jaazmarkets.com',
+    'https://admin.jaazmarkets.com',
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://localhost:8173'
+];
+
 const corsOptions = {
-    origin: '*',
+    origin: function (origin, callback) {
+        // Allow requests with no origin (React Native, Postman, curl)
+        if (!origin) return callback(null, true);
+
+        if (allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(null, true); // Or set to false to block unknown origins
+        }
+    },
     methods: ['GET', 'POST', 'DELETE', 'PATCH', 'PUT', 'OPTIONS'],
-    credentials: true
+    credentials: true,
+    optionsSuccessStatus: 200
 };
 
 // Middleware
@@ -51,7 +72,7 @@ app.get('/', (req, res) => {
 });
 
 // 404 handler
-app.use('/*path', (req, res) => {
+app.use('*', (req, res) => {
     res.status(404).json({ message: 'Route not found' });
 });
 
@@ -67,9 +88,9 @@ app.use((err, req, res, next) => {
 // Start server
 connectDB()
     .then(() => {
-        app.listen(PORT, () => {
+        app.listen(PORT, '0.0.0.0', () => {
             console.log(`Server running on port ${PORT}`);
-            console.log(`API URL: http://localhost:${PORT}`);
+            console.log(`Environment: ${process.env.NODE_ENV}`);
         });
     })
     .catch(err => {
