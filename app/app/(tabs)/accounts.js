@@ -1,35 +1,38 @@
-import { View, Text, ScrollView, TouchableOpacity, TextInput, RefreshControl, ActivityIndicator, Alert } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, RefreshControl, Platform, Alert } from 'react-native'
 import React, { useState, useEffect, useCallback } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as Clipboard from 'expo-clipboard'
-import { useAuth } from '@/context/authContext'
 import api from '@/services/api'
-import Loading from '@/components/Loading'
-import EmptyState from '@/components/EmptyState'
-import ErrorState from '@/components/ErrorState'
 
 const Accounts = () => {
     const router = useRouter()
-    const { user } = useAuth()
-
     const [activeTab, setActiveTab] = useState('Real')
+
+    // State
     const [accounts, setAccounts] = useState([])
     const [loading, setLoading] = useState(true)
     const [refreshing, setRefreshing] = useState(false)
     const [error, setError] = useState(null)
+
+    // Filter state
     const [searchTerm, setSearchTerm] = useState('')
     const [sortBy, setSortBy] = useState('newest')
+    const [platformFilter, setPlatformFilter] = useState('all')
+    const [classFilter, setClassFilter] = useState('all')
+    const [balanceRangeFilter, setBalanceRangeFilter] = useState('all')
+    const [showFilters, setShowFilters] = useState(false)
 
     useEffect(() => {
         fetchAccounts()
-    }, [])
+    }, [activeTab])
 
     const fetchAccounts = async () => {
         try {
             setLoading(true)
             setError(null)
+
             const response = await api.get('/account/my-accounts')
 
             if (response.data.success) {
@@ -40,19 +43,20 @@ const Accounts = () => {
             setError(err.response?.data?.message || 'Failed to load accounts')
         } finally {
             setLoading(false)
+            setRefreshing(false)
         }
     }
 
-    const onRefresh = useCallback(async () => {
+    const onRefresh = useCallback(() => {
         setRefreshing(true)
-        await fetchAccounts()
-        setRefreshing(false)
+        fetchAccounts()
     }, [])
 
+    // Filter and sort accounts
     const getFilteredAccounts = () => {
         let filtered = accounts
 
-        // Filter by tab
+        // Filter by account type (tab)
         filtered = filtered.filter((acc) => {
             if (activeTab === 'Real') return acc.accountType === 'Real' && acc.status !== 'closed'
             if (activeTab === 'Demo') return acc.accountType === 'Demo' && acc.status !== 'closed'
@@ -68,8 +72,28 @@ const Accounts = () => {
                     acc.accountNumber?.toLowerCase().includes(searchLower) ||
                     acc.login?.toLowerCase().includes(searchLower) ||
                     acc.platform?.toLowerCase().includes(searchLower) ||
-                    acc.accountClass?.toLowerCase().includes(searchLower)
+                    acc.accountClass?.toLowerCase().includes(searchLower) ||
+                    acc.server?.toLowerCase().includes(searchLower)
             )
+        }
+
+        // Platform filter
+        if (platformFilter !== 'all') {
+            filtered = filtered.filter((acc) => acc.platform === platformFilter)
+        }
+
+        // Class filter
+        if (classFilter !== 'all') {
+            filtered = filtered.filter((acc) => acc.accountClass === classFilter)
+        }
+
+        // Balance range filter
+        if (balanceRangeFilter !== 'all') {
+            const [min, max] = balanceRangeFilter.split('-').map(Number)
+            filtered = filtered.filter((acc) => {
+                const balance = acc.balance || 0
+                return balance >= min && (max ? balance <= max : true)
+            })
         }
 
         // Sort
@@ -83,6 +107,10 @@ const Accounts = () => {
                     return (b.balance || 0) - (a.balance || 0)
                 case 'balance-low':
                     return (a.balance || 0) - (b.balance || 0)
+                case 'name-asc':
+                    return (a.accountNumber || '').localeCompare(b.accountNumber || '')
+                case 'name-desc':
+                    return (b.accountNumber || '').localeCompare(a.accountNumber || '')
                 default:
                     return 0
             }
@@ -93,247 +121,109 @@ const Accounts = () => {
 
     const filteredAccounts = getFilteredAccounts()
 
-    // Count accounts by type
-    const realCount = accounts.filter((acc) => acc.accountType === 'Real' && acc.status !== 'closed').length
-    const demoCount = accounts.filter((acc) => acc.accountType === 'Demo' && acc.status !== 'closed').length
-    const archivedCount = accounts.filter((acc) => acc.status === 'closed').length
+    // Get unique values for filters
+    const platformOptions = [...new Set(accounts.map((acc) => acc.platform))].filter(Boolean)
+    const classOptions = [...new Set(accounts.map((acc) => acc.accountClass))].filter(Boolean)
 
-    const handleCopyToClipboard = async (text, label) => {
-        await Clipboard.setStringAsync(text)
-        Alert.alert('Copied', `${label} copied to clipboard`)
+    // Check if filters are active
+    const hasActiveFilters =
+        searchTerm !== '' ||
+        platformFilter !== 'all' ||
+        classFilter !== 'all' ||
+        balanceRangeFilter !== 'all' ||
+        sortBy !== 'newest'
+
+    const clearFilters = () => {
+        setSearchTerm('')
+        setSortBy('newest')
+        setPlatformFilter('all')
+        setClassFilter('all')
+        setBalanceRangeFilter('all')
     }
+
+    // Count accounts by type
+    const realCount = accounts.filter(
+        (acc) => acc.accountType === 'Real' && acc.status !== 'closed'
+    ).length
+    const demoCount = accounts.filter(
+        (acc) => acc.accountType === 'Demo' && acc.status !== 'closed'
+    ).length
+    const archivedCount = accounts.filter(
+        (acc) => acc.status === 'closed'
+    ).length
 
     const handleReactivate = async (accountId) => {
-        Alert.alert(
-            'Reactivate Account',
-            'Are you sure you want to reactivate this account?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Reactivate',
-                    onPress: async () => {
-                        try {
-                            const response = await api.patch(`/account/${accountId}/status`, { status: 'active' })
-                            if (response.data.success) {
-                                Alert.alert('Success', 'Account reactivated successfully')
-                                fetchAccounts()
-                            }
-                        } catch (err) {
-                            Alert.alert('Error', err.response?.data?.message || 'Failed to reactivate account')
-                        }
-                    }
-                }
-            ]
-        )
+        try {
+            const response = await api.patch(`/account/${accountId}/status`, {
+                status: 'active',
+            })
+
+            if (response.data.success) {
+                Alert.alert('Success', 'Account reactivated successfully')
+                fetchAccounts()
+            }
+        } catch (err) {
+            console.error('Failed to reactivate account:', err)
+            Alert.alert('Error', 'Failed to reactivate account')
+        }
     }
 
-    const renderAccountCard = (account) => {
-        const isArchived = account.status === 'closed'
-
-        return (
-            <View key={account._id} className="bg-white rounded-xl p-4 mb-4 shadow-sm border border-gray-100">
-                {/* Header with badges */}
-                <View className="flex-row flex-wrap gap-2 mb-4">
-                    <View className={`px-2.5 py-1 rounded-full ${account.accountType === 'Real' ? 'bg-purple-100' : 'bg-blue-100'}`}>
-                        <Text className={`text-xs font-semibold ${account.accountType === 'Real' ? 'text-purple-800' : 'text-blue-800'}`}>
-                            {account.accountType}
-                        </Text>
-                    </View>
-                    <View className="px-2.5 py-1 rounded-full bg-gray-100">
-                        <Text className="text-xs font-semibold text-gray-800">{account.platform}</Text>
-                    </View>
-                    <View className="px-2.5 py-1 rounded-full bg-orange-100">
-                        <Text className="text-xs font-semibold text-orange-800">{account.accountClass}</Text>
-                    </View>
-                    <View className={`px-2.5 py-1 rounded-full ${isArchived ? 'bg-gray-100' : 'bg-green-100'}`}>
-                        <Text className={`text-xs font-semibold ${isArchived ? 'text-gray-800' : 'text-green-800'}`}>
-                            {isArchived ? 'Archived' : 'Active'}
-                        </Text>
-                    </View>
-                </View>
-
-                {/* Balance */}
-                <View className="mb-4">
-                    <Text className="text-3xl font-bold text-gray-900">
-                        {account.balance?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </Text>
-                    <Text className="text-sm text-gray-500 uppercase">{account.currency}</Text>
-                </View>
-
-                {/* Stats Grid */}
-                <View className="space-y-2 mb-4">
-                    <View className="flex-row items-center justify-between p-2.5 bg-gray-50 rounded-lg">
-                        <View className="flex-row items-center gap-2 flex-1">
-                            <Ionicons name="fingerprint" size={16} color="#9ca3af" />
-                            <View className="flex-1">
-                                <Text className="text-xs text-gray-500 uppercase">Account Number</Text>
-                                <Text className="text-sm font-semibold text-gray-900">{account.accountNumber}</Text>
-                            </View>
-                        </View>
-                        <TouchableOpacity onPress={() => handleCopyToClipboard(account.accountNumber, 'Account Number')}>
-                            <Ionicons name="copy-outline" size={16} color="#6b7280" />
-                        </TouchableOpacity>
-                    </View>
-
-                    <View className="flex-row items-center justify-between p-2.5 bg-gray-50 rounded-lg">
-                        <View className="flex-row items-center gap-2 flex-1">
-                            <Ionicons name="card" size={16} color="#9ca3af" />
-                            <View className="flex-1">
-                                <Text className="text-xs text-gray-500 uppercase">Login</Text>
-                                <Text className="text-sm font-semibold text-gray-900">{account.login}</Text>
-                            </View>
-                        </View>
-                        <TouchableOpacity onPress={() => handleCopyToClipboard(account.login, 'Login')}>
-                            <Ionicons name="copy-outline" size={16} color="#6b7280" />
-                        </TouchableOpacity>
-                    </View>
-
-                    <View className="flex-row items-center justify-between p-2.5 bg-gray-50 rounded-lg">
-                        <View className="flex-row items-center gap-2 flex-1">
-                            <Ionicons name="server" size={16} color="#9ca3af" />
-                            <View className="flex-1">
-                                <Text className="text-xs text-gray-500 uppercase">Server</Text>
-                                <Text className="text-sm font-semibold text-gray-900">{account.server}</Text>
-                            </View>
-                        </View>
-                        <TouchableOpacity onPress={() => handleCopyToClipboard(account.server, 'Server')}>
-                            <Ionicons name="copy-outline" size={16} color="#6b7280" />
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                {/* Equity & Margin */}
-                <View className="flex-row gap-2 mb-4">
-                    <View className="flex-1 p-3 bg-green-50 rounded-lg border border-green-100">
-                        <Text className="text-xs text-green-700 uppercase mb-1">Equity</Text>
-                        <Text className="text-base font-bold text-green-900">
-                            {account.currency} {(account.equity || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        </Text>
-                    </View>
-                    <View className="flex-1 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                        <Text className="text-xs text-blue-700 uppercase mb-1">Free Margin</Text>
-                        <Text className="text-base font-bold text-blue-900">
-                            {account.currency} {(account.freeMargin || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        </Text>
-                    </View>
-                </View>
-
-                {/* Trading Info */}
-                <View className="bg-orange-50 rounded-lg p-3 border border-orange-100 mb-4">
-                    <Text className="text-xs text-orange-800 font-semibold uppercase mb-2">Trading Info</Text>
-                    <View className="space-y-2">
-                        <View className="flex-row justify-between">
-                            <Text className="text-sm text-gray-600">Leverage</Text>
-                            <Text className="text-sm font-bold text-orange-600">{account.leverage}</Text>
-                        </View>
-                        <View className="flex-row justify-between">
-                            <Text className="text-sm text-gray-600">Spread</Text>
-                            <Text className="text-sm font-medium text-gray-900">
-                                {account.accountClass?.includes('Raw') || account.accountClass?.includes('Zero') ? 'Raw Spread' : 'Variable'}
-                            </Text>
-                        </View>
-                        <View className="flex-row justify-between">
-                            <Text className="text-sm text-gray-600">Commission</Text>
-                            <Text className="text-sm font-medium text-gray-900">
-                                {account.accountClass?.includes('Standard') ? 'No commission' : '$3.5 per lot'}
-                            </Text>
-                        </View>
-                    </View>
-                </View>
-
-                {/* Action Buttons */}
-                {isArchived ? (
-                    <TouchableOpacity
-                        onPress={() => handleReactivate(account._id)}
-                        className="bg-orange-500 rounded-lg py-3 flex-row items-center justify-center gap-2"
-                    >
-                        <Ionicons name="reload" size={18} color="white" />
-                        <Text className="text-white font-semibold">Reactivate</Text>
-                    </TouchableOpacity>
-                ) : (
-                    <View className="flex-row gap-2">
-                        <TouchableOpacity
-                            onPress={() => router.push('/deposit')}
-                            className="flex-1 bg-green-50 border border-green-200 rounded-lg py-3 flex-row items-center justify-center gap-2"
-                        >
-                            <Ionicons name="add-circle" size={18} color="#10b981" />
-                            <Text className="text-green-700 font-semibold">Deposit</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => router.push('/withdraw')}
-                            className="flex-1 bg-red-50 border border-red-200 rounded-lg py-3 flex-row items-center justify-center gap-2"
-                        >
-                            <Ionicons name="remove-circle" size={18} color="#ef4444" />
-                            <Text className="text-red-700 font-semibold">Withdraw</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
-            </View>
-        )
+    const copyToClipboard = async (text, label) => {
+        await Clipboard.setStringAsync(text)
+        Alert.alert('Copied', `${label} copied to clipboard`)
     }
 
     return (
         <SafeAreaView className="flex-1 bg-gray-50">
             {/* Header */}
             <View className="bg-white px-6 py-4 border-b border-gray-200">
-                <View className="flex-row items-center justify-between mb-4">
-                    <View>
-                        <Text className="text-2xl font-bold text-gray-900">Accounts</Text>
-                        <Text className="text-gray-600 text-sm">Manage your trading accounts</Text>
-                    </View>
+                <View className="flex-row items-center justify-between mb-2">
+                    <Text className="text-2xl font-bold text-gray-900">Trading Accounts</Text>
                     <TouchableOpacity
                         onPress={() => router.push('/new-account')}
-                        className="bg-orange-500 rounded-lg px-4 py-2.5 flex-row items-center gap-2"
+                        className="bg-orange-500 px-2 py-2 rounded-full flex-row items-center gap-2"
+                        activeOpacity={0.7}
                     >
                         <Ionicons name="add" size={20} color="white" />
-                        <Text className="text-white font-semibold">New</Text>
                     </TouchableOpacity>
                 </View>
-
-                {/* Tabs */}
-                <View className="flex-row bg-gray-100 rounded-lg p-1">
-                    {['Real', 'Demo', 'Archived'].map((tab) => (
-                        <TouchableOpacity
-                            key={tab}
-                            onPress={() => setActiveTab(tab)}
-                            className={`flex-1 py-2 rounded-lg ${activeTab === tab ? 'bg-white shadow-sm' : ''}`}
-                        >
-                            <Text className={`text-center font-semibold text-sm ${activeTab === tab ? 'text-gray-900' : 'text-gray-600'}`}>
-                                {tab} ({tab === 'Real' ? realCount : tab === 'Demo' ? demoCount : archivedCount})
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
+                <Text className="text-gray-600 text-sm">Manage your trading accounts</Text>
             </View>
 
-            {/* Search */}
-            <View className="bg-white px-6 py-3 border-b border-gray-100">
-                <View className="flex-row items-center bg-gray-100 rounded-lg px-3 py-2">
-                    <Ionicons name="search" size={18} color="#9ca3af" />
-                    <TextInput
-                        placeholder="Search accounts..."
-                        value={searchTerm}
-                        onChangeText={setSearchTerm}
-                        className="flex-1 ml-2 text-gray-900"
-                        placeholderTextColor="#9ca3af"
+            {/* Tabs */}
+            <View className="bg-white border-b border-gray-200 px-6 py-3">
+                <View className="flex-row gap-4">
+                    <TabButton
+                        label="Real Accounts"
+                        count={realCount}
+                        isActive={activeTab === 'Real'}
+                        onPress={() => setActiveTab('Real')}
                     />
-                    {searchTerm !== '' && (
-                        <TouchableOpacity onPress={() => setSearchTerm('')}>
-                            <Ionicons name="close-circle" size={18} color="#9ca3af" />
-                        </TouchableOpacity>
-                    )}
+                    <TabButton
+                        label="Demo Accounts"
+                        count={demoCount}
+                        isActive={activeTab === 'Demo'}
+                        onPress={() => setActiveTab('Demo')}
+                    />
+                    <TabButton
+                        label="Archived"
+                        count={archivedCount}
+                        isActive={activeTab === 'Archived'}
+                        onPress={() => setActiveTab('Archived')}
+                    />
                 </View>
             </View>
 
-            {/* Results Count */}
+            {/* Results Summary */}
             <View className="px-6 py-3 bg-gray-50">
                 <Text className="text-sm text-gray-600">
-                    Showing {filteredAccounts.length} of {accounts.filter(acc => {
+                    Showing {filteredAccounts.length} of {accounts.filter((acc) => {
                         if (activeTab === 'Real') return acc.accountType === 'Real' && acc.status !== 'closed'
                         if (activeTab === 'Demo') return acc.accountType === 'Demo' && acc.status !== 'closed'
                         if (activeTab === 'Archived') return acc.status === 'closed'
                         return true
                     }).length} accounts
+                    {hasActiveFilters && ' (Filtered)'}
                 </Text>
             </View>
 
@@ -341,35 +231,339 @@ const Accounts = () => {
             <ScrollView
                 className="flex-1 px-6"
                 showsVerticalScrollIndicator={false}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#f97316']} />
+                }
             >
-                {loading ? (
-                    <View className="flex-1 items-center justify-center py-20">
+                {loading && !refreshing ? (
+                    <View className="flex-1 items-center justify-center py-12">
                         <ActivityIndicator size="large" color="#f97316" />
                     </View>
                 ) : error ? (
-                    <ErrorState
-                        title="Failed to load accounts"
-                        message={error}
-                        onRetry={fetchAccounts}
-                    />
+                    <View className="bg-white rounded-lg p-8 mt-4">
+                        <View className="items-center">
+                            <Ionicons name="alert-circle-outline" size={64} color="#ef4444" />
+                            <Text className="text-xl font-semibold text-gray-900 mt-4 mb-2">Failed to Load Accounts</Text>
+                            <Text className="text-gray-600 text-center mb-6">{error}</Text>
+                            <TouchableOpacity
+                                onPress={fetchAccounts}
+                                className="bg-orange-500 px-6 py-3 rounded-lg"
+                            >
+                                <Text className="text-white font-semibold">Try Again</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
                 ) : filteredAccounts.length === 0 ? (
-                    <EmptyState
-                        icon="briefcase-outline"
-                        title="No accounts found"
-                        message={searchTerm ? 'Try adjusting your search' : `You don't have any ${activeTab.toLowerCase()} accounts yet`}
-                        actionText={!searchTerm && activeTab !== 'Archived' ? 'Create Your First Account' : undefined}
-                        onAction={!searchTerm && activeTab !== 'Archived' ? () => router.push('/new-account') : undefined}
-                    />
+                    <View className="bg-white rounded-lg p-8 mt-4">
+                        <View className="items-center">
+                            <Ionicons name="wallet-outline" size={64} color="#9ca3af" />
+                            <Text className="text-xl font-semibold text-gray-900 mt-4 mb-2">No accounts found</Text>
+                            <Text className="text-gray-600 text-center mb-6">
+                                {hasActiveFilters
+                                    ? 'Try adjusting your filters to see more results'
+                                    : `You don't have any ${activeTab.toLowerCase()} accounts yet`}
+                            </Text>
+                            {!hasActiveFilters && activeTab !== 'Archived' && (
+                                <TouchableOpacity
+                                    onPress={() => router.push('/new-account')}
+                                    className="bg-orange-500 px-6 py-3 rounded-lg flex-row items-center gap-2"
+                                >
+                                    <Ionicons name="add" size={20} color="white" />
+                                    <Text className="text-white font-semibold">Create Your First Account</Text>
+                                </TouchableOpacity>
+                            )}
+                            {hasActiveFilters && (
+                                <TouchableOpacity
+                                    onPress={clearFilters}
+                                    className="bg-white border-2 border-gray-300 px-6 py-3 rounded-lg"
+                                >
+                                    <Text className="text-gray-900 font-semibold">Clear Filters</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    </View>
                 ) : (
                     <View className="py-4">
-                        {filteredAccounts.map(renderAccountCard)}
-                        <View className="h-20" />
+                        {filteredAccounts.map((account) => (
+                            <View key={account._id} className="mb-4">
+                                {activeTab === 'Archived' ? (
+                                    <ArchivedAccountCard
+                                        account={account}
+                                        onReactivate={() => handleReactivate(account._id)}
+                                    />
+                                ) : (
+                                    <ActiveAccountCard
+                                        account={account}
+                                        onCopyToClipboard={copyToClipboard}
+                                    />
+                                )}
+                            </View>
+                        ))}
+                        <View className="h-6" />
                     </View>
                 )}
             </ScrollView>
         </SafeAreaView>
     )
 }
+
+// Helper Components
+const TabButton = ({ label, count, isActive, onPress }) => (
+    <TouchableOpacity
+        onPress={onPress}
+        className={`pb-2 border-b-2 ${isActive ? 'border-orange-500' : 'border-transparent'}`}
+    >
+        <View className="flex-row items-center gap-2">
+            <Text className={`font-semibold ${isActive ? 'text-orange-500' : 'text-gray-600'}`}>
+                {label}
+            </Text>
+            <View className={`px-2 py-0.5 rounded-full ${isActive ? 'bg-orange-100' : 'bg-gray-100'}`}>
+                <Text className={`text-xs font-medium ${isActive ? 'text-orange-700' : 'text-gray-600'}`}>
+                    {count}
+                </Text>
+            </View>
+        </View>
+    </TouchableOpacity>
+)
+
+const FilterSelect = ({ label, value, onChange, options }) => {
+    const [showPicker, setShowPicker] = useState(false)
+    const selectedLabel = options.find(o => o.value === value)?.label || ''
+
+    return (
+        <View className="mb-3">
+            <Text className="text-sm font-medium text-gray-700 mb-2">{label}</Text>
+            <TouchableOpacity
+                onPress={() => setShowPicker(!showPicker)}
+                className="px-4 py-3 border border-gray-300 rounded-lg bg-white flex-row items-center justify-between"
+            >
+                <Text className="text-gray-900">{selectedLabel}</Text>
+                <Ionicons name="chevron-down" size={20} color="#9ca3af" />
+            </TouchableOpacity>
+
+            {showPicker && (
+                <View className="mt-2 border border-gray-300 rounded-lg bg-white overflow-hidden">
+                    {options.map((option) => (
+                        <TouchableOpacity
+                            key={option.value}
+                            onPress={() => {
+                                onChange(option.value)
+                                setShowPicker(false)
+                            }}
+                            className={`px-4 py-3 border-b border-gray-100 ${value === option.value ? 'bg-orange-50' : 'bg-white'}`}
+                        >
+                            <Text className={`${value === option.value ? 'text-orange-600 font-semibold' : 'text-gray-900'}`}>
+                                {option.label}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            )}
+        </View>
+    )
+}
+
+const ActiveAccountCard = ({ account, onCopyToClipboard }) => {
+    const [showDetails, setShowDetails] = useState(false)
+
+    const formatCurrency = (amount, currency) => {
+        return `${currency} ${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    }
+
+    const formatDate = (dateString) => {
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+        })
+    }
+
+    return (
+        <View className="bg-white rounded-lg shadow-sm overflow-hidden">
+            {/* Header */}
+            <View className="p-4 border-b border-gray-100">
+                <View className="flex-row items-start justify-between mb-3">
+                    <View className="flex-row flex-wrap gap-2">
+                        <View className="bg-orange-100 px-3 py-1 rounded-full">
+                            <Text className="text-orange-700 font-semibold text-xs">{account.accountType}</Text>
+                        </View>
+                        <View className="bg-blue-100 px-3 py-1 rounded-full">
+                            <Text className="text-blue-700 font-semibold text-xs">{account.platform}</Text>
+                        </View>
+                        <View className="bg-purple-100 px-3 py-1 rounded-full">
+                            <Text className="text-purple-700 font-semibold text-xs">{account.accountClass}</Text>
+                        </View>
+                    </View>
+                </View>
+
+                <View className="flex-row items-center justify-between">
+                    <View>
+                        <Text className="text-gray-600 text-xs mb-1">Balance</Text>
+                        <Text className="text-2xl font-bold text-gray-900">
+                            {formatCurrency(account.balance, account.currency)}
+                        </Text>
+                    </View>
+
+                    {/* ✅ FIXED: Disabled until pages exist */}
+                    <View className="flex-row gap-2">
+                        <TouchableOpacity
+                            onPress={() => Alert.alert('Coming Soon', 'Deposit feature will be available soon')}
+                            className="bg-orange-500 px-4 py-2 rounded-lg flex-row items-center gap-1"
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons name="add" size={16} color="white" />
+                            <Text className="text-white font-semibold text-sm">Deposit</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => Alert.alert('Coming Soon', 'Withdraw feature will be available soon')}
+                            className="bg-white border border-gray-300 px-4 py-2 rounded-lg flex-row items-center gap-1"
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons name="remove" size={16} color="#374151" />
+                            <Text className="text-gray-700 font-semibold text-sm">Withdraw</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+
+            {/* Account Details */}
+            <View className="p-4">
+                <View className="flex-row flex-wrap gap-4 mb-4">
+                    <StatItem label="Equity" value={formatCurrency(account.equity || account.balance, account.currency)} />
+                    <StatItem label="Margin" value={formatCurrency(account.margin || 0, account.currency)} />
+                    <StatItem label="Free Margin" value={formatCurrency(account.freeMargin || account.balance, account.currency)} />
+                    <StatItem label="Leverage" value={account.leverage} />
+                </View>
+
+                {/* Toggle Details */}
+                <TouchableOpacity
+                    onPress={() => setShowDetails(!showDetails)}
+                    className="flex-row items-center justify-center gap-2 py-2 border-t border-gray-100"
+                >
+                    <Text className="text-gray-600 font-medium text-sm">
+                        {showDetails ? 'Hide Details' : 'Show Details'}
+                    </Text>
+                    <Ionicons name={showDetails ? 'chevron-up' : 'chevron-down'} size={20} color="#6b7280" />
+                </TouchableOpacity>
+
+                {/* Expanded Details */}
+                {showDetails && (
+                    <View className="mt-4 border-t border-gray-100 pt-4">
+                        <DetailRow
+                            label="Account Number"
+                            value={account.accountNumber}
+                            copyable
+                            onCopy={() => onCopyToClipboard(account.accountNumber, 'Account Number')}
+                        />
+                        <DetailRow
+                            label="Login"
+                            value={account.login}
+                            copyable
+                            onCopy={() => onCopyToClipboard(account.login, 'Login')}
+                        />
+                        <DetailRow
+                            label="Server"
+                            value={account.server}
+                            copyable
+                            onCopy={() => onCopyToClipboard(account.server, 'Server')}
+                        />
+                        <DetailRow label="Created" value={formatDate(account.createdAt)} />
+                        <DetailRow label="Status" value={account.status} />
+                    </View>
+                )}
+            </View>
+        </View>
+    )
+}
+
+const ArchivedAccountCard = ({ account, onReactivate }) => {
+    const formatDate = (dateString) => {
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+        })
+    }
+
+    const formatCurrency = (amount, currency) => {
+        return `${currency} ${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    }
+
+    return (
+        <View className="bg-white rounded-lg shadow-sm overflow-hidden opacity-75">
+            <View className="p-4">
+                <View className="flex-row items-start justify-between mb-3">
+                    <View className="flex-row flex-wrap gap-2">
+                        <View className="bg-gray-100 px-3 py-1 rounded-full">
+                            <Text className="text-gray-700 font-semibold text-xs">{account.accountType}</Text>
+                        </View>
+                        <View className="bg-gray-100 px-3 py-1 rounded-full">
+                            <Text className="text-gray-700 font-semibold text-xs">{account.platform}</Text>
+                        </View>
+                        <View className="bg-gray-100 px-3 py-1 rounded-full">
+                            <Text className="text-gray-700 font-semibold text-xs">{account.accountClass}</Text>
+                        </View>
+                    </View>
+                    <View className="flex-row items-center gap-1">
+                        <Ionicons name="calendar-outline" size={12} color="#6b7280" />
+                        <Text className="text-xs text-gray-500">{formatDate(account.updatedAt)}</Text>
+                    </View>
+                </View>
+
+                <View className="flex-row items-center justify-between mb-4">
+                    <View>
+                        <Text className="text-gray-600 text-xs mb-1">Balance</Text>
+                        <Text className="text-xl font-bold text-gray-900">
+                            {formatCurrency(account.balance, account.currency)}
+                        </Text>
+                    </View>
+
+                    <TouchableOpacity
+                        onPress={onReactivate}
+                        className="bg-orange-500 px-4 py-2 rounded-lg flex-row items-center gap-2"
+                    >
+                        <Ionicons name="refresh" size={16} color="white" />
+                        <Text className="text-white font-semibold text-sm">Reactivate</Text>
+                    </TouchableOpacity>
+                </View>
+
+                <View className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <View className="flex-row items-start gap-2">
+                        <View className="w-2 h-2 bg-amber-400 rounded-full mt-1.5" />
+                        <View className="flex-1">
+                            <Text className="text-amber-800 text-sm font-medium">
+                                {account.archiveReason || 'Account archived due to inactivity'}
+                            </Text>
+                            <Text className="text-amber-700 text-xs mt-1">
+                                Archived on {formatDate(account.updatedAt)}
+                            </Text>
+                        </View>
+                    </View>
+                </View>
+            </View>
+        </View>
+    )
+}
+
+const StatItem = ({ label, value }) => (
+    <View className="flex-1 min-w-[100px]">
+        <Text className="text-gray-600 text-xs mb-1">{label}</Text>
+        <Text className="text-gray-900 font-semibold text-sm">{value}</Text>
+    </View>
+)
+
+const DetailRow = ({ label, value, copyable, onCopy }) => (
+    <View className="flex-row items-center justify-between py-2">
+        <Text className="text-gray-600 text-sm">{label}</Text>
+        <View className="flex-row items-center gap-2">
+            <Text className="text-gray-900 font-medium text-sm">{value}</Text>
+            {copyable && (
+                <TouchableOpacity onPress={onCopy} className="p-1">
+                    <Ionicons name="copy-outline" size={16} color="#6b7280" />
+                </TouchableOpacity>
+            )}
+        </View>
+    </View>
+)
 
 export default Accounts

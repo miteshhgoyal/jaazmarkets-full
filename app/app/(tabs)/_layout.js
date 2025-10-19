@@ -35,28 +35,11 @@ export default function TabsLayout() {
                     ),
                 }}
             />
+            
             <Tabs.Screen
-                name="wallet"
+                name="performance"
                 options={{
-                    title: 'Wallet',
-                    tabBarIcon: ({ color, focused }) => (
-                        <Ionicons name={focused ? 'wallet' : 'wallet-outline'} size={24} color={color} />
-                    ),
-                }}
-            />
-            <Tabs.Screen
-                name="trading"
-                options={{
-                    title: 'Trading',
-                    tabBarIcon: ({ color, focused }) => (
-                        <Ionicons name={focused ? 'trending-up' : 'trending-up-outline'} size={24} color={color} />
-                    ),
-                }}
-            />
-            <Tabs.Screen
-                name="analytics"
-                options={{
-                    title: 'Analytics',
+                    title: 'Performance',
                     tabBarIcon: ({ color, focused }) => (
                         <Ionicons name={focused ? 'bar-chart' : 'bar-chart-outline'} size={24} color={color} />
                     ),

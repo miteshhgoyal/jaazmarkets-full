@@ -16,8 +16,11 @@ function MainLayout() {
 
         const inAuth = segments[0] === '(auth)';
         const inTabs = segments[0] === '(tabs)';
+        const inNewAccount = segments[0] === 'new-account'; // ✅ ADD THIS
+        const inPayments = segments[0] === 'payments-and-wallet'; // ✅ ADD THIS (if you have payments folder)
 
-        if (isAuthenticated && !inTabs) {
+        // ✅ UPDATED LOGIC - Allow authenticated routes
+        if (isAuthenticated && !inTabs && !inNewAccount && !inPayments) {
             router.replace('/(tabs)/accounts');
         } else if (isAuthenticated === false && !inAuth) {
             router.replace('/(auth)/signin');
@@ -70,8 +73,9 @@ function MainLayout() {
                 name="new-account"
                 options={{
                     presentation: 'modal',
-                    headerShown: true,
-                    title: 'Create New Account'
+                    headerShown: false,
+                    title: 'Create New Account',
+                    animation: 'slide_from_bottom',
                 }}
             />
         </Stack>

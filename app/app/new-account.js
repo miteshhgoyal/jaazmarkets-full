@@ -1,22 +1,25 @@
-import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Image } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal, StyleSheet } from 'react-native'
 import React, { useState, useEffect } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as Clipboard from 'expo-clipboard'
-import CustomKeyboardView from '@/components/CustomKeyboardView'
-import Loading from '@/components/Loading'
 import api from '@/services/api'
 
 const NewAccount = () => {
     const router = useRouter()
 
-    const [step, setStep] = useState(1) // 1 = Selection, 2 = Form, 3 = Success
+    const [step, setStep] = useState(1)
     const [selectedAccount, setSelectedAccount] = useState(null)
     const [accountType, setAccountType] = useState('Demo')
     const [showPassword, setShowPassword] = useState(false)
     const [loading, setLoading] = useState(false)
     const [createdAccount, setCreatedAccount] = useState(null)
+
+    // Picker visibility states
+    const [showCurrencyPicker, setShowCurrencyPicker] = useState(false)
+    const [showLeveragePicker, setShowLeveragePicker] = useState(false)
+    const [showPlatformPicker, setShowPlatformPicker] = useState(false)
 
     // Settings from backend
     const [settings, setSettings] = useState(null)
@@ -56,6 +59,12 @@ const NewAccount = () => {
                         currency: response.data.data.currencies[0].code,
                     }))
                 }
+                if (response.data.data.leverageOptions.length > 0) {
+                    setFormData(prev => ({
+                        ...prev,
+                        leverage: response.data.data.leverageOptions[0],
+                    }))
+                }
             }
         } catch (error) {
             console.error('Failed to fetch settings:', error)
@@ -85,6 +94,19 @@ const NewAccount = () => {
         setSelectedAccount(null)
     }
 
+    const handleClose = () => {
+        try {
+            if (router.canGoBack()) {
+                router.back()
+            } else {
+                router.replace('/(tabs)/accounts')
+            }
+        } catch (error) {
+            console.error('Navigation error:', error)
+            router.replace('/(tabs)/accounts')
+        }
+    }
+
     const validatePassword = (password) => {
         return {
             length: password.length >= 8 && password.length <= 15,
@@ -96,7 +118,11 @@ const NewAccount = () => {
     }
 
     const handleSubmit = async () => {
-        // Validate password if provided
+        if (!formData.nickname.trim()) {
+            Alert.alert('Validation Error', 'Please enter a nickname')
+            return
+        }
+
         if (formData.traderPassword) {
             const checks = validatePassword(formData.traderPassword)
             const allValid = Object.values(checks).every(v => v)
@@ -117,6 +143,7 @@ const NewAccount = () => {
                 leverage: formData.leverage,
                 startingBalance: accountType === 'Demo' ? Number(formData.startingBalance) : undefined,
                 nickname: formData.nickname,
+                traderPassword: formData.traderPassword || undefined,
             }
 
             const response = await api.post('/account/create', payload)
@@ -145,6 +172,7 @@ const NewAccount = () => {
         return (
             <View className="flex-1 items-center justify-center bg-white">
                 <ActivityIndicator size="large" color="#f97316" />
+                <Text className="text-gray-600 mt-4">Loading account options...</Text>
             </View>
         )
     }
@@ -152,7 +180,9 @@ const NewAccount = () => {
     if (!settings) {
         return (
             <View className="flex-1 items-center justify-center bg-white px-6">
-                <Text className="text-red-600 mb-4">Failed to load settings</Text>
+                <Ionicons name="alert-circle-outline" size={64} color="#ef4444" />
+                <Text className="text-xl font-semibold text-gray-900 mt-4 mb-2">Failed to load settings</Text>
+                <Text className="text-gray-600 text-center mb-6">Please check your connection and try again</Text>
                 <TouchableOpacity onPress={fetchSettings} className="bg-orange-500 px-6 py-3 rounded-lg">
                     <Text className="text-white font-semibold">Retry</Text>
                 </TouchableOpacity>
@@ -167,14 +197,19 @@ const NewAccount = () => {
 
         return (
             <SafeAreaView className="flex-1 bg-gray-50">
-                {/* Header */}
                 <View className="bg-white px-6 py-4 border-b border-gray-200">
-                    <Text className="text-2xl font-bold text-gray-900">Open Account</Text>
-                    <Text className="text-gray-600 text-sm mt-1">Choose your account type</Text>
+                    <View className="flex-row items-center justify-between">
+                        <View className="flex-1">
+                            <Text className="text-2xl font-bold text-gray-900">Open Account</Text>
+                            <Text className="text-gray-600 text-sm mt-1">Choose your account type</Text>
+                        </View>
+                        <TouchableOpacity onPress={handleClose} className="p-2">
+                            <Ionicons name="close" size={24} color="#374151" />
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 <ScrollView className="flex-1 px-6 py-6" showsVerticalScrollIndicator={false}>
-                    {/* Standard Accounts */}
                     {standardAccounts.length > 0 && (
                         <View className="mb-8">
                             <Text className="text-lg font-bold text-gray-900 mb-4">Standard Accounts</Text>
@@ -189,7 +224,6 @@ const NewAccount = () => {
                         </View>
                     )}
 
-                    {/* Professional Accounts */}
                     {professionalAccounts.length > 0 && (
                         <View className="mb-8">
                             <Text className="text-lg font-bold text-gray-900 mb-4">Professional Accounts</Text>
@@ -207,12 +241,12 @@ const NewAccount = () => {
                     <View className="h-24" />
                 </ScrollView>
 
-                {/* Fixed Continue Button */}
                 <View className="bg-white border-t border-gray-200 px-6 py-4">
                     <TouchableOpacity
                         onPress={handleContinue}
                         disabled={!selectedAccount}
                         className={`py-4 rounded-lg ${selectedAccount ? 'bg-orange-500' : 'bg-gray-200'}`}
+                        activeOpacity={0.7}
                     >
                         <Text className={`text-center font-semibold text-lg ${selectedAccount ? 'text-white' : 'text-gray-400'}`}>
                             Continue
@@ -227,7 +261,6 @@ const NewAccount = () => {
     if (step === 2) {
         return (
             <SafeAreaView className="flex-1 bg-gray-50">
-                {/* Header */}
                 <View className="bg-white px-6 py-4 border-b border-gray-200">
                     <View className="flex-row items-center gap-4">
                         <TouchableOpacity onPress={handleBack} className="p-2 -ml-2">
@@ -240,162 +273,221 @@ const NewAccount = () => {
                     </View>
                 </View>
 
-                <CustomKeyboardView inScrollView>
-                    <ScrollView className="flex-1 px-6 py-6" showsVerticalScrollIndicator={false}>
-                        {/* Demo/Real Toggle */}
-                        <View className="bg-white rounded-lg p-2 mb-6">
-                            <View className="flex-row gap-2">
-                                <TouchableOpacity
-                                    onPress={() => setAccountType('Demo')}
-                                    className={`flex-1 py-3 rounded-lg ${accountType === 'Demo' ? 'bg-orange-500' : 'bg-white'}`}
-                                >
-                                    <Text className={`text-center font-semibold ${accountType === 'Demo' ? 'text-white' : 'text-gray-600'}`}>
-                                        Demo
-                                    </Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    onPress={() => setAccountType('Real')}
-                                    className={`flex-1 py-3 rounded-lg ${accountType === 'Real' ? 'bg-orange-500' : 'bg-white'}`}
-                                >
-                                    <Text className={`text-center font-semibold ${accountType === 'Real' ? 'text-white' : 'text-gray-600'}`}>
-                                        Real
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-
-                        <Text className="text-sm text-gray-600 mb-6">
-                            {accountType === 'Demo'
-                                ? 'Risk-free account. Trade with virtual money'
-                                : 'Trade with real money and withdraw any profit you may make'}
-                        </Text>
-
-                        {/* Form */}
-                        <View className="bg-white rounded-xl p-6 shadow-sm">
-                            {/* Currency */}
-                            <View className="mb-4">
-                                <Text className="text-sm font-medium text-gray-700 mb-2">
-                                    Currency <Text className="text-red-500">*</Text>
-                                </Text>
-                                <View className="border border-gray-300 rounded-lg">
-                                    <TouchableOpacity className="px-4 py-3 flex-row items-center justify-between">
-                                        <Text className="text-gray-900">{formData.currency}</Text>
-                                        <Ionicons name="chevron-down" size={20} color="#9ca3af" />
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-
-                            {/* Starting Balance (Demo only) */}
-                            {accountType === 'Demo' && (
-                                <View className="mb-4">
-                                    <Text className="text-sm font-medium text-gray-700 mb-2">
-                                        Starting balance <Text className="text-red-500">*</Text>
-                                    </Text>
-                                    <TextInput
-                                        value={formData.startingBalance}
-                                        onChangeText={(value) => handleInputChange('startingBalance', value)}
-                                        keyboardType="numeric"
-                                        className="px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
-                                    />
-                                </View>
-                            )}
-
-                            {/* Nickname */}
-                            <View className="mb-4">
-                                <Text className="text-sm font-medium text-gray-700 mb-2">
-                                    Nickname <Text className="text-red-500">*</Text>
-                                </Text>
-                                <TextInput
-                                    value={formData.nickname}
-                                    onChangeText={(value) => handleInputChange('nickname', value)}
-                                    maxLength={36}
-                                    className="px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
-                                />
-                                <Text className="text-xs text-gray-500 mt-1">
-                                    {formData.nickname.length}/36 characters
-                                </Text>
-                            </View>
-
-                            {/* Leverage */}
-                            <View className="mb-4">
-                                <Text className="text-sm font-medium text-gray-700 mb-2">
-                                    Max leverage <Text className="text-red-500">*</Text>
-                                </Text>
-                                <View className="border border-gray-300 rounded-lg">
-                                    <TouchableOpacity className="px-4 py-3 flex-row items-center justify-between">
-                                        <Text className="text-gray-900">{formData.leverage}</Text>
-                                        <Ionicons name="chevron-down" size={20} color="#9ca3af" />
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-
-                            {/* Platform */}
-                            <View className="mb-4">
-                                <Text className="text-sm font-medium text-gray-700 mb-2">
-                                    Platform <Text className="text-red-500">*</Text>
-                                </Text>
-                                <View className="border border-gray-300 rounded-lg">
-                                    <TouchableOpacity className="px-4 py-3 flex-row items-center justify-between">
-                                        <Text className="text-gray-900">{formData.platform}</Text>
-                                        <Ionicons name="chevron-down" size={20} color="#9ca3af" />
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-
-                            {/* Trader Password (Optional) */}
-                            <View className="mb-4">
-                                <Text className="text-sm font-medium text-gray-700 mb-2">
-                                    Trader password (Optional)
-                                </Text>
-                                <View className="relative">
-                                    <TextInput
-                                        value={formData.traderPassword}
-                                        onChangeText={(value) => handleInputChange('traderPassword', value)}
-                                        secureTextEntry={!showPassword}
-                                        className="px-4 py-3 pr-12 border border-gray-300 rounded-lg text-gray-900"
-                                    />
-                                    <TouchableOpacity
-                                        onPress={() => setShowPassword(!showPassword)}
-                                        className="absolute right-3 top-3"
-                                    >
-                                        <Ionicons
-                                            name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                                            size={20}
-                                            color="#9ca3af"
-                                        />
-                                    </TouchableOpacity>
-                                </View>
-
-                                {/* Password Requirements */}
-                                {formData.traderPassword !== '' && (
-                                    <View className="mt-3 space-y-2">
-                                        <PasswordCheck check={passwordChecks.length} label="Between 8-15 characters" />
-                                        <PasswordCheck check={passwordChecks.uppercase && passwordChecks.lowercase} label="Upper and lower case letters" />
-                                        <PasswordCheck check={passwordChecks.number} label="At least one number" />
-                                        <PasswordCheck check={passwordChecks.special} label="At least one special character" />
-                                    </View>
-                                )}
-                            </View>
-
-                            {/* Submit Button */}
+                <ScrollView className="flex-1 px-6 py-6" showsVerticalScrollIndicator={false}>
+                    {/* Demo/Real Toggle - ✅ REMOVED shadow-sm */}
+                    <View className="bg-white rounded-lg p-2 mb-6" style={styles.cardShadow}>
+                        <View className="flex-row gap-2">
                             <TouchableOpacity
-                                onPress={handleSubmit}
-                                disabled={loading}
-                                className={`py-4 rounded-lg ${loading ? 'bg-gray-300' : 'bg-orange-500'}`}
+                                onPress={() => setAccountType('Demo')}
+                                className={`flex-1 py-3 rounded-lg ${accountType === 'Demo' ? 'bg-orange-500' : 'bg-white'}`}
                             >
-                                {loading ? (
-                                    <Loading size={24} />
-                                ) : (
-                                    <Text className="text-white font-semibold text-center text-lg">
-                                        Create account
-                                    </Text>
-                                )}
+                                <Text className={`text-center font-semibold ${accountType === 'Demo' ? 'text-white' : 'text-gray-600'}`}>
+                                    Demo
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => setAccountType('Real')}
+                                className={`flex-1 py-3 rounded-lg ${accountType === 'Real' ? 'bg-orange-500' : 'bg-white'}`}
+                            >
+                                <Text className={`text-center font-semibold ${accountType === 'Real' ? 'text-white' : 'text-gray-600'}`}>
+                                    Real
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    <Text className="text-sm text-gray-600 mb-6">
+                        {accountType === 'Demo'
+                            ? 'Risk-free account. Trade with virtual money'
+                            : 'Trade with real money and withdraw any profit you may make'}
+                    </Text>
+
+                    {/* Form - ✅ REMOVED shadow-sm */}
+                    <View className="bg-white rounded-xl p-6" style={styles.cardShadow}>
+                        {/* Currency Picker */}
+                        <View className="mb-4">
+                            <Text className="text-sm font-medium text-gray-700 mb-2">
+                                Currency <Text className="text-red-500">*</Text>
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => setShowCurrencyPicker(true)}
+                                className="px-4 py-3 border border-gray-300 rounded-lg flex-row items-center justify-between"
+                            >
+                                <Text className="text-gray-900">{formData.currency}</Text>
+                                <Ionicons name="chevron-down" size={20} color="#9ca3af" />
                             </TouchableOpacity>
                         </View>
 
-                        <View className="h-24" />
-                    </ScrollView>
-                </CustomKeyboardView>
+                        {/* Starting Balance */}
+                        {accountType === 'Demo' && (
+                            <View className="mb-4">
+                                <Text className="text-sm font-medium text-gray-700 mb-2">
+                                    Starting balance <Text className="text-red-500">*</Text>
+                                </Text>
+                                <TextInput
+                                    value={formData.startingBalance}
+                                    onChangeText={(value) => handleInputChange('startingBalance', value)}
+                                    keyboardType="numeric"
+                                    className="px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+                                    placeholder="Enter starting balance"
+                                />
+                                <Text className="text-xs text-gray-500 mt-1">
+                                    Min: 100 | Max: 100,000
+                                </Text>
+                            </View>
+                        )}
+
+                        {/* Nickname */}
+                        <View className="mb-4">
+                            <Text className="text-sm font-medium text-gray-700 mb-2">
+                                Nickname <Text className="text-red-500">*</Text>
+                            </Text>
+                            <TextInput
+                                value={formData.nickname}
+                                onChangeText={(value) => handleInputChange('nickname', value)}
+                                maxLength={36}
+                                className="px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+                                placeholder="Enter account nickname"
+                            />
+                            <Text className="text-xs text-gray-500 mt-1">
+                                {formData.nickname.length}/36 characters
+                            </Text>
+                        </View>
+
+                        {/* Leverage Picker */}
+                        <View className="mb-4">
+                            <Text className="text-sm font-medium text-gray-700 mb-2">
+                                Max leverage <Text className="text-red-500">*</Text>
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => setShowLeveragePicker(true)}
+                                className="px-4 py-3 border border-gray-300 rounded-lg flex-row items-center justify-between"
+                            >
+                                <Text className="text-gray-900">{formData.leverage}</Text>
+                                <Ionicons name="chevron-down" size={20} color="#9ca3af" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Platform Picker */}
+                        <View className="mb-4">
+                            <Text className="text-sm font-medium text-gray-700 mb-2">
+                                Platform <Text className="text-red-500">*</Text>
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => setShowPlatformPicker(true)}
+                                className="px-4 py-3 border border-gray-300 rounded-lg flex-row items-center justify-between"
+                            >
+                                <Text className="text-gray-900">{formData.platform}</Text>
+                                <Ionicons name="chevron-down" size={20} color="#9ca3af" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Trader Password */}
+                        <View className="mb-4">
+                            <Text className="text-sm font-medium text-gray-700 mb-2">
+                                Trader password (Optional)
+                            </Text>
+                            <View className="relative">
+                                <TextInput
+                                    value={formData.traderPassword}
+                                    onChangeText={(value) => handleInputChange('traderPassword', value)}
+                                    secureTextEntry={!showPassword}
+                                    className="px-4 py-3 pr-12 border border-gray-300 rounded-lg text-gray-900"
+                                    placeholder="Enter custom password (optional)"
+                                />
+                                <TouchableOpacity
+                                    onPress={() => setShowPassword(!showPassword)}
+                                    style={{ position: 'absolute', right: 12, top: 12 }}
+                                >
+                                    <Ionicons
+                                        name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                                        size={20}
+                                        color="#9ca3af"
+                                    />
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Password Requirements - ✅ REMOVED space-y-2, added style */}
+                            {formData.traderPassword !== '' && (
+                                <View style={{ marginTop: 12 }}>
+                                    <PasswordCheck check={passwordChecks.length} label="Between 8-15 characters" />
+                                    <PasswordCheck check={passwordChecks.uppercase && passwordChecks.lowercase} label="Upper and lower case letters" />
+                                    <PasswordCheck check={passwordChecks.number} label="At least one number" />
+                                    <PasswordCheck check={passwordChecks.special} label="At least one special character" />
+                                </View>
+                            )}
+                        </View>
+
+                        {/* Submit Button */}
+                        <TouchableOpacity
+                            onPress={handleSubmit}
+                            disabled={loading}
+                            className={`py-4 rounded-lg ${loading ? 'bg-gray-300' : 'bg-orange-500'} mt-4`}
+                            activeOpacity={0.7}
+                        >
+                            {loading ? (
+                                <View className="flex-row items-center justify-center gap-2">
+                                    <ActivityIndicator size="small" color="#ffffff" />
+                                    <Text className="text-white font-semibold text-center text-lg">
+                                        Creating account...
+                                    </Text>
+                                </View>
+                            ) : (
+                                <Text className="text-white font-semibold text-center text-lg">
+                                    Create account
+                                </Text>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+
+                    <View className="h-24" />
+                </ScrollView>
+
+                {/* Modals */}
+                <PickerModal
+                    visible={showCurrencyPicker}
+                    onClose={() => setShowCurrencyPicker(false)}
+                    title="Select Currency"
+                    options={settings.currencies.map(c => ({
+                        label: `${c.code} - ${c.name} (${c.symbol})`,
+                        value: c.code
+                    }))}
+                    selectedValue={formData.currency}
+                    onSelect={(value) => {
+                        handleInputChange('currency', value)
+                        setShowCurrencyPicker(false)
+                    }}
+                />
+
+                <PickerModal
+                    visible={showLeveragePicker}
+                    onClose={() => setShowLeveragePicker(false)}
+                    title="Select Leverage"
+                    options={settings.leverageOptions.map(l => ({
+                        label: l,
+                        value: l
+                    }))}
+                    selectedValue={formData.leverage}
+                    onSelect={(value) => {
+                        handleInputChange('leverage', value)
+                        setShowLeveragePicker(false)
+                    }}
+                />
+
+                <PickerModal
+                    visible={showPlatformPicker}
+                    onClose={() => setShowPlatformPicker(false)}
+                    title="Select Platform"
+                    options={settings.platforms.map(p => ({
+                        label: p.name,
+                        value: p.name
+                    }))}
+                    selectedValue={formData.platform}
+                    onSelect={(value) => {
+                        handleInputChange('platform', value)
+                        setShowPlatformPicker(false)
+                    }}
+                />
             </SafeAreaView>
         )
     }
@@ -417,7 +509,6 @@ const NewAccount = () => {
                         </Text>
                     </View>
 
-                    {/* Warning Box */}
                     <View className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
                         <Text className="text-sm text-orange-800 font-semibold mb-1">
                             ⚠️ Important: Save your credentials
@@ -427,8 +518,8 @@ const NewAccount = () => {
                         </Text>
                     </View>
 
-                    {/* Credentials */}
-                    <View className="space-y-3 mb-8">
+                    {/* Credentials - ✅ REMOVED space-y-3, added gap style */}
+                    <View style={{ marginBottom: 32 }}>
                         <CredentialRow label="Account Number" value={createdAccount.accountNumber} onCopy={copyToClipboard} />
                         <CredentialRow label="Login" value={createdAccount.login} onCopy={copyToClipboard} />
                         <CredentialRow label="Password" value={createdAccount.password} onCopy={copyToClipboard} highlight />
@@ -438,8 +529,8 @@ const NewAccount = () => {
                         <CredentialRow label="Balance" value={`${createdAccount.currency} ${createdAccount.balance}`} />
                     </View>
 
-                    {/* Action Buttons */}
-                    <View className="space-y-3">
+                    {/* Action Buttons - ✅ REMOVED space-y-3 */}
+                    <View style={{ gap: 12 }}>
                         <TouchableOpacity
                             onPress={() => router.replace('/(tabs)/accounts')}
                             className="bg-orange-500 py-4 rounded-lg"
@@ -454,11 +545,11 @@ const NewAccount = () => {
                                 setSelectedAccount(null)
                                 setCreatedAccount(null)
                                 setFormData({
-                                    currency: 'USD',
+                                    currency: settings.currencies[0]?.code || 'USD',
                                     startingBalance: '10000',
                                     nickname: '',
-                                    leverage: '1:100',
-                                    platform: 'MT5',
+                                    leverage: settings.leverageOptions[0] || '1:100',
+                                    platform: settings.platforms[0]?.name || 'MT5',
                                     traderPassword: '',
                                 })
                             }}
@@ -477,16 +568,27 @@ const NewAccount = () => {
     return null
 }
 
+// ✅ ADD STYLESHEET for shadows
+const styles = StyleSheet.create({
+    cardShadow: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 2,
+    }
+})
+
 // Helper Components
 const AccountCard = ({ account, isSelected, onSelect }) => (
     <TouchableOpacity
         onPress={() => onSelect(account)}
-        className={`bg-white rounded-xl p-4 mb-4 border-2 ${isSelected ? 'border-orange-400 shadow-md' : 'border-gray-200'
-            }`}
+        className={`bg-white rounded-xl p-4 mb-4 border-2 ${isSelected ? 'border-orange-400' : 'border-gray-200'}`}
+        style={isSelected ? styles.cardShadow : null}
+        activeOpacity={0.7}
     >
         <View className="flex-row items-start gap-4">
-            <View className={`w-5 h-5 rounded-full border-2 items-center justify-center ${isSelected ? 'border-orange-400 bg-orange-500' : 'border-gray-300 bg-white'
-                }`}>
+            <View className={`w-5 h-5 rounded-full border-2 items-center justify-center mt-1 ${isSelected ? 'border-orange-400 bg-orange-500' : 'border-gray-300 bg-white'}`}>
                 {isSelected && <View className="w-2 h-2 bg-white rounded-full" />}
             </View>
             <View className="flex-1">
@@ -516,9 +618,8 @@ const AccountCard = ({ account, isSelected, onSelect }) => (
 )
 
 const PasswordCheck = ({ check, label }) => (
-    <View className="flex-row items-center gap-2">
-        <View className={`w-4 h-4 rounded-full border-2 items-center justify-center ${check ? 'border-green-500 bg-green-500' : 'border-gray-300'
-            }`}>
+    <View className="flex-row items-center gap-2" style={{ marginBottom: 8 }}>
+        <View className={`w-4 h-4 rounded-full border-2 items-center justify-center ${check ? 'border-green-500 bg-green-500' : 'border-gray-300'}`}>
             {check && <Ionicons name="checkmark" size={12} color="white" />}
         </View>
         <Text className={`text-sm ${check ? 'text-green-700' : 'text-gray-600'}`}>{label}</Text>
@@ -526,8 +627,7 @@ const PasswordCheck = ({ check, label }) => (
 )
 
 const CredentialRow = ({ label, value, onCopy, highlight }) => (
-    <View className={`flex-row items-center justify-between p-4 rounded-lg ${highlight ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50'
-        }`}>
+    <View className={`flex-row items-center justify-between p-4 rounded-lg ${highlight ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50'}`} style={{ marginBottom: 12 }}>
         <View className="flex-1">
             <Text className="text-sm text-gray-600 mb-1">{label}</Text>
             <Text className={`font-mono font-semibold ${highlight ? 'text-orange-700' : 'text-gray-900'}`}>
@@ -540,6 +640,45 @@ const CredentialRow = ({ label, value, onCopy, highlight }) => (
             </TouchableOpacity>
         )}
     </View>
+)
+
+const PickerModal = ({ visible, onClose, title, options, selectedValue, onSelect }) => (
+    <Modal
+        visible={visible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={onClose}
+    >
+        <View className="flex-1 justify-end bg-black/50">
+            <View className="bg-white rounded-t-3xl max-h-[70%]">
+                <View className="flex-row items-center justify-between px-6 py-4 border-b border-gray-200">
+                    <Text className="text-lg font-bold text-gray-900">{title}</Text>
+                    <TouchableOpacity onPress={onClose} className="p-2">
+                        <Ionicons name="close" size={24} color="#374151" />
+                    </TouchableOpacity>
+                </View>
+                <ScrollView className="px-6 py-2">
+                    {options.map((option) => (
+                        <TouchableOpacity
+                            key={option.value}
+                            onPress={() => onSelect(option.value)}
+                            className={`py-4 border-b border-gray-100 ${selectedValue === option.value ? 'bg-orange-50' : ''}`}
+                        >
+                            <View className="flex-row items-center justify-between">
+                                <Text className={`text-base ${selectedValue === option.value ? 'text-orange-600 font-semibold' : 'text-gray-900'}`}>
+                                    {option.label}
+                                </Text>
+                                {selectedValue === option.value && (
+                                    <Ionicons name="checkmark-circle" size={24} color="#f97316" />
+                                )}
+                            </View>
+                        </TouchableOpacity>
+                    ))}
+                    <View className="h-8" />
+                </ScrollView>
+            </View>
+        </View>
+    </Modal>
 )
 
 export default NewAccount
