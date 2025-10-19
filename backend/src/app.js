@@ -67,7 +67,6 @@ app.get('/', (req, res) => {
         message: 'API is running!',
         version: '1.0.0',
         timestamp: new Date().toISOString(),
-        whatsappEnabled: true
     });
 });
 
