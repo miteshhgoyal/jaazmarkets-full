@@ -159,7 +159,8 @@ router.post("/signup", async (req, res) => {
             existingUser.password = password;
             if (mobile) existingUser.phoneNumber = mobile;
 
-
+            // ⏰ Reset expiration time - 2 MINUTES from now
+            existingUser.expiresAt = new Date(Date.now() + 2 * 60 * 1000);
 
             if (referralCode && !existingUser.referredBy) {
                 const referrer = await User.findOne({ userId: referralCode });
@@ -181,9 +182,9 @@ router.post("/signup", async (req, res) => {
             // Send verification email
             try {
                 await sendEmailVerificationOTP(existingUser.email, verificationOTP, existingUser.firstName);
-                console.log(`Verification OTP resent to ${existingUser.email}`);
+                console.log(`✅ Verification OTP resent to ${existingUser.email}`);
             } catch (emailError) {
-                console.error('Verification email failed:', emailError);
+                console.error('❌ Verification email failed:', emailError);
             }
 
             return res.status(200).json({
@@ -230,7 +231,7 @@ router.post("/signup", async (req, res) => {
         // Generate email verification OTP
         const verificationOTP = generateOTP();
 
-        // Create user with BOTH hashed and plain passwords
+        // Create user with 2 MINUTE expiration
         const user = new User({
             userId,
             email: email.toLowerCase(),
@@ -246,6 +247,7 @@ router.post("/signup", async (req, res) => {
             emailVerificationOTPExpiry: Date.now() + 10 * 60 * 1000,
             referralCode: userId,
             referredBy: referrerId,
+            expiresAt: new Date(Date.now() + 2 * 60 * 1000) // ⏰ Expire in 2 MINUTES
         });
 
         await user.save();
@@ -253,9 +255,9 @@ router.post("/signup", async (req, res) => {
         // Send verification email
         try {
             await sendEmailVerificationOTP(user.email, verificationOTP, user.firstName);
-            console.log(`Verification OTP sent to ${user.email}`);
+            console.log(`✅ Verification OTP sent to ${user.email}`);
         } catch (emailError) {
-            console.error('Verification email failed:', emailError);
+            console.error('❌ Verification email failed:', emailError);
         }
 
         res.status(201).json({
@@ -337,11 +339,12 @@ router.post('/verify-email-otp', async (req, res) => {
             });
         }
 
-        // Mark user as verified
+        // ✅ Mark user as verified and remove expiration
         user.isVerified = true;
         user.accountStatus = 'active';
         user.emailVerificationOTP = undefined;
         user.emailVerificationOTPExpiry = undefined;
+        user.expiresAt = undefined; // Remove TTL - user is now permanent
 
         await user.save();
 
@@ -351,7 +354,7 @@ router.post('/verify-email-otp', async (req, res) => {
                 email: user.email,
                 firstName: user.firstName,
                 lastName: user.lastName,
-                portalPassword: password,              // From request body
+                portalPassword: password,
                 accountNumber: user.accountNumber,
                 currency: user.currency,
                 referralCode: user.userId,
@@ -359,7 +362,6 @@ router.post('/verify-email-otp', async (req, res) => {
             console.log(`✅ Registration email sent to ${user.email} with all credentials`);
         } catch (emailError) {
             console.error('❌ Registration email failed:', emailError);
-            // Don't fail the request if email fails - user is still verified
         }
 
         // Generate tokens for auto-login
@@ -416,7 +418,8 @@ router.post('/resend-verification-otp', async (req, res) => {
             });
         }
 
-
+        // ⏰ Reset expiration time - give user another 2 MINUTES
+        user.expiresAt = new Date(Date.now() + 2 * 60 * 1000);
 
         // Generate new OTP
         const verificationOTP = generateOTP();
@@ -427,9 +430,9 @@ router.post('/resend-verification-otp', async (req, res) => {
         // Send new OTP
         try {
             await sendEmailVerificationOTP(user.email, verificationOTP, user.firstName);
-            console.log(`Verification OTP resent to ${user.email}`);
+            console.log(`✅ Verification OTP resent to ${user.email}`);
         } catch (emailError) {
-            console.error('Email resend failed:', emailError);
+            console.error('❌ Email resend failed:', emailError);
             throw new Error('Failed to send verification email');
         }
 

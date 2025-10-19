@@ -165,9 +165,37 @@ const userSchema = new mongoose.Schema({
         select: false
     },
 
+    // TTL Field - Auto-delete unverified users
+    expiresAt: {
+        type: Date,
+        default: null,
+        index: true
+    }
+
 }, {
     timestamps: true
 });
+
+// ============================================
+// TTL INDEX - Auto-delete unverified users
+// ============================================
+// This index will automatically delete documents where:
+// 1. isVerified is false
+// 2. expiresAt date has passed
+// MongoDB checks every ~60 seconds for expired documents
+userSchema.index(
+    { expiresAt: 1 },
+    {
+        expireAfterSeconds: 0,
+        partialFilterExpression: {
+            isVerified: false
+        }
+    }
+);
+
+// ============================================
+// MIDDLEWARE & METHODS
+// ============================================
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {
@@ -181,7 +209,7 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
     return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// Generate OTP
+// Generate OTP for password reset
 userSchema.methods.generateResetOTP = function () {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     this.resetPasswordOTP = otp;
