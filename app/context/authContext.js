@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import api from '@/services/api';
+import api, { setLogoutCallback } from '@/services/api';
 import { tokenService } from '@/services/tokenService';
 
 export const AuthContext = createContext();
@@ -22,6 +22,16 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         checkAuth();
+
+        // Register logout callback for API interceptor
+        setLogoutCallback(() => {
+            handleForceLogout();
+        });
+
+        return () => {
+            // Cleanup if needed
+            setLogoutCallback(null);
+        };
     }, []);
 
     const checkAuth = async () => {
@@ -32,10 +42,21 @@ export const AuthProvider = ({ children }) => {
             if (token && refreshToken) {
                 setIsAuthenticated(true);
 
-                // Load user data from AsyncStorage if stored
+                // Load user data from storage
                 const storedUser = await AsyncStorage.getItem('user');
                 if (storedUser) {
                     setUser(JSON.parse(storedUser));
+                } else {
+                    // Optionally fetch user from /auth/me
+                    try {
+                        const response = await api.get('/auth/me');
+                        if (response.data.success) {
+                            setUser(response.data.data);
+                            await AsyncStorage.setItem('user', JSON.stringify(response.data.data));
+                        }
+                    } catch (err) {
+                        console.log('Could not fetch user profile');
+                    }
                 }
             } else {
                 setIsAuthenticated(false);
@@ -55,11 +76,15 @@ export const AuthProvider = ({ children }) => {
         try {
             const { accessToken, refreshToken, user } = userData;
 
+            if (!accessToken || !refreshToken) {
+                throw new Error('Missing tokens');
+            }
+
             // Store tokens
             await tokenService.setToken(accessToken);
             await tokenService.setRefreshToken(refreshToken);
 
-            // Store user if provided
+            // Store user
             if (user) {
                 setUser(user);
                 await AsyncStorage.setItem('user', JSON.stringify(user));
@@ -69,17 +94,31 @@ export const AuthProvider = ({ children }) => {
             return { success: true };
         } catch (error) {
             console.error('Login error:', error);
-            return { success: false, message: 'Failed to save login data' };
+            return { success: false, message: error.message || 'Failed to save login data' };
         }
+    };
+
+    const handleForceLogout = async () => {
+        console.log('🔴 Force logout triggered by token expiration');
+
+        await tokenService.clearTokens();
+        await AsyncStorage.removeItem('user');
+        setUser(null);
+        setIsAuthenticated(false);
+
+        // Use replace to prevent back navigation
+        setTimeout(() => {
+            router.replace('/(auth)/signin');
+        }, 100);
     };
 
     const logout = async () => {
         try {
-            // Optional: Call backend logout endpoint
+            // Call backend logout
             const refreshToken = await tokenService.getRefreshToken();
             if (refreshToken) {
-                await api.post('/auth/logout', { refreshToken }).catch(() => {
-                    // Ignore errors
+                await api.post('/auth/logout', { refreshToken }).catch((err) => {
+                    console.log('Backend logout failed:', err.message);
                 });
             }
         } catch (error) {
@@ -90,8 +129,8 @@ export const AuthProvider = ({ children }) => {
             setUser(null);
             setIsAuthenticated(false);
 
-            // Navigate to login screen
-            router.replace('/login');
+            // Navigate to signin
+            router.replace('/(auth)/signin');
         }
     };
 

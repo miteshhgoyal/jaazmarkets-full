@@ -70,7 +70,7 @@ const generateTokens = (user) => {
             role: user.role,
         },
         process.env.JWT_SECRET,
-        { expiresIn: '15m' }
+        { expiresIn: '3d' }
     );
 
     const refreshToken = jwt.sign(
