@@ -4,7 +4,6 @@ import MetaHead from "../../components/MetaHead";
 import PageHeader from "../../components/ui/PageHeader";
 import GridCard from "../../components/settings/GridCard";
 import ChangePasswordForm from "../../components/settings/ChangePasswordForm";
-import ChangePhoneForm from "../../components/settings/ChangePhoneForm";
 import ForgotPasswordModal from "../../components/settings/ForgotPasswordModal";
 import api from "../../services/api";
 import toast from "react-hot-toast";
