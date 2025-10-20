@@ -295,6 +295,7 @@ const Accounts = () => {
                                     <ActiveAccountCard
                                         account={account}
                                         onCopyToClipboard={copyToClipboard}
+                                        router={router}
                                     />
                                 )}
                             </View>
@@ -363,7 +364,7 @@ const FilterSelect = ({ label, value, onChange, options }) => {
     )
 }
 
-const ActiveAccountCard = ({ account, onCopyToClipboard }) => {
+const ActiveAccountCard = ({ account, onCopyToClipboard, router }) => {
     const [showDetails, setShowDetails] = useState(false)
 
     const formatCurrency = (amount, currency) => {
@@ -404,10 +405,10 @@ const ActiveAccountCard = ({ account, onCopyToClipboard }) => {
                         </Text>
                     </View>
 
-                    {/* ✅ FIXED: Disabled until pages exist */}
+                    {/* Updated with proper routing */}
                     <View className="flex-row gap-2">
                         <TouchableOpacity
-                            onPress={() => Alert.alert('Coming Soon', 'Deposit feature will be available soon')}
+                            onPress={() => router.push('/deposit')}
                             className="bg-orange-500 px-4 py-2 rounded-lg flex-row items-center gap-1"
                             activeOpacity={0.7}
                         >
@@ -415,7 +416,7 @@ const ActiveAccountCard = ({ account, onCopyToClipboard }) => {
                             <Text className="text-white font-semibold text-sm">Deposit</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                            onPress={() => Alert.alert('Coming Soon', 'Withdraw feature will be available soon')}
+                            onPress={() => router.push('/withdrawal')}
                             className="bg-white border border-gray-300 px-4 py-2 rounded-lg flex-row items-center gap-1"
                             activeOpacity={0.7}
                         >

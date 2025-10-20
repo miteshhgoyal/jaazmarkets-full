@@ -43,6 +43,15 @@ const signup = () => {
         }
     }, [resendTimer])
 
+    // Auto-focus first OTP input when step changes to 2
+    useEffect(() => {
+        if (step === 2) {
+            setTimeout(() => {
+                otpRefs.current[0]?.focus()
+            }, 300)
+        }
+    }, [step])
+
     const handleInputChange = (name, value) => {
         setFormData(prev => ({ ...prev, [name]: value }))
         setError('')
@@ -81,7 +90,7 @@ const signup = () => {
                 setError(response.data.message || 'Registration failed')
             }
         } catch (err) {
-            const message = err.response?.data?.message || 'Registration failed'
+            const message = err.response?.data?.message || 'Registration failed. Please try again.'
             setError(message)
         } finally {
             setIsLoading(false)
@@ -89,23 +98,63 @@ const signup = () => {
     }
 
     const handleOtpChange = (index, value) => {
-        if (!/^\d*$/.test(value)) return
+        // Handle paste or multi-character input
+        if (value.length > 1) {
+            const digits = value.slice(0, 6).split('')
+            const newOtp = [...otp]
 
+            digits.forEach((digit, i) => {
+                if (index + i < 6 && /^\d$/.test(digit)) {
+                    newOtp[index + i] = digit
+                }
+            })
+
+            setOtp(newOtp)
+
+            // Focus last filled input or next empty
+            const lastIndex = Math.min(index + digits.length, 5)
+            setTimeout(() => {
+                otpRefs.current[lastIndex]?.focus()
+            }, 10)
+
+            setError('')
+            return
+        }
+
+        // Only allow single digits
+        if (value && !/^\d$/.test(value)) return
+
+        // Update OTP array
         const newOtp = [...otp]
         newOtp[index] = value
         setOtp(newOtp)
 
         // Auto-focus next input
         if (value && index < 5) {
-            otpRefs.current[index + 1]?.focus()
+            setTimeout(() => {
+                otpRefs.current[index + 1]?.focus()
+            }, 10)
         }
 
         setError('')
     }
 
     const handleOtpKeyPress = (index, key) => {
-        if (key === 'Backspace' && !otp[index] && index > 0) {
-            otpRefs.current[index - 1]?.focus()
+        if (key === 'Backspace') {
+            if (!otp[index] && index > 0) {
+                // Move to previous input if current is empty
+                const newOtp = [...otp]
+                newOtp[index - 1] = ''
+                setOtp(newOtp)
+                setTimeout(() => {
+                    otpRefs.current[index - 1]?.focus()
+                }, 10)
+            } else {
+                // Clear current input
+                const newOtp = [...otp]
+                newOtp[index] = ''
+                setOtp(newOtp)
+            }
         }
     }
 
@@ -135,7 +184,7 @@ const signup = () => {
                 setError(response.data.message || 'Verification failed')
             }
         } catch (err) {
-            setError(err.response?.data?.message || 'Invalid or expired code')
+            setError(err.response?.data?.message || 'Invalid or expired code. Please try again.')
         } finally {
             setIsLoading(false)
         }
@@ -155,15 +204,20 @@ const signup = () => {
             if (response.data.success) {
                 setResendTimer(60)
                 setOtp(['', '', '', '', '', ''])
+                setTimeout(() => {
+                    otpRefs.current[0]?.focus()
+                }, 100)
             } else {
                 setError(response.data.message || 'Failed to resend code')
             }
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to resend code')
+            setError(err.response?.data?.message || 'Failed to resend code. Please try again.')
         } finally {
             setIsLoading(false)
         }
     }
+
+    const isOtpComplete = otp.join('').length === 6
 
     return (
         <CustomKeyboardView>
@@ -172,6 +226,7 @@ const signup = () => {
                 className="flex-1 bg-white"
                 contentContainerStyle={{ flexGrow: 1 }}
                 keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
             >
                 <View className="flex-1 justify-center px-6 py-8">
                     {/* Header */}
@@ -182,7 +237,7 @@ const signup = () => {
                         <Text className="text-2xl font-bold text-gray-800">
                             {step === 1 ? 'Create Account' : 'Verify Email'}
                         </Text>
-                        <Text className="text-gray-500 mt-1">
+                        <Text className="text-gray-500 mt-1 text-center">
                             {step === 1 ? 'Sign up to get started' : `Code sent to ${formData.email}`}
                         </Text>
                     </View>
@@ -190,7 +245,7 @@ const signup = () => {
                     {/* Error Message */}
                     {error ? (
                         <View className="mb-4 p-3 bg-red-50 rounded-lg border border-red-200">
-                            <Text className="text-red-600 text-sm">{error}</Text>
+                            <Text className="text-red-600 text-sm text-center">{error}</Text>
                         </View>
                     ) : null}
 
@@ -204,6 +259,7 @@ const signup = () => {
                                         value={formData.firstName}
                                         onChangeText={(value) => handleInputChange('firstName', value)}
                                         placeholder="John"
+                                        autoCapitalize="words"
                                         className="border border-gray-300 rounded-lg px-3 py-3 text-gray-900"
                                     />
                                 </View>
@@ -213,6 +269,7 @@ const signup = () => {
                                         value={formData.lastName}
                                         onChangeText={(value) => handleInputChange('lastName', value)}
                                         placeholder="Doe"
+                                        autoCapitalize="words"
                                         className="border border-gray-300 rounded-lg px-3 py-3 text-gray-900"
                                     />
                                 </View>
@@ -226,6 +283,7 @@ const signup = () => {
                                     placeholder="your.email@example.com"
                                     keyboardType="email-address"
                                     autoCapitalize="none"
+                                    autoCorrect={false}
                                     className="border border-gray-300 rounded-lg px-3 py-3 text-gray-900"
                                 />
                             </View>
@@ -249,9 +307,14 @@ const signup = () => {
                                         onChangeText={(value) => handleInputChange('password', value)}
                                         placeholder="Create a password"
                                         secureTextEntry={!passwordVisible}
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
                                         className="flex-1 text-gray-900"
                                     />
-                                    <TouchableOpacity onPress={() => setPasswordVisible(!passwordVisible)}>
+                                    <TouchableOpacity
+                                        onPress={() => setPasswordVisible(!passwordVisible)}
+                                        activeOpacity={0.7}
+                                    >
                                         <Ionicons
                                             name={passwordVisible ? "eye-off-outline" : "eye-outline"}
                                             size={20}
@@ -267,6 +330,7 @@ const signup = () => {
                                     value={formData.referralCode}
                                     onChangeText={(value) => handleInputChange('referralCode', value)}
                                     placeholder="Enter referral code"
+                                    autoCapitalize="characters"
                                     className="border border-gray-300 rounded-lg px-3 py-3 text-gray-900"
                                 />
                             </View>
@@ -274,6 +338,7 @@ const signup = () => {
                             <TouchableOpacity
                                 onPress={handleSubmit}
                                 disabled={isLoading}
+                                activeOpacity={0.8}
                                 className={`py-3 rounded-lg mb-4 ${isLoading ? 'bg-gray-400' : 'bg-orange-500'}`}
                             >
                                 {isLoading ? (
@@ -288,7 +353,7 @@ const signup = () => {
 
                             <View className="flex-row justify-center items-center">
                                 <Text className="text-gray-600">Already have an account? </Text>
-                                <TouchableOpacity onPress={() => router.push('/signin')}>
+                                <TouchableOpacity onPress={() => router.push('/signin')} activeOpacity={0.7}>
                                     <Text className="text-orange-500 font-semibold">Sign In</Text>
                                 </TouchableOpacity>
                             </View>
@@ -310,7 +375,9 @@ const signup = () => {
                                             onKeyPress={({ nativeEvent }) => handleOtpKeyPress(index, nativeEvent.key)}
                                             maxLength={1}
                                             keyboardType="number-pad"
-                                            className={`w-12 h-14 text-center text-xl font-bold border-2 rounded-lg ${digit ? 'border-orange-500' : 'border-gray-300'
+                                            selectTextOnFocus
+                                            textContentType="oneTimeCode"
+                                            className={`w-12 h-14 text-center text-xl font-bold border-2 rounded-lg ${digit ? 'border-orange-500 text-gray-900' : 'border-gray-300 text-gray-900'
                                                 }`}
                                         />
                                     ))}
@@ -319,8 +386,9 @@ const signup = () => {
 
                             <TouchableOpacity
                                 onPress={handleVerifyOtp}
-                                disabled={isLoading || otp.join('').length !== 6}
-                                className={`py-3 rounded-lg mb-4 ${(isLoading || otp.join('').length !== 6) ? 'bg-gray-400' : 'bg-green-500'
+                                disabled={isLoading || !isOtpComplete}
+                                activeOpacity={0.8}
+                                className={`py-3 rounded-lg mb-4 ${(isLoading || !isOtpComplete) ? 'bg-gray-400' : 'bg-orange-500'
                                     }`}
                             >
                                 {isLoading ? (
@@ -338,7 +406,7 @@ const signup = () => {
                                 {resendTimer > 0 ? (
                                     <Text className="text-orange-500 font-semibold">Resend in {resendTimer}s</Text>
                                 ) : (
-                                    <TouchableOpacity onPress={handleResendOtp}>
+                                    <TouchableOpacity onPress={handleResendOtp} activeOpacity={0.7} disabled={isLoading}>
                                         <Text className="text-orange-500 font-semibold">Resend Code</Text>
                                     </TouchableOpacity>
                                 )}
@@ -350,6 +418,7 @@ const signup = () => {
                                     setOtp(['', '', '', '', '', ''])
                                     setError('')
                                 }}
+                                activeOpacity={0.7}
                                 className="items-center pt-4 border-t border-gray-200"
                             >
                                 <Text className="text-gray-600">
