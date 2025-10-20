@@ -230,21 +230,21 @@ router.post('/create', authenticateToken, async (req, res) => {
 
         // ===== SEND EMAIL WITH ALL CREDENTIALS =====
         try {
-            await sendTradingAccountCreatedEmail({
-                email: user.email,
-                userName: `${user.firstName} ${user.lastName}`,
-                accountNumber: tradingAccount.accountNumber,
-                login: tradingAccount.login,
-                platform: tradingAccount.platform,
-                server: tradingAccount.server,
-                accountType: tradingAccount.accountType,
-                accountClass: tradingAccount.accountClass,
-                currency: tradingAccount.currency,
-                leverage: tradingAccount.leverage,
-                balance: tradingAccount.balance,
-                traderPassword: plainTraderPassword,    // Plain text for email
-                investorPassword: plainInvestorPassword // Plain text for email
-            });
+            // await sendTradingAccountCreatedEmail({
+            //     email: user.email,
+            //     userName: `${user.firstName} ${user.lastName}`,
+            //     accountNumber: tradingAccount.accountNumber,
+            //     login: tradingAccount.login,
+            //     platform: tradingAccount.platform,
+            //     server: tradingAccount.server,
+            //     accountType: tradingAccount.accountType,
+            //     accountClass: tradingAccount.accountClass,
+            //     currency: tradingAccount.currency,
+            //     leverage: tradingAccount.leverage,
+            //     balance: tradingAccount.balance,
+            //     traderPassword: plainTraderPassword,    // Plain text for email
+            //     investorPassword: plainInvestorPassword // Plain text for email
+            // });
             console.log(`✅ Trading account email sent to ${user.email}`);
 
             // ===== DELETE PLAIN PASSWORDS AFTER EMAIL SENT =====
