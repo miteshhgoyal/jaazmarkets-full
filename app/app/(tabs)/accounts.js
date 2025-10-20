@@ -327,43 +327,7 @@ const TabButton = ({ label, count, isActive, onPress }) => (
     </TouchableOpacity>
 )
 
-const FilterSelect = ({ label, value, onChange, options }) => {
-    const [showPicker, setShowPicker] = useState(false)
-    const selectedLabel = options.find(o => o.value === value)?.label || ''
-
-    return (
-        <View className="mb-3">
-            <Text className="text-sm font-medium text-gray-700 mb-2">{label}</Text>
-            <TouchableOpacity
-                onPress={() => setShowPicker(!showPicker)}
-                className="px-4 py-3 border border-gray-300 rounded-lg bg-white flex-row items-center justify-between"
-            >
-                <Text className="text-gray-900">{selectedLabel}</Text>
-                <Ionicons name="chevron-down" size={20} color="#9ca3af" />
-            </TouchableOpacity>
-
-            {showPicker && (
-                <View className="mt-2 border border-gray-300 rounded-lg bg-white overflow-hidden">
-                    {options.map((option) => (
-                        <TouchableOpacity
-                            key={option.value}
-                            onPress={() => {
-                                onChange(option.value)
-                                setShowPicker(false)
-                            }}
-                            className={`px-4 py-3 border-b border-gray-100 ${value === option.value ? 'bg-orange-50' : 'bg-white'}`}
-                        >
-                            <Text className={`${value === option.value ? 'text-orange-600 font-semibold' : 'text-gray-900'}`}>
-                                {option.label}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-            )}
-        </View>
-    )
-}
-
+// Replace ActiveAccountCard component
 const ActiveAccountCard = ({ account, onCopyToClipboard, router }) => {
     const [showDetails, setShowDetails] = useState(false)
 
@@ -380,103 +344,126 @@ const ActiveAccountCard = ({ account, onCopyToClipboard, router }) => {
     }
 
     return (
-        <View className="bg-white rounded-lg shadow-sm overflow-hidden">
-            {/* Header */}
-            <View className="p-4 border-b border-gray-100">
-                <View className="flex-row items-start justify-between mb-3">
-                    <View className="flex-row flex-wrap gap-2">
-                        <View className="bg-orange-100 px-3 py-1 rounded-full">
-                            <Text className="text-orange-700 font-semibold text-xs">{account.accountType}</Text>
-                        </View>
-                        <View className="bg-blue-100 px-3 py-1 rounded-full">
-                            <Text className="text-blue-700 font-semibold text-xs">{account.platform}</Text>
-                        </View>
-                        <View className="bg-purple-100 px-3 py-1 rounded-full">
-                            <Text className="text-purple-700 font-semibold text-xs">{account.accountClass}</Text>
-                        </View>
+        <View className="bg-white rounded-xl overflow-hidden border border-gray-200">
+            {/* Header Section */}
+            <View className="p-5">
+                {/* Tags Row */}
+                <View className="flex-row flex-wrap mb-4 gap-2">
+                    <View className="border border-orange-300 px-3 py-1 rounded-full">
+                        <Text className="text-orange-600 font-medium text-xs">{account.accountType}</Text>
+                    </View>
+                    <View className="border border-blue-300 px-3 py-1 rounded-full">
+                        <Text className="text-blue-600 font-medium text-xs">{account.platform}</Text>
+                    </View>
+                    <View className="border border-purple-300 px-3 py-1 rounded-full">
+                        <Text className="text-purple-600 font-medium text-xs">{account.accountClass}</Text>
                     </View>
                 </View>
 
-                <View className="flex-row items-center justify-between">
-                    <View>
-                        <Text className="text-gray-600 text-xs mb-1">Balance</Text>
-                        <Text className="text-2xl font-bold text-gray-900">
-                            {formatCurrency(account.balance, account.currency)}
-                        </Text>
-                    </View>
+                {/* Balance Display */}
+                <View className="mb-5">
+                    <Text className="text-gray-500 text-xs font-medium mb-1">Available Balance</Text>
+                    <Text className="text-3xl font-bold text-gray-900">
+                        {formatCurrency(account.balance, account.currency)}
+                    </Text>
+                </View>
 
-                    {/* Updated with proper routing */}
-                    <View className="flex-row gap-2">
-                        <TouchableOpacity
-                            onPress={() => router.push('/deposit')}
-                            className="bg-orange-500 px-4 py-2 rounded-lg flex-row items-center gap-1"
-                            activeOpacity={0.7}
-                        >
-                            <Ionicons name="add" size={16} color="white" />
-                            <Text className="text-white font-semibold text-sm">Deposit</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => router.push('/withdrawal')}
-                            className="bg-white border border-gray-300 px-4 py-2 rounded-lg flex-row items-center gap-1"
-                            activeOpacity={0.7}
-                        >
-                            <Ionicons name="remove" size={16} color="#374151" />
-                            <Text className="text-gray-700 font-semibold text-sm">Withdraw</Text>
-                        </TouchableOpacity>
-                    </View>
+                {/* Action Buttons */}
+                <View className="flex-row gap-3">
+                    <TouchableOpacity
+                        onPress={() => router.push('/deposit')}
+                        className="flex-1 bg-orange-500 px-4 py-3 rounded-lg flex-row items-center justify-center gap-2"
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons name="arrow-down-circle" size={18} color="white" />
+                        <Text className="text-white font-semibold text-sm">Deposit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={() => router.push('/withdrawal')}
+                        className="flex-1 border border-gray-300 px-4 py-3 rounded-lg flex-row items-center justify-center gap-2"
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons name="arrow-up-circle-outline" size={18} color="#374151" />
+                        <Text className="text-gray-700 font-semibold text-sm">Withdraw</Text>
+                    </TouchableOpacity>
                 </View>
             </View>
 
-            {/* Account Details */}
-            <View className="p-4">
-                <View className="flex-row flex-wrap gap-4 mb-4">
-                    <StatItem label="Equity" value={formatCurrency(account.equity || account.balance, account.currency)} />
-                    <StatItem label="Margin" value={formatCurrency(account.margin || 0, account.currency)} />
-                    <StatItem label="Free Margin" value={formatCurrency(account.freeMargin || account.balance, account.currency)} />
-                    <StatItem label="Leverage" value={account.leverage} />
+            {/* Stats Section */}
+            <View className="px-5 py-4 border-t border-gray-200">
+                <View className="flex-row flex-wrap gap-4">
+                    <StatItem
+                        label="Equity"
+                        value={formatCurrency(account.equity || account.balance, account.currency)}
+                    />
+                    <StatItem
+                        label="Margin"
+                        value={formatCurrency(account.margin || 0, account.currency)}
+                    />
+                    <StatItem
+                        label="Free Margin"
+                        value={formatCurrency(account.freeMargin || account.balance, account.currency)}
+                    />
+                    <StatItem
+                        label="Leverage"
+                        value={account.leverage}
+                    />
                 </View>
 
-                {/* Toggle Details */}
+                {/* Show/Hide Details Toggle */}
                 <TouchableOpacity
                     onPress={() => setShowDetails(!showDetails)}
-                    className="flex-row items-center justify-center gap-2 py-2 border-t border-gray-100"
+                    className="flex-row items-center justify-center mt-4 pt-4 border-t border-gray-200 gap-1"
+                    activeOpacity={0.7}
                 >
                     <Text className="text-gray-600 font-medium text-sm">
                         {showDetails ? 'Hide Details' : 'Show Details'}
                     </Text>
-                    <Ionicons name={showDetails ? 'chevron-up' : 'chevron-down'} size={20} color="#6b7280" />
+                    <Ionicons
+                        name={showDetails ? 'chevron-up' : 'chevron-down'}
+                        size={16}
+                        color="#6b7280"
+                    />
                 </TouchableOpacity>
-
-                {/* Expanded Details */}
-                {showDetails && (
-                    <View className="mt-4 border-t border-gray-100 pt-4">
-                        <DetailRow
-                            label="Account Number"
-                            value={account.accountNumber}
-                            copyable
-                            onCopy={() => onCopyToClipboard(account.accountNumber, 'Account Number')}
-                        />
-                        <DetailRow
-                            label="Login"
-                            value={account.login}
-                            copyable
-                            onCopy={() => onCopyToClipboard(account.login, 'Login')}
-                        />
-                        <DetailRow
-                            label="Server"
-                            value={account.server}
-                            copyable
-                            onCopy={() => onCopyToClipboard(account.server, 'Server')}
-                        />
-                        <DetailRow label="Created" value={formatDate(account.createdAt)} />
-                        <DetailRow label="Status" value={account.status} />
-                    </View>
-                )}
             </View>
+
+            {/* Expanded Details Section */}
+            {showDetails && (
+                <View className="px-5 py-4 border-t border-gray-200">
+                    <DetailRow
+                        label="Account Number"
+                        value={account.accountNumber}
+                        copyable
+                        onCopy={() => onCopyToClipboard(account.accountNumber, 'Account Number')}
+                    />
+                    <DetailRow
+                        label="Login"
+                        value={account.login}
+                        copyable
+                        onCopy={() => onCopyToClipboard(account.login, 'Login')}
+                    />
+                    <DetailRow
+                        label="Server"
+                        value={account.server}
+                        copyable
+                        onCopy={() => onCopyToClipboard(account.server, 'Server')}
+                    />
+                    <DetailRow
+                        label="Created"
+                        value={formatDate(account.createdAt)}
+                    />
+                    <DetailRow
+                        label="Status"
+                        value={account.status}
+                        isLast={true}
+                    />
+                </View>
+            )}
         </View>
     )
 }
 
+// Replace ArchivedAccountCard component
 const ArchivedAccountCard = ({ account, onReactivate }) => {
     const formatDate = (dateString) => {
         return new Date(dateString).toLocaleDateString('en-US', {
@@ -491,51 +478,55 @@ const ArchivedAccountCard = ({ account, onReactivate }) => {
     }
 
     return (
-        <View className="bg-white rounded-lg shadow-sm overflow-hidden opacity-75">
-            <View className="p-4">
-                <View className="flex-row items-start justify-between mb-3">
-                    <View className="flex-row flex-wrap gap-2">
-                        <View className="bg-gray-100 px-3 py-1 rounded-full">
-                            <Text className="text-gray-700 font-semibold text-xs">{account.accountType}</Text>
+        <View className="bg-white rounded-xl overflow-hidden border border-gray-300 opacity-60">
+            <View className="p-5">
+                {/* Header with Tags and Date */}
+                <View className="flex-row items-start justify-between mb-4">
+                    <View className="flex-row flex-wrap gap-2 flex-1 pr-3">
+                        <View className="border border-gray-300 px-3 py-1 rounded-full">
+                            <Text className="text-gray-500 font-medium text-xs">{account.accountType}</Text>
                         </View>
-                        <View className="bg-gray-100 px-3 py-1 rounded-full">
-                            <Text className="text-gray-700 font-semibold text-xs">{account.platform}</Text>
+                        <View className="border border-gray-300 px-3 py-1 rounded-full">
+                            <Text className="text-gray-500 font-medium text-xs">{account.platform}</Text>
                         </View>
-                        <View className="bg-gray-100 px-3 py-1 rounded-full">
-                            <Text className="text-gray-700 font-semibold text-xs">{account.accountClass}</Text>
+                        <View className="border border-gray-300 px-3 py-1 rounded-full">
+                            <Text className="text-gray-500 font-medium text-xs">{account.accountClass}</Text>
                         </View>
                     </View>
                     <View className="flex-row items-center gap-1">
-                        <Ionicons name="calendar-outline" size={12} color="#6b7280" />
+                        <Ionicons name="time-outline" size={12} color="#9ca3af" />
                         <Text className="text-xs text-gray-500">{formatDate(account.updatedAt)}</Text>
                     </View>
                 </View>
 
-                <View className="flex-row items-center justify-between mb-4">
-                    <View>
-                        <Text className="text-gray-600 text-xs mb-1">Balance</Text>
-                        <Text className="text-xl font-bold text-gray-900">
+                {/* Balance and Reactivate Button */}
+                <View className="flex-row items-end justify-between mb-4">
+                    <View className="flex-1">
+                        <Text className="text-gray-500 text-xs font-medium mb-1">Final Balance</Text>
+                        <Text className="text-2xl font-bold text-gray-900">
                             {formatCurrency(account.balance, account.currency)}
                         </Text>
                     </View>
 
                     <TouchableOpacity
                         onPress={onReactivate}
-                        className="bg-orange-500 px-4 py-2 rounded-lg flex-row items-center gap-2"
+                        className="bg-orange-500 px-4 py-2.5 rounded-lg flex-row items-center gap-2"
+                        activeOpacity={0.8}
                     >
-                        <Ionicons name="refresh" size={16} color="white" />
+                        <Ionicons name="refresh-circle" size={18} color="white" />
                         <Text className="text-white font-semibold text-sm">Reactivate</Text>
                     </TouchableOpacity>
                 </View>
 
-                <View className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                {/* Archive Info Banner */}
+                <View className="border border-amber-300 rounded-lg p-3">
                     <View className="flex-row items-start gap-2">
-                        <View className="w-2 h-2 bg-amber-400 rounded-full mt-1.5" />
+                        <Ionicons name="information-circle" size={18} color="#f59e0b" />
                         <View className="flex-1">
-                            <Text className="text-amber-800 text-sm font-medium">
-                                {account.archiveReason || 'Account archived due to inactivity'}
+                            <Text className="text-amber-900 text-sm font-medium mb-0.5">
+                                {account.archiveReason || 'Account archived'}
                             </Text>
-                            <Text className="text-amber-700 text-xs mt-1">
+                            <Text className="text-amber-700 text-xs">
                                 Archived on {formatDate(account.updatedAt)}
                             </Text>
                         </View>
@@ -546,25 +537,32 @@ const ArchivedAccountCard = ({ account, onReactivate }) => {
     )
 }
 
+// Replace StatItem component
 const StatItem = ({ label, value }) => (
-    <View className="flex-1 min-w-[100px]">
-        <Text className="text-gray-600 text-xs mb-1">{label}</Text>
+    <View className="flex-1 min-w-[120px]">
+        <Text className="text-gray-500 text-xs font-medium mb-1">{label}</Text>
         <Text className="text-gray-900 font-semibold text-sm">{value}</Text>
     </View>
 )
 
-const DetailRow = ({ label, value, copyable, onCopy }) => (
-    <View className="flex-row items-center justify-between py-2">
-        <Text className="text-gray-600 text-sm">{label}</Text>
+// Replace DetailRow component
+const DetailRow = ({ label, value, copyable, onCopy, isLast }) => (
+    <View className={`flex-row items-center justify-between py-3 ${!isLast ? 'border-b border-gray-200' : ''}`}>
+        <Text className="text-gray-600 text-sm font-medium">{label}</Text>
         <View className="flex-row items-center gap-2">
-            <Text className="text-gray-900 font-medium text-sm">{value}</Text>
+            <Text className="text-gray-900 font-semibold text-sm">{value}</Text>
             {copyable && (
-                <TouchableOpacity onPress={onCopy} className="p-1">
+                <TouchableOpacity
+                    onPress={onCopy}
+                    className="p-1.5 rounded active:bg-gray-100"
+                    activeOpacity={0.7}
+                >
                     <Ionicons name="copy-outline" size={16} color="#6b7280" />
                 </TouchableOpacity>
             )}
         </View>
     </View>
 )
+
 
 export default Accounts

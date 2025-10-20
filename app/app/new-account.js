@@ -94,19 +94,6 @@ const NewAccount = () => {
         setSelectedAccount(null)
     }
 
-    const handleClose = () => {
-        try {
-            if (router.canGoBack()) {
-                router.back()
-            } else {
-                router.replace('/(tabs)/accounts')
-            }
-        } catch (error) {
-            console.error('Navigation error:', error)
-            router.replace('/(tabs)/accounts')
-        }
-    }
-
     const validatePassword = (password) => {
         return {
             length: password.length >= 8 && password.length <= 15,
@@ -196,20 +183,12 @@ const NewAccount = () => {
         const professionalAccounts = settings.accountTypes.filter(acc => acc.category === 'Professional accounts')
 
         return (
-            <SafeAreaView className="flex-1 bg-gray-50">
-                <View className="bg-white px-6 py-4 border-b border-gray-200">
-                    <View className="flex-row items-center justify-between">
-                        <View className="flex-1">
-                            <Text className="text-2xl font-bold text-gray-900">Open Account</Text>
-                            <Text className="text-gray-600 text-sm mt-1">Choose your account type</Text>
-                        </View>
-                        <TouchableOpacity onPress={handleClose} className="p-2">
-                            <Ionicons name="close" size={24} color="#374151" />
-                        </TouchableOpacity>
-                    </View>
-                </View>
+            <SafeAreaView className="flex-1 bg-gray-50" edges={['bottom']}>
+                {/* ✅ Header removed - now using layout header */}
 
                 <ScrollView className="flex-1 px-6 py-6" showsVerticalScrollIndicator={false}>
+                    <Text className="text-gray-600 text-sm mb-6">Choose your account type</Text>
+
                     {standardAccounts.length > 0 && (
                         <View className="mb-8">
                             <Text className="text-lg font-bold text-gray-900 mb-4">Standard Accounts</Text>
@@ -241,6 +220,7 @@ const NewAccount = () => {
                     <View className="h-24" />
                 </ScrollView>
 
+                {/* Bottom Button */}
                 <View className="bg-white border-t border-gray-200 px-6 py-4">
                     <TouchableOpacity
                         onPress={handleContinue}
@@ -260,21 +240,13 @@ const NewAccount = () => {
     // STEP 2: Account Setup Form
     if (step === 2) {
         return (
-            <SafeAreaView className="flex-1 bg-gray-50">
-                <View className="bg-white px-6 py-4 border-b border-gray-200">
-                    <View className="flex-row items-center gap-4">
-                        <TouchableOpacity onPress={handleBack} className="p-2 -ml-2">
-                            <Ionicons name="arrow-back" size={24} color="#374151" />
-                        </TouchableOpacity>
-                        <View className="flex-1">
-                            <Text className="text-2xl font-bold text-gray-900">Set up account</Text>
-                            <Text className="text-gray-600 text-sm">{selectedAccount?.name}</Text>
-                        </View>
-                    </View>
-                </View>
+            <SafeAreaView className="flex-1 bg-gray-50" edges={['bottom']}>
+                {/* ✅ Custom header with back button removed - layout header handles back */}
 
                 <ScrollView className="flex-1 px-6 py-6" showsVerticalScrollIndicator={false}>
-                    {/* Demo/Real Toggle - ✅ REMOVED shadow-sm */}
+                    <Text className="text-gray-600 text-sm mb-4">{selectedAccount?.name}</Text>
+
+                    {/* Demo/Real Toggle */}
                     <View className="bg-white rounded-lg p-2 mb-6" style={styles.cardShadow}>
                         <View className="flex-row gap-2">
                             <TouchableOpacity
@@ -302,7 +274,7 @@ const NewAccount = () => {
                             : 'Trade with real money and withdraw any profit you may make'}
                     </Text>
 
-                    {/* Form - ✅ REMOVED shadow-sm */}
+                    {/* Form */}
                     <View className="bg-white rounded-xl p-6" style={styles.cardShadow}>
                         {/* Currency Picker */}
                         <View className="mb-4">
@@ -459,7 +431,7 @@ const NewAccount = () => {
     // STEP 3: Success Screen
     if (step === 3 && createdAccount) {
         return (
-            <SafeAreaView className="flex-1 bg-white">
+            <SafeAreaView className="flex-1 bg-white" edges={['bottom']}>
                 <ScrollView className="flex-1 px-6 py-8" showsVerticalScrollIndicator={false}>
                     <View className="items-center mb-8">
                         <View className="w-16 h-16 bg-green-100 rounded-full items-center justify-center mb-4">
@@ -482,7 +454,7 @@ const NewAccount = () => {
                         </Text>
                     </View>
 
-                    {/* Credentials - ✅ REMOVED space-y-3, added gap style */}
+                    {/* Credentials */}
                     <View style={{ marginBottom: 32 }}>
                         <CredentialRow label="Account Number" value={createdAccount.accountNumber} onCopy={copyToClipboard} />
                         <CredentialRow label="Login" value={createdAccount.login} onCopy={copyToClipboard} />
@@ -493,7 +465,7 @@ const NewAccount = () => {
                         <CredentialRow label="Balance" value={`${createdAccount.currency} ${createdAccount.balance}`} />
                     </View>
 
-                    {/* Action Buttons - ✅ REMOVED space-y-3 */}
+                    {/* Action Buttons */}
                     <View style={{ gap: 12 }}>
                         <TouchableOpacity
                             onPress={() => router.replace('/(tabs)/accounts')}
@@ -524,6 +496,7 @@ const NewAccount = () => {
                             </Text>
                         </TouchableOpacity>
                     </View>
+                    <View className="h-24" />
                 </ScrollView>
             </SafeAreaView>
         )
@@ -532,7 +505,6 @@ const NewAccount = () => {
     return null
 }
 
-// ✅ ADD STYLESHEET for shadows
 const styles = StyleSheet.create({
     cardShadow: {
         shadowColor: '#000',
