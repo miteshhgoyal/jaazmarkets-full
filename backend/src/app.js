@@ -31,16 +31,17 @@ const allowedOrigins = [
 ];
 
 const corsOptions = {
-    origin: function (origin, callback) {
-        // Allow requests with no origin (React Native, Postman, curl)
-        if (!origin) return callback(null, true);
+    // origin: function (origin, callback) {
+    //     // Allow requests with no origin (React Native, Postman, curl)
+    //     if (!origin) return callback(null, true);
 
-        if (allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            callback(null, true); // Or set to false to block unknown origins
-        }
-    },
+    //     if (allowedOrigins.includes(origin)) {
+    //         callback(null, true);
+    //     } else {
+    //         callback(null, true); // Or set to false to block unknown origins
+    //     }
+    // },
+    origin: '*',
     methods: ['GET', 'POST', 'DELETE', 'PATCH', 'PUT', 'OPTIONS'],
     credentials: true,
     optionsSuccessStatus: 200
