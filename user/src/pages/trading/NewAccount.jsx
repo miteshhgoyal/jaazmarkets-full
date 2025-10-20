@@ -442,58 +442,6 @@ const NewAccount = () => {
                       </select>
                     </div>
 
-                    {/* Trader Password (Optional) */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Trader password (Optional)
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showPassword ? "text" : "password"}
-                          name="traderPassword"
-                          value={formData.traderPassword}
-                          onChange={handleInputChange}
-                          className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >
-                          {showPassword ? (
-                            <EyeOff className="w-5 h-5" />
-                          ) : (
-                            <Eye className="w-5 h-5" />
-                          )}
-                        </button>
-                      </div>
-
-                      {/* Password Requirements */}
-                      {formData.traderPassword && (
-                        <div className="mt-3 space-y-2 text-sm">
-                          <PasswordCheck
-                            check={passwordChecks.length}
-                            label="Between 8-15 characters"
-                          />
-                          <PasswordCheck
-                            check={
-                              passwordChecks.uppercase &&
-                              passwordChecks.lowercase
-                            }
-                            label="Upper and lower case letters"
-                          />
-                          <PasswordCheck
-                            check={passwordChecks.number}
-                            label="At least one number"
-                          />
-                          <PasswordCheck
-                            check={passwordChecks.special}
-                            label="At least one special character"
-                          />
-                        </div>
-                      )}
-                    </div>
-
                     {/* Submit Button */}
                     <div className="pt-4">
                       <button

@@ -382,42 +382,6 @@ const NewAccount = () => {
                             </TouchableOpacity>
                         </View>
 
-                        {/* Trader Password */}
-                        <View className="mb-4">
-                            <Text className="text-sm font-medium text-gray-700 mb-2">
-                                Trader password (Optional)
-                            </Text>
-                            <View className="relative">
-                                <TextInput
-                                    value={formData.traderPassword}
-                                    onChangeText={(value) => handleInputChange('traderPassword', value)}
-                                    secureTextEntry={!showPassword}
-                                    className="px-4 py-3 pr-12 border border-gray-300 rounded-lg text-gray-900"
-                                    placeholder="Enter custom password (optional)"
-                                />
-                                <TouchableOpacity
-                                    onPress={() => setShowPassword(!showPassword)}
-                                    style={{ position: 'absolute', right: 12, top: 12 }}
-                                >
-                                    <Ionicons
-                                        name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                                        size={20}
-                                        color="#9ca3af"
-                                    />
-                                </TouchableOpacity>
-                            </View>
-
-                            {/* Password Requirements - ✅ REMOVED space-y-2, added style */}
-                            {formData.traderPassword !== '' && (
-                                <View style={{ marginTop: 12 }}>
-                                    <PasswordCheck check={passwordChecks.length} label="Between 8-15 characters" />
-                                    <PasswordCheck check={passwordChecks.uppercase && passwordChecks.lowercase} label="Upper and lower case letters" />
-                                    <PasswordCheck check={passwordChecks.number} label="At least one number" />
-                                    <PasswordCheck check={passwordChecks.special} label="At least one special character" />
-                                </View>
-                            )}
-                        </View>
-
                         {/* Submit Button */}
                         <TouchableOpacity
                             onPress={handleSubmit}

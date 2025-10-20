@@ -49,9 +49,8 @@ def find_and_extract_files(target_files, root_dir='.', output_file='files-conten
 if __name__ == "__main__":
     # Define the files you want to search for
     files_to_find = [
-   '_layout.js',
-   'new-account.js',
-   'accounts.js',
+  '_layout.js',
+  'index.js',
     ]
     
     # Start the search from current directory

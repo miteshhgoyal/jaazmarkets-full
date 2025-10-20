@@ -17,7 +17,6 @@ function MainLayout() {
         const inAuth = segments[0] === '(auth)';
         const inTabs = segments[0] === '(tabs)';
 
-        // ✅ Check for authenticated routes
         const authenticatedRoutes = [
             'new-account',
             'profile-settings',
@@ -32,7 +31,6 @@ function MainLayout() {
         ];
         const inAuthenticatedRoute = authenticatedRoutes.includes(segments[0]);
 
-        // ✅ UPDATED LOGIC - Allow authenticated routes
         if (isAuthenticated && !inTabs && !inAuthenticatedRoute) {
             router.replace('/(tabs)/accounts');
         } else if (isAuthenticated === false && !inAuth) {
@@ -74,25 +72,33 @@ function MainLayout() {
             screenOptions={{
                 headerShown: false,
                 animation: 'slide_from_right',
-                contentStyle: { backgroundColor: 'white' }
+                contentStyle: {
+                    backgroundColor: 'white',
+                }
             }}
         >
             <Stack.Screen name="index" />
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="(tabs)" />
 
-            {/* Modal Screen - New Account */}
+            {/* ✅ FIXED: Changed from modal to regular screen with header */}
             <Stack.Screen
                 name="new-account"
                 options={{
-                    presentation: 'modal',
-                    headerShown: false,
+                    headerShown: true,
                     title: 'Create New Account',
-                    animation: 'slide_from_bottom',
+                    headerStyle: {
+                        backgroundColor: '#fff',
+                    },
+                    headerTintColor: '#000',
+                    headerShadowVisible: false,
+                    animation: 'slide_from_right',  // Changed from slide_from_bottom
+                    contentStyle: {
+                        backgroundColor: 'white',
+                    }
                 }}
             />
 
-            {/* Profile Sub-Screens */}
             <Stack.Screen
                 name="profile-settings"
                 options={{
@@ -102,6 +108,10 @@ function MainLayout() {
                         backgroundColor: '#fff',
                     },
                     headerTintColor: '#000',
+                    headerShadowVisible: false,
+                    contentStyle: {
+                        backgroundColor: 'white',
+                    }
                 }}
             />
             <Stack.Screen
@@ -113,10 +123,13 @@ function MainLayout() {
                         backgroundColor: '#fff',
                     },
                     headerTintColor: '#000',
+                    headerShadowVisible: false,
+                    contentStyle: {
+                        backgroundColor: 'white',
+                    }
                 }}
             />
 
-            {/* Trading Screens */}
             <Stack.Screen
                 name="history-orders"
                 options={{
@@ -126,10 +139,13 @@ function MainLayout() {
                         backgroundColor: '#fff',
                     },
                     headerTintColor: '#000',
+                    headerShadowVisible: false,
+                    contentStyle: {
+                        backgroundColor: 'white',
+                    }
                 }}
             />
 
-            {/* Payment & Transfer Screens */}
             <Stack.Screen
                 name="deposit"
                 options={{
@@ -139,6 +155,10 @@ function MainLayout() {
                         backgroundColor: '#fff',
                     },
                     headerTintColor: '#000',
+                    headerShadowVisible: false,
+                    contentStyle: {
+                        backgroundColor: 'white',
+                    }
                 }}
             />
             <Stack.Screen
@@ -150,6 +170,10 @@ function MainLayout() {
                         backgroundColor: '#fff',
                     },
                     headerTintColor: '#000',
+                    headerShadowVisible: false,
+                    contentStyle: {
+                        backgroundColor: 'white',
+                    }
                 }}
             />
             <Stack.Screen
@@ -161,6 +185,10 @@ function MainLayout() {
                         backgroundColor: '#fff',
                     },
                     headerTintColor: '#000',
+                    headerShadowVisible: false,
+                    contentStyle: {
+                        backgroundColor: 'white',
+                    }
                 }}
             />
             <Stack.Screen
@@ -172,10 +200,13 @@ function MainLayout() {
                         backgroundColor: '#fff',
                     },
                     headerTintColor: '#000',
+                    headerShadowVisible: false,
+                    contentStyle: {
+                        backgroundColor: 'white',
+                    }
                 }}
             />
 
-            {/* More Screens */}
             <Stack.Screen
                 name="refer-earn"
                 options={{
@@ -185,6 +216,10 @@ function MainLayout() {
                         backgroundColor: '#fff',
                     },
                     headerTintColor: '#000',
+                    headerShadowVisible: false,
+                    contentStyle: {
+                        backgroundColor: 'white',
+                    }
                 }}
             />
             <Stack.Screen
@@ -196,6 +231,10 @@ function MainLayout() {
                         backgroundColor: '#fff',
                     },
                     headerTintColor: '#000',
+                    headerShadowVisible: false,
+                    contentStyle: {
+                        backgroundColor: 'white',
+                    }
                 }}
             />
         </Stack>
@@ -207,8 +246,8 @@ export default function RootLayout() {
         <AuthProvider>
             <StatusBar
                 barStyle="dark-content"
-                backgroundColor="transparent"
-                translucent={true}
+                backgroundColor="#ffffff"
+                translucent={false}
             />
             <MainLayout />
         </AuthProvider>
