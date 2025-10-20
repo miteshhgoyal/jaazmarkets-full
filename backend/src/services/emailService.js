@@ -28,7 +28,7 @@ const createTransporter = () => {
 let transporter = null;
 let isVerified = false;
 
-const initializeTransporter = async () => {
+export const initializeTransporter = async () => {
     try {
         transporter = createTransporter();
         await transporter.verify();
