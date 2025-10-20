@@ -254,7 +254,7 @@ router.post("/signup", async (req, res) => {
 
         // Send verification email
         try {
-            await sendEmailVerificationOTP(user.email, verificationOTP, user.firstName);
+            // await sendEmailVerificationOTP(user.email, verificationOTP, user.firstName);
             console.log(`✅ Verification OTP sent to ${user.email}`);
         } catch (emailError) {
             console.error('❌ Verification email failed:', emailError);
@@ -429,7 +429,7 @@ router.post('/resend-verification-otp', async (req, res) => {
 
         // Send new OTP
         try {
-            await sendEmailVerificationOTP(user.email, verificationOTP, user.firstName);
+            // await sendEmailVerificationOTP(user.email, verificationOTP, user.firstName);
             console.log(`✅ Verification OTP resent to ${user.email}`);
         } catch (emailError) {
             console.error('❌ Email resend failed:', emailError);
