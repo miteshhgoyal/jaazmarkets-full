@@ -19,36 +19,33 @@ const app = express();
 const PORT = process.env.PORT || 8000;
 
 const allowedOrigins = [
-    'https://jaazmarkets-user.vercel.app',
-    'https://jaazmarkets-admin.vercel.app',
-    'https://jaazmarkets.com',
-    'https://client.jaazmarkets.com',
-    'https://dashboard.jaazmarkets.com',
-    'https://admin.jaazmarkets.com',
+    'https://jaazmarkets.miteshh.in',
+    'https://jaazmarkets-admin.miteshh.in',
     'http://localhost:3000',
     'http://localhost:5173',
     'http://localhost:8173'
 ];
 
 const corsOptions = {
-    // origin: function (origin, callback) {
-    //     // Allow requests with no origin (React Native, Postman, curl)
-    //     if (!origin) return callback(null, true);
+    origin: function (origin, callback) {
+        // Allow requests with no origin (mobile apps, Postman, curl)
+        if (!origin) return callback(null, true);
 
-    //     if (allowedOrigins.includes(origin)) {
-    //         callback(null, true);
-    //     } else {
-    //         callback(null, true); // Or set to false to block unknown origins
-    //     }
-    // },
-    origin: '*',
+        if (allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     methods: ['GET', 'POST', 'DELETE', 'PATCH', 'PUT', 'OPTIONS'],
     credentials: true,
-    optionsSuccessStatus: 200
+    optionsSuccessStatus: 200,
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 };
 
 // Middleware
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Handle preflight requests
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -71,7 +68,7 @@ app.get('/', (req, res) => {
     });
 });
 
-app.use('/{*splat}', (req, res) => {
+app.use('*', (req, res) => {
     res.status(404).json({ message: 'Route not found' });
 });
 
