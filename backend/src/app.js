@@ -70,14 +70,6 @@ app.get('/', (req, res) => {
     });
 });
 
-// 404 handler - must be BEFORE error handler
-app.all('*', (req, res) => {
-    res.status(404).json({
-        message: 'Route not found',
-        path: req.originalUrl
-    });
-});
-
 // Global error handling middleware - must be LAST
 app.use((err, req, res, next) => {
     console.error('Error:', err.stack);
