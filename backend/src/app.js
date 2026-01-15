@@ -16,7 +16,7 @@ import settingsRoutes from "./routes/settings.routes.js";
 import referRoutes from "./routes/refer.routes.js";
 
 const app = express();
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT || 8020;
 
 const allowedOrigins = [
     'https://jaazmarkets.miteshh.in',
@@ -34,7 +34,9 @@ const corsOptions = {
         if (allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
-            callback(new Error('Not allowed by CORS'));
+            // Change to callback(null, true) to allow all origins temporarily for testing
+            // Or keep callback(new Error('Not allowed by CORS')) to block unknown origins
+            callback(null, true);
         }
     },
     methods: ['GET', 'POST', 'DELETE', 'PATCH', 'PUT', 'OPTIONS'],
@@ -62,20 +64,25 @@ app.use('/admin/settings', settingsRoutes);
 // Root route
 app.get('/', (req, res) => {
     res.json({
-        message: 'API is running!',
+        message: 'Jaaz Markets API is running!',
         version: '1.0.0',
         timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development'
     });
 });
 
-app.use('*', (req, res) => {
-    res.status(404).json({ message: 'Route not found' });
+// 404 handler - must be BEFORE error handler
+app.all('*', (req, res) => {
+    res.status(404).json({
+        message: 'Route not found',
+        path: req.originalUrl
+    });
 });
 
-// Global error handling middleware
+// Global error handling middleware - must be LAST
 app.use((err, req, res, next) => {
     console.error('Error:', err.stack);
-    res.status(500).json({
+    res.status(err.status || 500).json({
         message: 'Something went wrong!',
         error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
     });
@@ -84,13 +91,14 @@ app.use((err, req, res, next) => {
 // Start server
 connectDB()
     .then(() => {
-        app.listen(PORT, '0.0.0.0', async () => {
-            console.log(`Server running on port ${PORT}`);
-            console.log(`Environment: ${process.env.NODE_ENV}`);
+        app.listen(PORT, '0.0.0.0', () => {
+            console.log(`✓ Server running on port ${PORT}`);
+            console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
+            console.log(`✓ API URL: http://localhost:${PORT}`);
         });
     })
     .catch(err => {
-        console.error("DB connection failed:", err);
+        console.error("✗ DB connection failed:", err);
         process.exit(1);
     });
 
