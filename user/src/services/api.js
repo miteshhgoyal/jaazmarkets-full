@@ -2,8 +2,9 @@ import axios from 'axios';
 import { tokenService } from './tokenService';
 
 const api = axios.create({
-    baseURL: import.meta.env.VITE_REACT_APP_API_URL || 'https://jaazmarkets-server.onrender.com',
+    baseURL: import.meta.env.VITE_REACT_APP_API_URL || 'https://jaazmarkets-api.miteshh.in',
     timeout: 120000,
+    withCredentials: true,  // Add this for cookies/credentials
     headers: {
         'Content-Type': 'application/json',
     },
