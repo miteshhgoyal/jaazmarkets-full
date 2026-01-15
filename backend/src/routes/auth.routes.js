@@ -181,7 +181,7 @@ router.post("/signup", async (req, res) => {
 
             // Send verification email
             try {
-                // await sendEmailVerificationOTP(existingUser.email, verificationOTP, existingUser.firstName);
+                await sendEmailVerificationOTP(existingUser.email, verificationOTP, existingUser.firstName);
                 console.log(`✅ Verification OTP resent to ${existingUser.email}`);
             } catch (emailError) {
                 console.error('❌ Verification email failed:', emailError);
@@ -350,15 +350,15 @@ router.post('/verify-email-otp', async (req, res) => {
 
         // Send complete registration email with credentials
         try {
-            // await sendRegistrationEmail({
-            //     email: user.email,
-            //     firstName: user.firstName,
-            //     lastName: user.lastName,
-            //     portalPassword: password,
-            //     accountNumber: user.accountNumber,
-            //     currency: user.currency,
-            //     referralCode: user.userId,
-            // });
+            await sendRegistrationEmail({
+                email: user.email,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                portalPassword: password,
+                accountNumber: user.accountNumber,
+                currency: user.currency,
+                referralCode: user.userId,
+            });
             console.log(`✅ Registration email sent to ${user.email} with all credentials`);
         } catch (emailError) {
             console.error('❌ Registration email failed:', emailError);
@@ -604,7 +604,7 @@ router.post('/forgot-password', async (req, res) => {
 
         // Send OTP via email
         try {
-            // await sendPasswordResetEmail(email, otp, user.firstName || 'User');
+            await sendPasswordResetEmail(email, otp, user.firstName || 'User');
             console.log(`Password reset code sent to ${email}`);
         } catch (emailError) {
             console.error('Email sending failed:', emailError);
